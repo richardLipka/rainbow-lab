@@ -1,0 +1,4923 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jak vzniká duha / How a rainbow forms</title>
+<meta name="description" content="Interaktivní simulace vzniku duhy — geometrická optika, kaustika, antisolární bod. Interactive geometric-optics rainbow simulation.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Rainbow Lab -- an optical bench, not a brochure.
+ *
+ * One rule organises the whole palette: on this page, saturated colour means
+ * a wavelength. So the interface itself contributes nothing saturated -- the
+ * chrome is a cool blue-black instrument housing with a single warm brass
+ * accent for anything the hand touches, and the spectrum is the only thing
+ * allowed to sing.
+ *
+ * Deliberately single-theme: the ray colours and the night-sky grounds are
+ * the subject, and they do not survive a light ground. Every colour is
+ * therefore painted explicitly here rather than inherited from the host.
+ */
+
+:root {
+  /* grounds -- blue-biased, never neutral grey */
+  --bg: #060910;
+  --bg-panel: #0c111b;
+  --bg-raised: #141b28;
+  --line: rgba(126, 150, 196, 0.16);
+  --line-strong: rgba(126, 150, 196, 0.32);
+
+  /* ink */
+  --fg: #dde5f2;
+  --fg-dim: #93a3bd;
+  --fg-faint: #626f8a;
+
+  /* brass: instrument fittings, and the Sun. The only warm thing on screen,
+     reserved for interactive state. */
+  --accent: #e0a83f;
+  --accent-2: #86c8ee;
+
+  /* semantic -- reflection order, used identically in CSS and on canvas */
+  --k1: #6fd3a4;
+  --k2: #9b8cf0;
+  --k3: #f0885d;
+  --warn: var(--k3);
+  --violet: var(--k2);
+
+  --radius: 8px;
+  --font: "IBM Plex Sans", ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Consolas, monospace;
+  color-scheme: dark;
+}
+
+/* Numbers that sit in columns must not dance as they update. */
+.ctl-value,
+.row-val,
+.math-table,
+.classification,
+.formula {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 100vh;
+}
+
+/* ------------------------------------------------------------------ header */
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, #0b1220, var(--bg));
+  flex: 0 0 auto;
+}
+
+.brand { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+.brand h1 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.brand .sub { color: var(--fg-faint); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.header-tools { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+
+/* ------------------------------------------------------------------ layout */
+
+.layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr) 330px;
+  gap: 1px;
+  background: var(--line);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.col { background: var(--bg-panel); min-width: 0; overflow: auto; }
+.col-scene { display: flex; flex-direction: column; background: var(--bg); }
+.col-title {
+  margin: 0;
+  padding: 10px 12px 6px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+}
+
+.scene-tabs { padding: 8px 12px 0; }
+.scene-desc {
+  margin: 6px 12px 0;
+  font-size: 11.5px;
+  color: var(--fg-faint);
+}
+.scene-stage { position: relative; flex: 1 1 auto; min-height: 300px; margin: 8px 12px 12px; }
+.scene-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: block;
+  touch-action: none;
+}
+.scene-canvas.hidden { display: none; }
+
+/* ------------------------------------------------------------------- graph */
+
+.graph-wrap {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--line);
+  background: var(--bg-panel);
+  padding: 8px 12px 12px;
+}
+.graph-tabs {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.graph-title { font-size: 12px; color: var(--fg); font-weight: 600; }
+.graph-hint { font-size: 11px; color: var(--fg-faint); margin-left: auto; }
+.graph-stage { height: 230px; }
+.graph-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  touch-action: none;
+}
+.inline-ctl { display: flex; align-items: center; gap: 10px; }
+.inline-ctl .ctl { margin: 0; min-width: 180px; }
+.inline-ctl .ctl-toggle { min-width: 0; }
+
+/* ---------------------------------------------------------------- controls */
+
+.controls { padding: 0 12px 16px; }
+
+.group { border-top: 1px solid var(--line); }
+.group:first-child { border-top: none; }
+.group-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: 0;
+  color: var(--fg);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 11px 0 8px;
+  cursor: pointer;
+  text-align: left;
+}
+.group-caret {
+  width: 0; height: 0;
+  border-left: 5px solid var(--fg-faint);
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transform: rotate(90deg);
+  transition: transform 0.15s;
+}
+.group-head.closed .group-caret { transform: rotate(0deg); }
+.group-body { padding-bottom: 10px; }
+.group-body.collapsed { display: none; }
+
+.ctl { display: block; margin-bottom: 11px; }
+.ctl-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--fg-dim);
+  margin-bottom: 4px;
+}
+.ctl-value { font-family: var(--mono); font-size: 11px; color: var(--fg); }
+.ctl-hint { display: block; color: var(--fg-faint); font-size: 10.5px; line-height: 1.45; margin-top: 3px; }
+.ctl-hint.block { margin: -4px 0 12px; }
+
+input[type='range'] {
+  width: 100%;
+  appearance: none;
+  height: 18px;
+  background: none;
+  cursor: pointer;
+}
+input[type='range']::-webkit-slider-runnable-track {
+  height: 3px;
+  background: var(--line-strong);
+  border-radius: 2px;
+}
+input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 13px; height: 13px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: var(--fg);
+  border: 2px solid var(--bg-panel);
+}
+input[type='range']::-moz-range-track { height: 3px; background: var(--line-strong); border-radius: 2px; }
+input[type='range']::-moz-range-thumb {
+  width: 13px; height: 13px; border-radius: 50%;
+  background: var(--fg); border: 2px solid var(--bg-panel);
+}
+
+.ctl-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  color: var(--fg-dim);
+  margin-bottom: 6px;
+  cursor: pointer;
+}
+.ctl-toggle input { accent-color: var(--accent); width: 13px; height: 13px; }
+.ctl-toggle.strong { color: var(--fg); font-weight: 600; }
+.stack { display: flex; flex-direction: column; gap: 2px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; margin-bottom: 8px; }
+
+select {
+  width: 100%;
+  background: var(--bg-raised);
+  color: var(--fg);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 5px 7px;
+  font: inherit;
+  font-size: 11.5px;
+}
+
+/* ---------------------------------------------------------------- segments */
+
+.segmented { display: flex; gap: 3px; }
+.segmented.wrap { flex-wrap: wrap; }
+.seg {
+  --seg-accent: var(--accent);
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  color: var(--fg-dim);
+  border-radius: 6px;
+  padding: 4px 9px;
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.seg:hover { color: var(--fg); border-color: var(--line-strong); }
+.seg.active {
+  background: color-mix(in srgb, var(--seg-accent) 18%, var(--bg-raised));
+  border-color: var(--seg-accent);
+  color: #fff;
+}
+.lang { display: flex; gap: 3px; }
+
+.btn {
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
+  color: var(--fg);
+  border-radius: 6px;
+  padding: 6px 13px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.btn:hover:not(:disabled) { border-color: var(--accent); }
+.btn:disabled { opacity: 0.4; cursor: default; }
+.btn.primary { background: color-mix(in srgb, var(--accent) 22%, var(--bg-raised)); border-color: var(--accent); color: #fff; }
+.btn.wide { width: 100%; margin-top: 12px; }
+
+.chip {
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
+  color: var(--fg-dim);
+  border-radius: 999px;
+  padding: 3px 11px;
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.chip:hover { color: var(--fg); border-color: var(--accent); }
+
+/* ------------------------------------------------------------------ panel */
+
+.panel { display: flex; flex-direction: column; height: 100%; }
+.panel > .segmented { padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.panel-body { padding: 12px 14px 24px; overflow: auto; }
+.panel-body h2 { margin: 0 0 8px; font-size: 15px; font-weight: 650; line-height: 1.3; }
+.panel-body h3 {
+  margin: 18px 0 6px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+}
+.panel-body p { margin: 0 0 10px; line-height: 1.55; font-size: 13px; color: #c6d2e8; }
+.panel-body ul { margin: 0 0 10px; padding-left: 16px; }
+.panel-body li { font-size: 12px; line-height: 1.6; color: #c6d2e8; margin-bottom: 3px; }
+
+.step-counter {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.action-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
+.step-nav { display: flex; gap: 8px; margin-top: 16px; }
+.step-nav .btn { flex: 1; }
+.progress { display: flex; gap: 5px; margin-top: 12px; }
+.dot {
+  flex: 1;
+  height: 4px;
+  border: 0;
+  padding: 0;
+  border-radius: 2px;
+  background: var(--line-strong);
+  cursor: pointer;
+}
+.dot.done { background: color-mix(in srgb, var(--accent) 45%, transparent); }
+.dot.on { background: var(--accent); }
+
+.note {
+  border-left: 2px solid var(--line-strong);
+  padding-left: 10px;
+  font-size: 12px !important;
+  color: var(--fg-dim) !important;
+  line-height: 1.6 !important;
+}
+.note.warn { border-left-color: var(--warn); color: #e6cdb4 !important; }
+.hint { font-size: 11.5px !important; color: var(--fg-faint) !important; }
+.chain {
+  font-family: var(--mono);
+  font-size: 11px !important;
+  line-height: 1.8 !important;
+  color: var(--accent-2) !important;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px;
+}
+
+.panel-block {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  margin-bottom: 10px;
+}
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 3px 0;
+  font-size: 11.5px;
+  border-bottom: 1px solid rgba(120, 145, 190, 0.08);
+}
+.row:last-child { border-bottom: none; }
+.row-key { color: var(--fg-dim); }
+.row-val { color: var(--fg); text-align: right; }
+.row-val.mono { font-family: var(--mono); }
+
+.classification {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  text-align: center;
+  margin-bottom: 10px;
+}
+.cls-primary { border-color: var(--k1); color: var(--k1); background: rgba(111, 211, 164, 0.09); }
+.cls-secondary { border-color: var(--k2); color: var(--k2); background: rgba(155, 140, 240, 0.09); }
+.cls-higherOrder { border-color: var(--k3); color: var(--k3); background: rgba(240, 136, 93, 0.08); }
+.cls-nonCaustic, .cls-noReflection, .cls-miss, .cls-tangent { color: var(--fg-dim); }
+
+.formula {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--accent-2);
+  border-radius: 6px;
+  padding: 9px 11px;
+  margin: 6px 0 10px;
+  color: #e2ecff;
+  overflow-x: auto;
+}
+.conv li { font-family: var(--mono); font-size: 11px; }
+
+.math-table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 10.5px; margin-bottom: 10px; }
+.math-table th {
+  text-align: right;
+  color: var(--fg-faint);
+  font-weight: 500;
+  padding: 4px 3px;
+  border-bottom: 1px solid var(--line-strong);
+}
+.math-table td { text-align: right; padding: 3px; color: var(--fg-dim); border-bottom: 1px solid rgba(120, 145, 190, 0.08); }
+.math-table td:first-child, .math-table th:first-child { text-align: left; }
+
+.qa { border-top: 1px solid var(--line); padding-top: 10px; margin-bottom: 6px; }
+.qa h3 { margin-top: 0; text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--fg); }
+.answer { margin-top: 8px !important; border-left: 2px solid var(--k1); padding-left: 10px; }
+.answer.hidden { display: none; }
+
+.swatch { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+
+/* -------------------------------------------------------------- responsive */
+
+@media (max-width: 1180px) {
+  .layout { grid-template-columns: 250px minmax(0, 1fr) 290px; }
+}
+
+@media (max-width: 980px) {
+  #app { height: auto; }
+  .layout { grid-template-columns: 1fr; }
+  .col { max-height: none; overflow: visible; }
+  .col-controls { order: 3; }
+  .col-scene { order: 1; }
+  .col-panel { order: 2; }
+  .scene-stage { height: 58vh; min-height: 320px; }
+  .graph-stage { height: 200px; }
+  .graph-hint { margin-left: 0; }
+}
+
+@media (max-width: 560px) {
+  .brand .sub { display: none; }
+  .app-header { flex-wrap: wrap; }
+  .grid2 { grid-template-columns: 1fr; }
+}
+
+</style>
+</head>
+<body>
+<div id="app"></div>
+<noscript>Tato simulace vyžaduje JavaScript. / This simulation requires JavaScript.</noscript>
+<script type="module">
+/* ============ src/optics.js ============ */
+
+/**
+ * optics.js -- pure optical / geometric engine for the rainbow simulation.
+ *
+ * NO DOM, no globals, no rendering. Everything here is testable in Node.
+ *
+ * ---------------------------------------------------------------------------
+ * ANGLE CONVENTIONS  (mirrored in the "Mathematics" panel of the UI)
+ * ---------------------------------------------------------------------------
+ * The single most common source of confusion in rainbow geometry is mixing up
+ * four different angles. They are defined once here and never mixed:
+ *
+ *   theta_i  angle of incidence at the first (air -> water) surface, measured
+ *            from the surface normal. 0 deg = central ray, 90 deg = grazing.
+ *            sin(theta_i) = b / R, where b is the impact parameter.
+ *
+ *   theta_r  angle of refraction inside the droplet, from the same normal.
+ *            n_air * sin(theta_i) = n_water * sin(theta_r).
+ *
+ *   D        TOTAL DEVIATION: the total angle through which the ray direction
+ *            has been turned, accumulated along the whole path and NOT folded
+ *            back into [0,180]. For k internal reflections:
+ *                D_k(theta_i) = 2*(theta_i - theta_r) + k*(PI - 2*theta_r)
+ *            D = 0 for an undeviated ray, ~138 deg for the primary rainbow
+ *            ray, ~230 deg for the secondary rainbow ray.
+ *
+ *   Theta    SCATTERING ANGLE: angle between the outgoing direction and the
+ *            original direction of propagation of the sunlight, folded into
+ *            [0,180]. Theta = fold(D). Theta = 0 is straight ahead (away from
+ *            the Sun); Theta = 180 is straight back towards the Sun.
+ *
+ *   phi      ANGLE FROM THE ANTISOLAR DIRECTION as seen by the observer:
+ *                phi = 180 deg - Theta
+ *            This is the angular radius of the bow in the sky.
+ *            Primary ~42 deg, secondary ~51 deg.
+ *
+ * The UI must always state which of these it is plotting.
+ * ---------------------------------------------------------------------------
+ */
+
+const DEG = 180 / Math.PI;
+const RAD = Math.PI / 180;
+const EPS = 1e-9;
+
+/* =========================================================================
+ * 1. Minimal 3-D vector algebra
+ * =======================================================================*/
+
+const vec = (x = 0, y = 0, z = 0) => ({ x, y, z });
+const vadd = (a, b) => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z });
+const vsub = (a, b) => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
+const vmul = (a, s) => ({ x: a.x * s, y: a.y * s, z: a.z * s });
+const vdot = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
+const vcross = (a, b) => ({
+  x: a.y * b.z - a.z * b.y,
+  y: a.z * b.x - a.x * b.z,
+  z: a.x * b.y - a.y * b.x,
+});
+const vlen = (a) => Math.sqrt(vdot(a, a));
+const vneg = (a) => ({ x: -a.x, y: -a.y, z: -a.z });
+const clamp = (x, lo, hi) => (x < lo ? lo : x > hi ? hi : x);
+
+function vnorm(a) {
+  const l = vlen(a);
+  if (l < EPS) return vec(0, 0, 0);
+  return vmul(a, 1 / l);
+}
+
+/** Angle between two vectors, radians, numerically safe. */
+function vangle(a, b) {
+  return Math.acos(clamp(vdot(vnorm(a), vnorm(b)), -1, 1));
+}
+
+/* =========================================================================
+ * 2. Refractive index of water
+ * =======================================================================*/
+
+/**
+ * Reference table of refractive indices. These are approximate values that
+ * are entirely adequate for a geometric-optics teaching simulation. They are
+ * NOT exact values for all temperatures, pressures and wavelengths.
+ * Everything downstream reads through makeIndexModel(), so the table stays
+ * configurable.
+ */
+const NAMED_COLORS = [
+  { id: 'red', lambda: 650, n: 1.331 },
+  { id: 'orange', lambda: 610, n: 1.333 },
+  { id: 'yellow', lambda: 580, n: 1.335 },
+  { id: 'green', lambda: 540, n: 1.337 },
+  { id: 'blue', lambda: 480, n: 1.340 },
+  { id: 'violet', lambda: 420, n: 1.343 },
+];
+
+/** Reference wavelength used as the "dispersion switched off" index. */
+const LAMBDA_REF = 589;
+
+/** Least-squares fit of  n = A + B / lambda^2  (lambda in micrometres). */
+function fitCauchy(table) {
+  const xs = table.map((c) => 1 / Math.pow(c.lambda / 1000, 2));
+  const ys = table.map((c) => c.n);
+  const mx = xs.reduce((a, b) => a + b, 0) / xs.length;
+  const my = ys.reduce((a, b) => a + b, 0) / ys.length;
+  let sxy = 0;
+  let sxx = 0;
+  for (let i = 0; i < xs.length; i++) {
+    sxy += (xs[i] - mx) * (ys[i] - my);
+    sxx += (xs[i] - mx) * (xs[i] - mx);
+  }
+  const B = sxy / sxx;
+  return { A: my - B * mx, B };
+}
+
+const CAUCHY = fitCauchy(NAMED_COLORS);
+
+/** Continuous Cauchy model; lambda in nanometres. */
+function cauchyIndex(lambda, cauchy = CAUCHY) {
+  const um = lambda / 1000;
+  return cauchy.A + cauchy.B / (um * um);
+}
+
+/**
+ * Build a refractive-index model.
+ *   mode        'table'  -> the six named colours use their tabulated value,
+ *                           anything else uses the Cauchy fit
+ *               'cauchy' -> everything uses the Cauchy fit
+ *   dispersion  0..1     -> blends n(lambda) towards n(LAMBDA_REF). At 0 every
+ *                           wavelength shares one index, so no colour
+ *                           separation is possible at all.
+ *   scale       multiplies the index (advanced "what if" experiment).
+ */
+function makeIndexModel(opts = {}) {
+  const {
+    mode = 'table',
+    dispersion = 1,
+    table = NAMED_COLORS,
+    cauchy = CAUCHY,
+    scale = 1,
+  } = opts;
+  const byLambda = new Map(table.map((c) => [c.lambda, c.n]));
+  const nRefRaw = cauchyIndex(LAMBDA_REF, cauchy);
+  const model = (lambda) => {
+    const raw =
+      mode === 'table' && byLambda.has(lambda)
+        ? byLambda.get(lambda)
+        : cauchyIndex(lambda, cauchy);
+    return (nRefRaw + dispersion * (raw - nRefRaw)) * scale;
+  };
+  model.meta = { mode, dispersion, cauchy, scale, nRef: nRefRaw * scale };
+  return model;
+}
+
+/** Default model: tabulated values, full dispersion. */
+const defaultIndex = makeIndexModel();
+
+/* =========================================================================
+ * 3. Interface physics: Snell, reflection, Fresnel
+ * =======================================================================*/
+
+/**
+ * Vector form of Snell's law.
+ *   d    unit incident direction
+ *   N    unit surface normal oriented so that dot(d, N) < 0
+ *   eta  n1 / n2
+ * Returns the unit refracted direction, or null on total internal reflection.
+ */
+function refract(d, N, eta) {
+  const cosi = -vdot(d, N);
+  const k = 1 - eta * eta * (1 - cosi * cosi);
+  if (k < 0) return null;
+  return vnorm(vadd(vmul(d, eta), vmul(N, eta * cosi - Math.sqrt(k))));
+}
+
+/** Mirror reflection about a surface with unit normal N (either orientation). */
+function reflect(d, N) {
+  return vnorm(vsub(d, vmul(N, 2 * vdot(d, N))));
+}
+
+/** Scalar Snell's law: theta_2 in radians, or null for total reflection. */
+function snellAngle(theta1, n1, n2) {
+  const s = (n1 / n2) * Math.sin(theta1);
+  if (Math.abs(s) > 1) return null;
+  return Math.asin(s);
+}
+
+/** Critical angle for n1 -> n2, radians, or null when n1 <= n2. */
+function criticalAngle(n1, n2) {
+  if (n1 <= n2) return null;
+  return Math.asin(n2 / n1);
+}
+
+/**
+ * Unpolarised Fresnel reflectance at an interface. theta1 is the angle of
+ * incidence in medium 1. Returns R in [0,1]; returns 1 for total internal
+ * reflection.
+ */
+function fresnelReflectance(theta1, n1, n2) {
+  const t2 = snellAngle(theta1, n1, n2);
+  if (t2 === null) return 1;
+  const c1 = Math.cos(theta1);
+  const c2 = Math.cos(t2);
+  const rs = (n1 * c1 - n2 * c2) / (n1 * c1 + n2 * c2);
+  const rp = (n1 * c2 - n2 * c1) / (n1 * c2 + n2 * c1);
+  return clamp(0.5 * (rs * rs + rp * rp), 0, 1);
+}
+
+/* =========================================================================
+ * 4. Ray / sphere intersection
+ * =======================================================================*/
+
+/**
+ * Standard quadratic ray-sphere intersection, solved in the numerically
+ * stable way (avoids catastrophic cancellation for distant origins).
+ * Returns { hit, t0, t1, tangent } with t0 <= t1.
+ */
+function intersectRaySphere(origin, dir, center, radius, eps = 1e-7) {
+  const oc = vsub(origin, center);
+  const a = vdot(dir, dir);
+  const b = 2 * vdot(oc, dir);
+  const c = vdot(oc, oc) - radius * radius;
+  const disc = b * b - 4 * a * c;
+  if (disc < 0) return { hit: false, tangent: false };
+  const sq = Math.sqrt(disc);
+  // Tangency must be judged as a LENGTH, not as a value of the discriminant:
+  // sq/(2a) is half the chord the ray cuts through the sphere, so comparing it
+  // with the radius stays meaningful however far away the ray started.
+  if (sq / (2 * a) <= eps * radius) {
+    const t = -b / (2 * a);
+    return { hit: true, t0: t, t1: t, tangent: true };
+  }
+  const q = b < 0 ? -0.5 * (b - sq) : -0.5 * (b + sq);
+  let t0 = q / a;
+  let t1 = c / q;
+  if (t0 > t1) {
+    const tmp = t0;
+    t0 = t1;
+    t1 = tmp;
+  }
+  return { hit: true, t0, t1, tangent: false };
+}
+
+/* =========================================================================
+ * 5. Ray classification vocabulary
+ * =======================================================================*/
+
+const RayClass = {
+  MISS: 'miss',
+  TANGENT: 'tangent',
+  NO_REFLECTION: 'noReflection',
+  PRIMARY: 'primary',
+  SECONDARY: 'secondary',
+  HIGHER_ORDER: 'higherOrder',
+  NON_CAUSTIC: 'nonCaustic',
+};
+
+/**
+ * Angular half-width (degrees) within which a ray counts as belonging to the
+ * bright rainbow family, i.e. close enough to the extremum that neighbouring
+ * rays pile up in nearly the same direction.
+ * A pedagogical threshold, not a physical constant.
+ */
+const CAUSTIC_TOLERANCE_DEG = 1.5;
+
+/* =========================================================================
+ * 6. Analytic deviation model
+ * =======================================================================*/
+
+/** D_k(theta_i) in radians; k = number of internal reflections. */
+function deviation(thetaI, n, k) {
+  const thetaR = snellAngle(thetaI, 1, n);
+  if (thetaR === null) return null;
+  return 2 * (thetaI - thetaR) + k * (Math.PI - 2 * thetaR);
+}
+
+/** Fold a total deviation D into a scattering angle Theta in [0, PI]. */
+function foldToScattering(D) {
+  let a = D % (2 * Math.PI);
+  if (a < 0) a += 2 * Math.PI;
+  if (a > Math.PI) a = 2 * Math.PI - a;
+  return a;
+}
+
+/** Angle from the antisolar direction, radians, from a total deviation D. */
+function antisolarAngle(D) {
+  return Math.PI - foldToScattering(D);
+}
+
+/**
+ * Analytic extremum ("rainbow") angle of incidence for k internal reflections.
+ * Setting dD/dtheta_i = 0 gives
+ *      cos^2(theta_i) = (n^2 - 1) / ((k+1)^2 - 1)
+ * Returns theta_i in radians, or null when out of range.
+ */
+function rainbowIncidenceAnalytic(n, k) {
+  const denom = (k + 1) * (k + 1) - 1;
+  if (denom <= 0) return null;
+  const c2 = (n * n - 1) / denom;
+  if (c2 < 0 || c2 > 1) return null;
+  return Math.acos(Math.sqrt(c2));
+}
+
+/**
+ * Locate the extremum of D_k numerically (golden-section search) WITHOUT
+ * using the analytic formula. The unit tests compare the two, which is the
+ * evidence that ~42 deg really emerges from the geometry.
+ */
+function rainbowIncidenceNumeric(n, k, samples = 4000) {
+  const f = (t) => deviation(t, n, k);
+  const lo0 = 1e-7;
+  const hi0 = Math.PI / 2 - 1e-7;
+  const step = (hi0 - lo0) / samples;
+  let bestT = lo0;
+  let bestV = f(lo0);
+  for (let i = 1; i <= samples; i++) {
+    const t = lo0 + step * i;
+    const v = f(t);
+    if (v < bestV) {
+      bestV = v;
+      bestT = t;
+    }
+  }
+  let a = Math.max(lo0, bestT - step);
+  let b = Math.min(hi0, bestT + step);
+  const gr = (Math.sqrt(5) - 1) / 2;
+  let c = b - gr * (b - a);
+  let d = a + gr * (b - a);
+  for (let i = 0; i < 300 && Math.abs(b - a) > 1e-14; i++) {
+    if (f(c) < f(d)) {
+      b = d;
+      d = c;
+      c = b - gr * (b - a);
+    } else {
+      a = c;
+      c = d;
+      d = a + gr * (b - a);
+    }
+  }
+  return 0.5 * (a + b);
+}
+
+/** Full description of the bow of order k for index n. */
+function rainbowGeometry(n, k) {
+  const thetaI = rainbowIncidenceAnalytic(n, k);
+  if (thetaI === null) return null;
+  const thetaR = snellAngle(thetaI, 1, n);
+  const D = deviation(thetaI, n, k);
+  return {
+    k,
+    n,
+    thetaI,
+    thetaR,
+    D,
+    phi: antisolarAngle(D),
+    thetaIDeg: thetaI * DEG,
+    thetaRDeg: thetaR * DEG,
+    deviationDeg: D * DEG,
+    scatteringDeg: foldToScattering(D) * DEG,
+    antisolarDeg: antisolarAngle(D) * DEG,
+    impactParameter: Math.sin(thetaI),
+  };
+}
+
+/* =========================================================================
+ * 7. Full vector ray trace through a spherical droplet
+ * =======================================================================*/
+
+/**
+ * Trace one ray through a spherical droplet using vector geometry only.
+ *
+ * options: { origin, dir, center, radius, n, reflections, exitLength }
+ *
+ * Returns a path object carrying the polyline, every interaction vertex, the
+ * measured angles, a relative intensity weight and a classification.
+ * `segments` carry a `medium` field so the renderer needs no physics.
+ */
+function traceRay(options) {
+  const {
+    origin,
+    dir,
+    center = vec(0, 0, 0),
+    radius = 1,
+    n = 1.333,
+    reflections = 1,
+  } = options;
+  const exitLength = options.exitLength ?? 4 * radius;
+
+  const d0 = vnorm(dir);
+  const path = {
+    hit: false,
+    tangent: false,
+    miss: false,
+    points: [],
+    segments: [],
+    vertices: [],
+    thetaI: null,
+    thetaR: null,
+    reflections,
+    actualReflections: 0,
+    dirIn: d0,
+    dirOut: null,
+    deviation: null,
+    scattering: null,
+    antisolar: null,
+    impactParameter: null,
+    intensity: 0,
+    fresnelR: null,
+    totalInternalReflection: false,
+    classification: RayClass.MISS,
+    n,
+  };
+
+  // Geometric impact parameter: distance from the centre to the incoming line.
+  const oc = vsub(center, origin);
+  const along = vdot(oc, d0);
+  path.impactParameter = vlen(vsub(oc, vmul(d0, along)));
+
+  const hit = intersectRaySphere(origin, d0, center, radius);
+  if (!hit.hit || hit.t1 < 0) {
+    path.miss = true;
+    path.points = [origin, vadd(origin, vmul(d0, exitLength + 4 * radius))];
+    path.segments = [{ a: path.points[0], b: path.points[1], medium: 'air', kind: 'miss' }];
+    path.dirOut = d0;
+    path.scattering = 0;
+    path.antisolar = Math.PI;
+    return path;
+  }
+
+  // Tangent / grazing: refuse to fabricate a refracted path, report honestly.
+  if (hit.tangent || Math.abs(path.impactParameter - radius) < 1e-7) {
+    path.hit = true;
+    path.tangent = true;
+    path.classification = RayClass.TANGENT;
+    const p = vadd(origin, vmul(d0, hit.t0));
+    const far = vadd(p, vmul(d0, exitLength));
+    path.points = [origin, p, far];
+    path.segments = [
+      { a: origin, b: p, medium: 'air', kind: 'incident' },
+      { a: p, b: far, medium: 'air', kind: 'exit' },
+    ];
+    path.dirOut = d0;
+    path.deviation = 0;
+    path.scattering = 0;
+    path.antisolar = Math.PI;
+    return path;
+  }
+
+  path.hit = true;
+
+  /* ---- entry: air -> water --------------------------------------------- */
+  const pEntry = vadd(origin, vmul(d0, hit.t0));
+  const nEntry = vnorm(vsub(pEntry, center)); // outward normal
+  const thetaI = Math.acos(clamp(-vdot(d0, nEntry), -1, 1));
+  const dIn = refract(d0, nEntry, 1 / n);
+  if (!dIn) return path; // impossible for air -> water, but stay safe
+  const thetaR = Math.acos(clamp(-vdot(dIn, nEntry), -1, 1));
+  path.thetaI = thetaI;
+  path.thetaR = thetaR;
+
+  path.points.push(origin, pEntry);
+  path.segments.push({ a: origin, b: pEntry, medium: 'air', kind: 'incident' });
+  path.vertices.push({
+    point: pEntry,
+    type: 'refraction',
+    normal: nEntry,
+    thetaIn: thetaI,
+    thetaOut: thetaR,
+  });
+
+  // Fresnel bookkeeping. By reversibility the reflectance is identical at
+  // every interface of this path, so weight = (1-R)^2 * R^k.
+  const R = fresnelReflectance(thetaI, 1, n);
+  path.fresnelR = R;
+  path.intensity = (1 - R) * (1 - R) * Math.pow(R, reflections);
+
+  /* ---- internal bounces, then exit -------------------------------------- */
+  let p = pEntry;
+  let d = dIn;
+
+  for (let i = 0; i <= reflections; i++) {
+    const h = intersectRaySphere(p, d, center, radius);
+    if (!h.hit) return path;
+    const t = h.t1 > 1e-9 ? h.t1 : h.t0;
+    if (!(t > 1e-9)) return path;
+    const pNext = vadd(p, vmul(d, t));
+    path.points.push(pNext);
+    path.segments.push({ a: p, b: pNext, medium: 'water', kind: 'internal' });
+
+    const nOut = vnorm(vsub(pNext, center)); // outward normal
+    const incidenceInside = Math.acos(clamp(vdot(d, nOut), -1, 1));
+
+    if (i < reflections) {
+      d = reflect(d, nOut);
+      path.actualReflections++;
+      path.vertices.push({
+        point: pNext,
+        type: 'reflection',
+        normal: nOut,
+        thetaIn: incidenceInside,
+        thetaOut: incidenceInside,
+      });
+      p = pNext;
+    } else {
+      const dOut = refract(d, vneg(nOut), n);
+      if (!dOut) {
+        path.totalInternalReflection = true;
+        path.classification = RayClass.NON_CAUSTIC;
+        return path;
+      }
+      const thetaExit = Math.acos(clamp(vdot(dOut, nOut), -1, 1));
+      path.vertices.push({
+        point: pNext,
+        type: 'refraction',
+        normal: nOut,
+        thetaIn: incidenceInside,
+        thetaOut: thetaExit,
+      });
+      const far = vadd(pNext, vmul(dOut, exitLength));
+      path.points.push(far);
+      path.segments.push({ a: pNext, b: far, medium: 'air', kind: 'exit' });
+      path.dirOut = dOut;
+      path.exitPoint = pNext;
+    }
+  }
+
+  if (path.dirOut) {
+    // Measured straight from the vectors; the tests check that this agrees
+    // with the analytic D_k formula.
+    path.scattering = vangle(d0, path.dirOut);
+    path.antisolar = Math.PI - path.scattering;
+    path.deviation = deviation(thetaI, n, reflections);
+  }
+  path.classification = classifyRay(path, n);
+  return path;
+}
+
+/* =========================================================================
+ * 8. Classification
+ * =======================================================================*/
+
+/**
+ * Classify a traced ray.
+ * The pedagogical point: "one internal reflection" is NOT the same thing as
+ * "rainbow ray". A ray belongs to the bright family only if its exit
+ * direction also lies close to the extremum -- the caustic.
+ */
+function classifyRay(path, n, tolDeg = CAUSTIC_TOLERANCE_DEG) {
+  if (!path || !path.hit) return RayClass.MISS;
+  if (path.tangent) return RayClass.TANGENT;
+  if (path.totalInternalReflection) return RayClass.NON_CAUSTIC;
+  const k = path.reflections;
+  if (k === 0) return RayClass.NO_REFLECTION;
+  const geo = rainbowGeometry(n, k);
+  if (!geo || path.antisolar === null) return RayClass.NON_CAUSTIC;
+  if (Math.abs(path.antisolar * DEG - geo.antisolarDeg) > tolDeg) {
+    return RayClass.NON_CAUSTIC;
+  }
+  if (k === 1) return RayClass.PRIMARY;
+  if (k === 2) return RayClass.SECONDARY;
+  return RayClass.HIGHER_ORDER;
+}
+
+/* =========================================================================
+ * 9. Exit-angle curves (the most important graph)
+ * =======================================================================*/
+
+/**
+ * Sample phi(b), Theta(b) and D(b) for one index and one reflection order.
+ * b is the normalised impact parameter b/R in [0,1]. Angles in DEGREES.
+ */
+function exitAngleCurve(n, k, samples = 400) {
+  const out = { b: [], phi: [], theta: [], D: [], intensity: [] };
+  for (let i = 0; i <= samples; i++) {
+    const b = i / samples;
+    const thetaI = Math.asin(clamp(b, 0, 1));
+    const D = deviation(thetaI, n, k);
+    if (D === null) continue;
+    const R = fresnelReflectance(thetaI, 1, n);
+    out.b.push(b);
+    out.D.push(D * DEG);
+    out.theta.push(foldToScattering(D) * DEG);
+    out.phi.push(antisolarAngle(D) * DEG);
+    out.intensity.push((1 - R) * (1 - R) * Math.pow(R, k));
+  }
+  return out;
+}
+
+/** Angle for one impact parameter, in degrees, in the requested convention. */
+function angleFor(n, k, b, mode = 'antisolar') {
+  const thetaI = Math.asin(clamp(b, 0, 1));
+  const D = deviation(thetaI, n, k);
+  if (D === null) return null;
+  if (mode === 'deviation') return D * DEG;
+  if (mode === 'scattering') return foldToScattering(D) * DEG;
+  return antisolarAngle(D) * DEG;
+}
+
+/* =========================================================================
+ * 10. Angular intensity distribution (the caustic)
+ * =======================================================================*/
+
+/**
+ * Accumulate the angular distribution of the light a droplet scatters.
+ *
+ * Documented simplification -- this is geometric optics only:
+ *   - a uniform beam illuminates the droplet, so the number of rays with
+ *     impact parameter in [b, b+db] is proportional to b*db (area weighting),
+ *     which is why b is sampled as sqrt(u);
+ *   - each ray carries the unpolarised Fresnel weight (1-R)^2 * R^k;
+ *   - rays are binned by their angle phi from the antisolar direction;
+ *   - dividing by sin(phi) converts "energy per bin" into radiance, because
+ *     a bin at angle phi covers a solid angle proportional to sin(phi)*dphi.
+ *
+ * No interference, no diffraction, no Mie theory, no supernumerary bows, no
+ * polarisation tracking. In the ideal limit the caustic peak is infinitely
+ * sharp; here it is smoothed only by the finite bin width.
+ */
+function angularDistribution(opts = {}) {
+  const {
+    n = 1.333,
+    orders = [1],
+    rays = 20000,
+    minDeg = 0,
+    maxDeg = 180,
+    bins = 360,
+    sampling = 'uniform',
+    perSolidAngle = true,
+    bMin = 0,
+    bMax = 1,
+  } = opts;
+  const acc = new Float64Array(bins);
+  const binWidth = (maxDeg - minDeg) / bins;
+  let total = 0;
+  let used = 0;
+  for (const k of orders) {
+    for (let i = 0; i < rays; i++) {
+      const u = sampling === 'random' ? Math.random() : (i + 0.5) / rays;
+      const b = Math.sqrt(bMin * bMin + u * (bMax * bMax - bMin * bMin));
+      const thetaI = Math.asin(clamp(b, 0, 1));
+      const D = deviation(thetaI, n, k);
+      if (D === null) continue;
+      const phi = antisolarAngle(D) * DEG;
+      const R = fresnelReflectance(thetaI, 1, n);
+      const w = (1 - R) * (1 - R) * Math.pow(R, k);
+      total += w;
+      used++;
+      const idx = Math.floor((phi - minDeg) / binWidth);
+      if (idx < 0 || idx >= bins) continue;
+      acc[idx] += w;
+    }
+  }
+  if (perSolidAngle) {
+    for (let i = 0; i < bins; i++) {
+      const phiMid = (minDeg + (i + 0.5) * binWidth) * RAD;
+      acc[i] /= Math.max(Math.sin(phiMid), 1e-3);
+    }
+  }
+  let peak = 0;
+  let peakIndex = 0;
+  for (let i = 0; i < bins; i++) {
+    if (acc[i] > peak) {
+      peak = acc[i];
+      peakIndex = i;
+    }
+  }
+  return {
+    bins: acc,
+    binWidth,
+    minDeg,
+    maxDeg,
+    total,
+    used,
+    peak,
+    peakIndex,
+    peakDeg: minDeg + (peakIndex + 0.5) * binWidth,
+    count: bins,
+  };
+}
+
+/* =========================================================================
+ * 11. Sky geometry: Sun, antisolar point, rainbow circles, horizon
+ * =======================================================================*/
+
+/**
+ * Unit vector towards the Sun. Right-handed frame, +Y up:
+ *   elevation  degrees above the horizon
+ *   azimuth    degrees; 0 = +Z, increasing towards +X
+ */
+function sunDirection(elevationDeg, azimuthDeg = 0) {
+  const e = elevationDeg * RAD;
+  const a = azimuthDeg * RAD;
+  return vec(Math.cos(e) * Math.sin(a), Math.sin(e), Math.cos(e) * Math.cos(a));
+}
+
+/** The antisolar point lies exactly opposite the Sun as seen by the observer. */
+function antisolarDirection(elevationDeg, azimuthDeg = 0) {
+  return vneg(sunDirection(elevationDeg, azimuthDeg));
+}
+
+/** Two unit vectors spanning the plane perpendicular to `axis`. */
+function orthonormalBasis(axis) {
+  const a = vnorm(axis);
+  const helper = Math.abs(a.y) < 0.9 ? vec(0, 1, 0) : vec(1, 0, 0);
+  const u = vnorm(vcross(a, helper));
+  return { u, v: vcross(a, u) };
+}
+
+/**
+ * Directions making the angle phiDeg with the antisolar direction -- i.e. the
+ * rainbow circle. Returns unit vectors.
+ */
+function rainbowCircle(antisolar, phiDeg, steps = 256) {
+  const a = vnorm(antisolar);
+  const { u, v } = orthonormalBasis(a);
+  const ph = phiDeg * RAD;
+  const ca = Math.cos(ph);
+  const sa = Math.sin(ph);
+  const pts = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = (i / steps) * 2 * Math.PI;
+    const ring = vadd(vmul(u, Math.cos(t)), vmul(v, Math.sin(t)));
+    pts.push(vadd(vmul(a, ca), vmul(ring, sa)));
+  }
+  return pts;
+}
+
+const EARTH_RADIUS_M = 6371000;
+
+/**
+ * Dip of the geometric horizon below the astronomical horizontal, in degrees,
+ * for an observer h metres above a spherical Earth.
+ * ~0.04 deg at eye level, only ~1.0 deg at 1000 m -- which is precisely why
+ * "standing higher" does not by itself reveal a full circular rainbow.
+ */
+function horizonDipDeg(heightM, earthRadius = EARTH_RADIUS_M) {
+  const h = Math.max(0, heightM);
+  return Math.acos(earthRadius / (earthRadius + h)) * DEG;
+}
+
+/**
+ * Which part of a bow of angular radius phi lies above the horizon?
+ * The antisolar point sits at elevation -sunElevation, so the top of the bow
+ * reaches elevation phi - sunElevation.
+ */
+function visibleFraction(sunElevationDeg, phiDeg, dipDeg = 0, steps = 2048) {
+  const anti = antisolarDirection(sunElevationDeg, 0);
+  const pts = rainbowCircle(anti, phiDeg, steps);
+  let above = 0;
+  let topEl = -Infinity;
+  let botEl = Infinity;
+  for (const p of pts) {
+    const el = Math.asin(clamp(p.y, -1, 1)) * DEG;
+    if (el > topEl) topEl = el;
+    if (el < botEl) botEl = el;
+    if (el > -dipDeg) above++;
+  }
+  return {
+    fraction: above / pts.length,
+    topElevationDeg: topEl,
+    bottomElevationDeg: botEl,
+    antisolarElevationDeg: -sunElevationDeg,
+  };
+}
+
+/* =========================================================================
+ * 12. Spectrum helpers used by the renderers
+ * =======================================================================*/
+
+/**
+ * Approximate wavelength -> RGB conversion (the widely used piecewise
+ * approximation). Purely a display convenience: no physics depends on it.
+ */
+function wavelengthToRGB(lambda, gamma = 0.8) {
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  if (lambda >= 380 && lambda < 440) {
+    r = -(lambda - 440) / 60;
+    b = 1;
+  } else if (lambda < 490) {
+    g = (lambda - 440) / 50;
+    b = 1;
+  } else if (lambda < 510) {
+    g = 1;
+    b = -(lambda - 510) / 20;
+  } else if (lambda < 580) {
+    r = (lambda - 510) / 70;
+    g = 1;
+  } else if (lambda < 645) {
+    r = 1;
+    g = -(lambda - 645) / 65;
+  } else if (lambda <= 780) {
+    r = 1;
+  }
+  let factor = 0;
+  if (lambda >= 380 && lambda < 420) factor = 0.3 + (0.7 * (lambda - 380)) / 40;
+  else if (lambda <= 700) factor = 1;
+  else if (lambda <= 780) factor = 0.3 + (0.7 * (780 - lambda)) / 80;
+  const f = (x) => Math.round(255 * Math.pow(Math.max(0, x) * factor, gamma));
+  return { r: f(r), g: f(g), b: f(b) };
+}
+
+function rgbCss(lambda, alpha = 1, gamma = 0.8) {
+  const c = wavelengthToRGB(lambda, gamma);
+  return alpha >= 1
+    ? `rgb(${c.r},${c.g},${c.b})`
+    : `rgba(${c.r},${c.g},${c.b},${alpha})`;
+}
+
+function linspace(a, b, n) {
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(a + ((b - a) * i) / (n - 1));
+  return out;
+}
+
+/* =========================================================================
+ * 13. Spectral radiance profile of the bow
+ * =======================================================================*/
+
+/**
+ * For a set of wavelengths and reflection orders compute radiance(phi) and
+ * convert it into an RGB profile. This is what the sky renderer paints, so
+ * the visible bow is a direct consequence of the ray simulation and never a
+ * hard-coded coloured arc.
+ */
+function spectralProfile(opts = {}) {
+  const {
+    indexModel = defaultIndex,
+    orders = [1, 2],
+    lambdas = null,
+    minDeg = 0,
+    maxDeg = 62,
+    bins = 496,
+    rays = 4000,
+  } = opts;
+  const ls = lambdas || linspace(405, 675, 28);
+  const acc = ls.map((lam) =>
+    angularDistribution({
+      n: indexModel(lam),
+      orders,
+      rays,
+      minDeg,
+      maxDeg,
+      bins,
+      perSolidAngle: true,
+    })
+  );
+  const weights = ls.map((lam) => wavelengthToRGB(lam, 1));
+  const rgb = new Array(bins);
+  let maxR = 0;
+  for (let i = 0; i < bins; i++) {
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    for (let j = 0; j < ls.length; j++) {
+      const v = acc[j].bins[i];
+      r += v * weights[j].r;
+      g += v * weights[j].g;
+      b += v * weights[j].b;
+    }
+    rgb[i] = { r, g, b };
+    maxR = Math.max(maxR, r, g, b);
+  }
+  const bw = (maxDeg - minDeg) / bins;
+  const phi = new Float64Array(bins);
+  for (let i = 0; i < bins; i++) phi[i] = minDeg + (i + 0.5) * bw;
+  return { phi, rgb, maxRadiance: maxR, binWidth: bw, minDeg, maxDeg, bins };
+}
+
+/* =========================================================================
+ * 14. Alexander's band
+ * =======================================================================*/
+
+/**
+ * The angular gap between the primary and the secondary bow. Geometric optics
+ * sends no once- or twice-reflected light into this range, so it looks darker
+ * than the sky inside the primary or outside the secondary. It is not black:
+ * higher orders, external reflection, multiple scattering between droplets and
+ * ordinary skylight all put some light there.
+ */
+function alexandersBand(indexModel = defaultIndex) {
+  const nRed = indexModel(650);
+  const nViolet = indexModel(420);
+  const p1r = rainbowGeometry(nRed, 1);
+  const p1v = rainbowGeometry(nViolet, 1);
+  const p2r = rainbowGeometry(nRed, 2);
+  const p2v = rainbowGeometry(nViolet, 2);
+  return {
+    innerDeg: Math.max(p1r.antisolarDeg, p1v.antisolarDeg),
+    outerDeg: Math.min(p2r.antisolarDeg, p2v.antisolarDeg),
+    primary: p1r,
+    secondary: p2r,
+  };
+}
+
+/* namespace object standing in for `import * as O from "./optics.js"` */
+
+const O = { DEG, RAD, EPS, vec, vadd, vsub, vmul, vdot, vcross, vlen, vneg, clamp, vnorm, vangle, NAMED_COLORS, LAMBDA_REF, fitCauchy, CAUCHY, cauchyIndex, makeIndexModel, defaultIndex, refract, reflect, snellAngle, criticalAngle, fresnelReflectance, intersectRaySphere, RayClass, CAUSTIC_TOLERANCE_DEG, deviation, foldToScattering, antisolarAngle, rainbowIncidenceAnalytic, rainbowIncidenceNumeric, rainbowGeometry, traceRay, classifyRay, exitAngleCurve, angleFor, angularDistribution, sunDirection, antisolarDirection, orthonormalBasis, rainbowCircle, EARTH_RADIUS_M, horizonDipDeg, visibleFraction, wavelengthToRGB, rgbCss, linspace, spectralProfile, alexandersBand };
+
+/* ============ src/i18n.js ============ */
+
+/**
+ * i18n.js -- the single translation dictionary.
+ *
+ * No visualisation component may contain a hard-coded Czech or English string.
+ * Everything user-facing goes through t('key') so that switching the language
+ * at runtime is a re-render, not a reload.
+ *
+ * Values may contain {placeholders}, filled by t('key', {placeholder: value}).
+ */
+
+const LANGS = ['cs', 'en'];
+
+const translations = {
+  cs: {
+    /* ---- shell ---- */
+    appTitle: 'Jak vzniká duha',
+    appSubtitle: 'interaktivní simulace geometrické optiky',
+    tabTutorial: 'Průvodce',
+    tabFree: 'Volný režim',
+    language: 'Jazyk',
+    controls: 'Ovládání',
+    explanation: 'Výklad',
+    close: 'Zavřít',
+    reset: 'Výchozí nastavení',
+    on: 'zap',
+    off: 'vyp',
+
+    /* ---- scenes ---- */
+    sceneDroplet: 'Jedna kapka',
+    sceneDrops: 'Mnoho kapek',
+    sceneSky: 'Obloha 3D',
+    sceneDropletDesc: 'Řez jednou kulovou kapkou. Paprsek se počítá, nikoli kreslí.',
+    sceneDropsDesc: 'Od jedné kapky k tisícům. Pozorovatel je vlevo.',
+    sceneSkyDesc: 'Kužel směrů kolem antisolárního bodu a jeho průnik s oblohou.',
+
+    /* ---- graphs ---- */
+    graphExitAngle: 'Výstupní úhel',
+    graphDistribution: 'Rozdělení paprsků',
+    graphExitAngleTitle: 'Výstupní úhel v závislosti na parametru dopadu',
+    graphDistributionTitle: 'Kolik paprsků odchází kterým směrem',
+    axisImpact: 'parametr dopadu b/R',
+    axisAngleAntisolar: 'úhel od antisolárního směru φ [°]',
+    axisAngleScattering: 'rozptylový úhel Θ [°]',
+    axisAngleDeviation: 'celková odchylka D [°]',
+    axisRayCount: 'relativní jas (počet paprsků na úhel)',
+    angleConvention: 'Zobrazený úhel',
+    angleAntisolar: 'φ — od antisolárního směru',
+    angleScattering: 'Θ — rozptylový úhel',
+    angleDeviation: 'D — celková odchylka',
+    graphHint: 'Klikněte do grafu a vyberte paprsek. Táhněte paprsek v kapce a bod se posune.',
+    extremumLabel: 'extrém → duha',
+    rayCount: 'Počet paprsků',
+    accumulate: 'Přidávat paprsky',
+
+    /* ---- controls: sun ---- */
+    sun: 'Slunce',
+    sunElevation: 'Výška Slunce nad obzorem',
+    sunAzimuth: 'Azimut Slunce',
+    observer: 'Pozorovatel',
+    observerHeight: 'Výška pozorovatele',
+    viewMode: 'Pohled',
+    viewOrbit: 'Zvenčí',
+    viewEye: 'Očima pozorovatele',
+    lookAzimuth: 'Směr pohledu',
+    lookElevation: 'Náklon pohledu',
+    fieldOfView: 'Zorný úhel',
+
+    /* ---- controls: light ---- */
+    light: 'Světlo',
+    wavelength: 'Vlnová délka',
+    white: 'Bílé světlo',
+    red: 'červená',
+    orange: 'oranžová',
+    yellow: 'žlutá',
+    green: 'zelená',
+    blue: 'modrá',
+    violet: 'fialová',
+    dispersion: 'Disperze',
+    dispersionHint: 'Při 0 % mají všechny vlnové délky stejný index lomu — duha zbělá.',
+
+    /* ---- controls: droplet & optics ---- */
+    droplet: 'Kapka',
+    dropletRadius: 'Poloměr kapky',
+    impactParameter: 'Parametr dopadu b/R',
+    reflections: 'Vnitřní odrazy',
+    refractiveIndex: 'Index lomu',
+    indexModel: 'Model indexu lomu',
+    indexTable: 'tabulka (6 barev)',
+    indexCauchy: 'Cauchyho vztah',
+    indexScale: 'Násobek indexu lomu',
+    optics: 'Optika',
+
+    /* ---- controls: rays ---- */
+    rays: 'Paprsky',
+    showNonRainbow: 'Zobrazit paprsky mimo duhu',
+    showFamilies: 'Zobrazené rodiny paprsků',
+    family0: '0 odrazů',
+    family1: '1 odraz (primární)',
+    family2: '2 odrazy (sekundární)',
+    family3: '3+ odrazy (vyšší řád)',
+    rayFan: 'Svazek paprsků',
+    fanCount: 'Počet paprsků ve svazku',
+
+    /* ---- controls: visualisation ---- */
+    visualization: 'Zobrazení',
+    showNormals: 'Normály k povrchu',
+    showAngles: 'Úhly',
+    showLabels: 'Popisky',
+    showWavelengthLabels: 'Popisky vlnových délek',
+    showDroplets: 'Kapky',
+    showCone: 'Kužel duhy',
+    showAntisolar: 'Antisolární bod',
+    showHorizon: 'Horizont',
+    showGround: 'Země',
+    showRenderedBow: 'Vykreslit duhu',
+    showAlexander: 'Alexandrův temný pás',
+    showPrimary: 'Primární duha',
+    showSecondary: 'Vedlejší duha',
+    showHigherOrder: 'Vyšší řády',
+    showSky: 'Obloha',
+    rainBelow: 'Déšť i pod pozorovatelem',
+
+    /* ---- terminology ---- */
+    refraction: 'lom',
+    reflection: 'odraz',
+    internalReflection: 'vnitřní odraz',
+    angleOfIncidence: 'úhel dopadu',
+    angleOfRefraction: 'úhel lomu',
+    exitAngle: 'výstupní úhel',
+    deviation: 'odchylka',
+    caustic: 'kaustika',
+    primaryRainbow: 'Primární duha',
+    secondaryRainbow: 'Vedlejší duha',
+    higherOrderRainbow: 'Vyšší řád duhy',
+    antisolarPoint: 'Antisolární bod',
+    horizon: 'horizont',
+    raindrop: 'dešťová kapka',
+    sunLabel: 'Slunce',
+    observerLabel: 'Pozorovatel',
+    antisolarLabelLong: 'antisolární bod — bod přesně proti Slunci',
+
+    /* ---- ray info panel ---- */
+    rayInfo: 'Údaje o paprsku',
+    rayInfoHint: 'Klepněte na paprsek nebo táhněte parametrem dopadu.',
+    infoWavelength: 'Vlnová délka',
+    infoIncidence: 'Úhel dopadu θᵢ',
+    infoRefraction: 'Úhel lomu θᵣ',
+    infoReflections: 'Vnitřní odrazy',
+    infoExitAngle: 'Úhel od antisolárního směru φ',
+    infoScattering: 'Rozptylový úhel Θ',
+    infoDeviation: 'Celková odchylka D',
+    infoImpact: 'Parametr dopadu b/R',
+    infoClassification: 'Klasifikace',
+    infoIntensity: 'Relativní podíl energie',
+    infoIndex: 'Index lomu n',
+    infoDistanceFromBow: 'Vzdálenost od extrému',
+
+    /* ---- classifications ---- */
+    classMiss: 'MIMO KAPKU',
+    classTangent: 'TEČNÝ PAPRSEK',
+    classNoReflection: 'BEZ VNITŘNÍHO ODRAZU',
+    classPrimary: 'RODINA PRIMÁRNÍ DUHY',
+    classSecondary: 'RODINA VEDLEJŠÍ DUHY',
+    classHigherOrder: 'DUHA VYŠŠÍHO ŘÁDU',
+    classNonCaustic: 'BĚŽNÝ ROZPTÝLENÝ PAPRSEK',
+
+    /* ---- labelled explanations required by the brief ---- */
+    explPrimary: 'Primární duha vzniká po jednom vnitřním odrazu paprsku uvnitř kapky.',
+    explSecondary:
+      'Vedlejší (sekundární) duha vzniká po dvou vnitřních odrazech. Je slabší, má větší úhlový poloměr a obrácené pořadí barev.',
+    explNoReflection: 'Bez vnitřního odrazu — nepřispívá k primární duze.',
+    explNonCaustic: 'Jeden vnitřní odraz, ale jiný výstupní úhel — běžný rozptýlený paprsek.',
+    explHigherOrder: 'Vyšší řád duhy — velmi slabý.',
+    explCaustic:
+      'V okolí tohoto extrému se mnoho různých paprsků odchyluje do velmi podobného směru. Světlo se proto v tomto směru výrazně koncentruje. Tento jev se nazývá kaustika.',
+    explObserverHeight:
+      'Úhlový poloměr duhy není dán výškou pozorovatele. Výška pozorovatele mění především to, jak velkou část kruhové duhy může zakrývat horizont.',
+    explNotOneReflection:
+      'Jeden vnitřní odraz sám o sobě duhu nedělá. Duha vzniká teprve tehdy, když se k jednomu vnitřnímu odrazu přidá úhlová koncentrace paprsků poblíž extrému.',
+    explAlexander:
+      'Mezi oběma duhami leží pás, do kterého geometrická optika neposílá žádné paprsky s jedním ani dvěma vnitřními odrazy. Proto se jeví tmavší. Není však úplně černý — světlo tam přichází z vyšších řádů, z odrazu na povrchu kapek a z běžného rozptylu v atmosféře.',
+    explNotAnObject:
+      'Duha není předmět v určité vzdálenosti. Každý pozorovatel dostává světlo od jiných kapek — od těch, které mu leží ve správném úhlovém směru.',
+
+    /* ---- mathematics panel ---- */
+    mathematics: 'Matematika',
+    mathIntro:
+      'Vše, co simulace kreslí, plyne z těchto vztahů. Žádný úhel není zadán ručně.',
+    mathConventions: 'Použité úhly',
+    mathConvTheta: 'θᵢ — úhel dopadu na první rozhraní, sin θᵢ = b/R',
+    mathConvThetaR: 'θᵣ — úhel lomu uvnitř kapky, sin θᵢ = n · sin θᵣ',
+    mathConvD:
+      'D — celková odchylka: o kolik se směr paprsku otočil za celou dráhu (nesklápí se do 0–180°)',
+    mathConvTheta2: 'Θ — rozptylový úhel: úhel mezi výstupním a původním směrem, sklopený do 0–180°',
+    mathConvPhi: 'φ = 180° − Θ — úhel od antisolárního směru; to je úhlový poloměr duhy na obloze',
+    mathWarning:
+      'Tyto čtyři úhly se nesmí zaměňovat. Graf i panel vždy uvádějí, který z nich zobrazují.',
+    mathDeviation: 'Odchylka po k vnitřních odrazech',
+    mathDeviationNote:
+      'Při vstupu i výstupu se paprsek otočí o (θᵢ − θᵣ), při každém vnitřním odrazu o (180° − 2θᵣ).',
+    mathExtremum: 'Podmínka extrému',
+    mathExtremumNote:
+      'Derivace se položí rovna nule. Ze Snellova zákona plyne dθᵣ/dθᵢ = cos θᵢ / (n cos θᵣ), a po dosazení vyjde:',
+    mathResult: 'Výsledek pro vodu',
+    mathResultNote:
+      'Číslo 42° tedy není konstanta geometrie — je to důsledek hodnoty indexu lomu n. Změňte n a úhel se posune.',
+    mathNumericCheck: 'Nezávislá numerická kontrola',
+    mathNumericNote:
+      'Poloha extrému nalezená hrubou silou (zlatý řez) bez použití vzorce:',
+    mathIntensityTitle: 'Odhad jasu',
+    mathIntensityNote:
+      'Jas se odhaduje geometricky: paprsky se vzorkují úměrně ploše (b·db), váží se nepolarizovanými Fresnelovými koeficienty (1−R)²·Rᵏ a třídí se podle φ. Dělením sin φ se z energie stane jas. Jde o výukové přiblížení — nikoli o přesný elektromagnetický výpočet.',
+    mathLimits: 'Meze modelu',
+    mathLimitsNote:
+      'Použita je pouze geometrická optika. Simulace nepočítá interferenci, ohyb, Mieův rozptyl, vedlejší (supernumerární) oblouky ani polarizaci. Velmi malé kapky vyžadují vlnovou optiku.',
+
+    /* ---- droplet size note ---- */
+    dropletSizeNote:
+      'Úhlová poloha duhy na velikosti kapky prakticky nezávisí — geometrická optika dává stejné úhly pro kapku 0,1 mm i 5 mm. Ostrost a barevnost skutečné duhy na velikosti kapek závisí, ale to je jev vlnové optiky, který tato simulace nepočítá.',
+
+    /* ---- tutorial ---- */
+    tutorial: 'Průvodce',
+    step: 'Krok',
+    of: 'z',
+    next: 'Další',
+    prev: 'Zpět',
+    finish: 'Dokončit',
+    startFree: 'Přejít do volného režimu',
+    tutorialDone: 'Hotovo. Zbytek si zkuste sami.',
+
+    s1title: 'Může jedna kapka udělat duhu?',
+    s1body:
+      'Vlevo je jediná kulová kapka v řezu. Sluneční paprsek přichází zleva. Zatím nevíme, co se s ním stane — necháme to spočítat.',
+    s2title: 'Sledujte paprsek',
+    s2body:
+      'Táhněte posuvníkem parametru dopadu (nebo myší v kapce). Paprsek se láme podle Snellova zákona: sin θᵢ = n · sin θᵣ. Nic není nakresleno předem.',
+    s3title: 'Přidejte vnitřní odraz',
+    s3body:
+      'Na zadní straně kapky se část světla odrazí zpět dovnitř. Přepněte počet vnitřních odrazů na 1 a sledujte dráhu R0 → R1 → R2 → R3.',
+    s4title: 'Kam paprsek míří?',
+    s4body:
+      'Změřte úhel mezi vystupujícím paprskem a směrem od Slunce. Panel vpravo ukazuje φ — úhel od antisolárního směru.',
+    s5title: 'Zkuste jiné paprsky',
+    s5body:
+      'Projděte celý rozsah parametru dopadu a dívejte se na graf dole. Výstupní úhel není konstantní — ale ani nestoupá donekonečna.',
+    s6title: 'Proč existuje jasný směr?',
+    s6body:
+      'Křivka má extrém. V jeho okolí je skoro plochá, takže mnoho různých vstupních paprsků odchází téměř stejným směrem. Přepněte graf na rozdělení paprsků a přidávejte je.',
+    s7title: 'Teď přidejte tisíce kapek',
+    s7body:
+      'Každá kapka dělá totéž. K pozorovateli se dostane světlo jen od těch kapek, které leží ve správném úhlu. Zapněte přidávání kapek.',
+    s8title: 'Proč je to oblouk?',
+    s8body:
+      'Ve třech rozměrech tvoří všechny takové směry kužel kolem antisolárního bodu. Průnik kužele s oblohou je kružnice. Zapněte horizont a dolní část zmizí.',
+    s9title: 'Odkud jsou barvy?',
+    s9body:
+      'Index lomu vody závisí na vlnové délce. Posuňte disperzi z 0 % na 100 % a sledujte, jak se jediný úhel rozpadne na pás barev.',
+    s10title: 'Může být duh víc?',
+    s10body:
+      'Nastavte dva vnitřní odrazy. Vznikne slabší duha s větším poloměrem a obráceným pořadím barev. Mezi nimi zůstane Alexandrův temný pás.',
+
+    /* ---- quiz ---- */
+    quiz: 'Otázky',
+    quizIntro: 'Odpovědi si můžete ověřit přímo v simulaci.',
+    showAnswer: 'Ukázat odpověď',
+    hideAnswer: 'Skrýt odpověď',
+    q1: 'Co se stane, když paprsek projde kapkou bez vnitřního odrazu?',
+    a1: 'Pokračuje dál dopředu, jen mírně odkloněný. Míří pryč od pozorovatele, který má Slunce za zády, a k primární duze nepřispívá.',
+    q2: 'Dělá každý paprsek s jedním odrazem duhu?',
+    a2: 'Ne. Jasná duha vzniká z úhlové koncentrace poblíž kaustiky.',
+    q3: 'Proč je duha asi 42° od antisolárního směru?',
+    a3: 'Protože rodina paprsků s jedním odrazem má extrém odchylky.',
+    q4: 'Proč je duha kruhová?',
+    a4: 'Protože příslušné výstupní směry tvoří kužel kolem antisolárního směru.',
+    q5: 'Proč obvykle vidíme jen oblouk?',
+    a5: 'Protože horizont a země zakrývají spodní část kružnice.',
+    q6: 'Proč jsou tam barvy?',
+    a6: 'Protože voda má pro různé vlnové délky různý index lomu.',
+    q7: 'Proč je vedlejší duha vně primární?',
+    a7: 'Dva vnitřní odrazy dávají větší úhlovou odchylku.',
+
+    /* ---- many-droplets scene ---- */
+    dropCount: 'Počet kapek',
+    dropsHint:
+      'Zelené kapky posílají světlo k pozorovateli, šedé ne. Rozhoduje jen úhel, ne vzdálenost.',
+    dropsContributing: 'Kapek přispívajících pozorovateli',
+    animateDrops: 'Animovat přibývání',
+
+    /* ---- sky scene ---- */
+    skyHint: 'Táhněte myší = otáčení, kolečko = přiblížení.',
+    coneAngle: 'Úhel kužele',
+    visibleAbove: 'Nad horizontem',
+    horizonDip: 'Pokles horizontu',
+    fullCircle: 'Úplný kruh',
+    flyMode: 'Let nad krajinou',
+    bowTopElevation: 'Vrchol duhy nad obzorem',
+    bowBelowHorizon: 'Celá primární duha je pod obzorem — Slunce je příliš vysoko.',
+    fullCircleNote:
+      'Nad horizontem může být celá kružnice jen tehdy, když jsou kapky i pod úrovní očí a horizont je nezakrývá. Samotná výška to nezaručí: i v kilometru klesne obzor jen asi o 1°.',
+    metres: 'm',
+    degrees: '°',
+    nm: 'nm',
+
+    /* ---- misc ---- */
+    derivedFromSim: 'spočítáno simulací',
+    notHardCoded: 'Žádná z hodnot níže není zadaná ručně.',
+    reconstructTitle: 'Řetěz odvození',
+    reconstructBody:
+      'jednotlivé paprsky → rozdělení výstupních úhlů → kaustika → mnoho kapek → kužel v 3D → kruhová duha → horizont → viditelný oblouk',
+    warningNoRender:
+      'Vykreslení duhy je vypnuté. Zapněte je až tehdy, když už tušíte, proč tam bude.',
+  },
+
+  en: {
+    /* ---- shell ---- */
+    appTitle: 'How a rainbow forms',
+    appSubtitle: 'an interactive geometric-optics simulation',
+    tabTutorial: 'Tutorial',
+    tabFree: 'Free mode',
+    language: 'Language',
+    controls: 'Controls',
+    explanation: 'Explanation',
+    close: 'Close',
+    reset: 'Reset',
+    on: 'on',
+    off: 'off',
+
+    /* ---- scenes ---- */
+    sceneDroplet: 'Single droplet',
+    sceneDrops: 'Many droplets',
+    sceneSky: 'Sky 3D',
+    sceneDropletDesc: 'Cross-section of one spherical droplet. The ray is computed, not drawn.',
+    sceneDropsDesc: 'From one droplet to thousands. The observer is on the left.',
+    sceneSkyDesc: 'The cone of directions around the antisolar point, and where it meets the sky.',
+
+    /* ---- graphs ---- */
+    graphExitAngle: 'Exit angle',
+    graphDistribution: 'Ray distribution',
+    graphExitAngleTitle: 'Exit angle versus impact parameter',
+    graphDistributionTitle: 'How many rays leave in each direction',
+    axisImpact: 'impact parameter b/R',
+    axisAngleAntisolar: 'angle from the antisolar direction φ [°]',
+    axisAngleScattering: 'scattering angle Θ [°]',
+    axisAngleDeviation: 'total deviation D [°]',
+    axisRayCount: 'relative brightness (rays per unit angle)',
+    angleConvention: 'Angle plotted',
+    angleAntisolar: 'φ — from the antisolar direction',
+    angleScattering: 'Θ — scattering angle',
+    angleDeviation: 'D — total deviation',
+    graphHint: 'Click the graph to pick a ray. Drag the ray in the droplet and the marker follows.',
+    extremumLabel: 'extremum → rainbow',
+    rayCount: 'Number of rays',
+    accumulate: 'Accumulate rays',
+
+    /* ---- controls: sun ---- */
+    sun: 'Sun',
+    sunElevation: 'Height of Sun above horizon',
+    sunAzimuth: 'Sun azimuth',
+    observer: 'Observer',
+    observerHeight: 'Observer height',
+    viewMode: 'View',
+    viewOrbit: 'From outside',
+    viewEye: "Observer's eye",
+    lookAzimuth: 'Looking towards',
+    lookElevation: 'Look elevation',
+    fieldOfView: 'Field of view',
+
+    /* ---- controls: light ---- */
+    light: 'Light',
+    wavelength: 'Wavelength',
+    white: 'White light',
+    red: 'red',
+    orange: 'orange',
+    yellow: 'yellow',
+    green: 'green',
+    blue: 'blue',
+    violet: 'violet',
+    dispersion: 'Dispersion',
+    dispersionHint: 'At 0 % every wavelength shares one refractive index — the bow turns white.',
+
+    /* ---- controls: droplet & optics ---- */
+    droplet: 'Droplet',
+    dropletRadius: 'Droplet radius',
+    impactParameter: 'Impact parameter b/R',
+    reflections: 'Internal reflections',
+    refractiveIndex: 'Refractive index',
+    indexModel: 'Refractive-index model',
+    indexTable: 'table (6 colours)',
+    indexCauchy: 'Cauchy relation',
+    indexScale: 'Refractive index multiplier',
+    optics: 'Optics',
+
+    /* ---- controls: rays ---- */
+    rays: 'Rays',
+    showNonRainbow: 'Show non-rainbow rays',
+    showFamilies: 'Ray families shown',
+    family0: '0 reflections',
+    family1: '1 reflection (primary)',
+    family2: '2 reflections (secondary)',
+    family3: '3+ reflections (higher order)',
+    rayFan: 'Fan of rays',
+    fanCount: 'Rays in the fan',
+
+    /* ---- controls: visualisation ---- */
+    visualization: 'Visualisation',
+    showNormals: 'Surface normals',
+    showAngles: 'Angles',
+    showLabels: 'Labels',
+    showWavelengthLabels: 'Wavelength labels',
+    showDroplets: 'Droplets',
+    showCone: 'Rainbow cone',
+    showAntisolar: 'Antisolar point',
+    showHorizon: 'Horizon',
+    showGround: 'Ground',
+    showRenderedBow: 'Render the bow',
+    showAlexander: "Alexander's dark band",
+    showPrimary: 'Primary rainbow',
+    showSecondary: 'Secondary rainbow',
+    showHigherOrder: 'Higher orders',
+    showSky: 'Sky',
+    rainBelow: 'Rain below the observer too',
+
+    /* ---- terminology ---- */
+    refraction: 'refraction',
+    reflection: 'reflection',
+    internalReflection: 'internal reflection',
+    angleOfIncidence: 'angle of incidence',
+    angleOfRefraction: 'angle of refraction',
+    exitAngle: 'exit angle',
+    deviation: 'deviation',
+    caustic: 'caustic',
+    primaryRainbow: 'Primary rainbow',
+    secondaryRainbow: 'Secondary rainbow',
+    higherOrderRainbow: 'Higher-order rainbow',
+    antisolarPoint: 'Antisolar point',
+    horizon: 'horizon',
+    raindrop: 'raindrop',
+    sunLabel: 'Sun',
+    observerLabel: 'Observer',
+    antisolarLabelLong: 'antisolar point — the point directly opposite the Sun',
+
+    /* ---- ray info panel ---- */
+    rayInfo: 'Ray data',
+    rayInfoHint: 'Click a ray, or drag the impact parameter.',
+    infoWavelength: 'Wavelength',
+    infoIncidence: 'Angle of incidence θᵢ',
+    infoRefraction: 'Angle of refraction θᵣ',
+    infoReflections: 'Internal reflections',
+    infoExitAngle: 'Angle from antisolar direction φ',
+    infoScattering: 'Scattering angle Θ',
+    infoDeviation: 'Total deviation D',
+    infoImpact: 'Impact parameter b/R',
+    infoClassification: 'Classification',
+    infoIntensity: 'Relative share of energy',
+    infoIndex: 'Refractive index n',
+    infoDistanceFromBow: 'Distance from the extremum',
+
+    /* ---- classifications ---- */
+    classMiss: 'MISSES THE DROPLET',
+    classTangent: 'TANGENT RAY',
+    classNoReflection: 'NO INTERNAL REFLECTION',
+    classPrimary: 'PRIMARY RAINBOW FAMILY',
+    classSecondary: 'SECONDARY RAINBOW FAMILY',
+    classHigherOrder: 'HIGHER-ORDER RAINBOW',
+    classNonCaustic: 'OTHER / NON-CAUSTIC RAY',
+
+    /* ---- labelled explanations required by the brief ---- */
+    explPrimary:
+      'The primary rainbow is produced by rays that undergo one internal reflection inside the droplet.',
+    explSecondary:
+      'The secondary rainbow is produced after two internal reflections. It is fainter, has a larger angular radius, and its color order is reversed.',
+    explNoReflection: 'No internal reflection — does not contribute to the primary rainbow.',
+    explNonCaustic: 'One internal reflection, but a different exit angle — an ordinary scattered ray.',
+    explHigherOrder: 'Higher-order rainbow — very faint.',
+    explCaustic:
+      'Near this extremum, many different incoming rays leave the droplet in nearly the same direction. Light therefore becomes strongly concentrated in this direction. This concentration is called a caustic.',
+    explObserverHeight:
+      "The angular radius of the rainbow is not determined by the observer's height. Observer height mainly changes how much of the circular rainbow can be visible above the horizon.",
+    explNotOneReflection:
+      'One internal reflection alone does not make a rainbow. The bright bow appears only when one internal reflection is combined with the angular concentration of rays near the extremum.',
+    explAlexander:
+      'Between the two bows lies a band into which geometric optics sends no once- or twice-reflected rays, so it looks darker. It is not truly black: higher orders, reflection from droplet surfaces and ordinary atmospheric scattering all put some light there.',
+    explNotAnObject:
+      'A rainbow is not an object at some distance. Every observer receives light from a different set of droplets — the ones that happen to lie in the right angular direction.',
+
+    /* ---- mathematics panel ---- */
+    mathematics: 'Mathematics',
+    mathIntro: 'Everything the simulation draws follows from these relations. No angle is entered by hand.',
+    mathConventions: 'The angles used',
+    mathConvTheta: 'θᵢ — angle of incidence at the first surface, sin θᵢ = b/R',
+    mathConvThetaR: 'θᵣ — angle of refraction inside the droplet, sin θᵢ = n · sin θᵣ',
+    mathConvD:
+      'D — total deviation: how far the ray direction has turned over the whole path (never folded into 0–180°)',
+    mathConvTheta2:
+      'Θ — scattering angle: between the outgoing and the original direction, folded into 0–180°',
+    mathConvPhi:
+      'φ = 180° − Θ — angle from the antisolar direction; this is the angular radius of the bow in the sky',
+    mathWarning:
+      'These four angles must never be mixed. The graph and the panels always state which one they show.',
+    mathDeviation: 'Deviation after k internal reflections',
+    mathDeviationNote:
+      'Entry and exit each turn the ray by (θᵢ − θᵣ); every internal reflection turns it by (180° − 2θᵣ).',
+    mathExtremum: 'The extremum condition',
+    mathExtremumNote:
+      "Set the derivative to zero. Snell's law gives dθᵣ/dθᵢ = cos θᵢ / (n cos θᵣ), and substituting yields:",
+    mathResult: 'Result for water',
+    mathResultNote:
+      'So 42° is not a constant of geometry — it is a consequence of the value of n. Change n and the angle moves.',
+    mathNumericCheck: 'Independent numerical check',
+    mathNumericNote:
+      'The extremum located by brute force (golden-section search) without using the formula:',
+    mathIntensityTitle: 'Brightness estimate',
+    mathIntensityNote:
+      'Brightness is estimated geometrically: rays are sampled in proportion to area (b·db), weighted by the unpolarised Fresnel factors (1−R)²·Rᵏ, and binned by φ. Dividing by sin φ turns energy into radiance. This is an educational approximation, not an exact electromagnetic calculation.',
+    mathLimits: 'Limits of the model',
+    mathLimitsNote:
+      'Geometric optics only. The simulation does not compute interference, diffraction, Mie scattering, supernumerary bows or polarisation. Very small droplets require wave optics.',
+
+    /* ---- droplet size note ---- */
+    dropletSizeNote:
+      'The angular position of the bow is essentially independent of droplet size — geometric optics gives the same angles for a 0.1 mm and a 5 mm drop. The sharpness and colour purity of a real rainbow do depend on droplet size, but that is a wave-optical effect this simulation does not compute.',
+
+    /* ---- tutorial ---- */
+    tutorial: 'Tutorial',
+    step: 'Step',
+    of: 'of',
+    next: 'Next',
+    prev: 'Back',
+    finish: 'Finish',
+    startFree: 'Go to free mode',
+    tutorialDone: 'Done. Now try the rest yourself.',
+
+    s1title: 'Can one raindrop create a rainbow?',
+    s1body:
+      'On the left is a single spherical droplet in cross-section. Sunlight arrives from the left. We do not yet know what happens to it — let the simulation work it out.',
+    s2title: 'Trace the ray',
+    s2body:
+      "Drag the impact-parameter slider (or drag inside the droplet). The ray bends according to Snell's law: sin θᵢ = n · sin θᵣ. Nothing here is drawn in advance.",
+    s3title: 'Add internal reflection',
+    s3body:
+      'At the back of the droplet part of the light reflects back inside. Set the number of internal reflections to 1 and follow the path R0 → R1 → R2 → R3.',
+    s4title: 'Where does the outgoing ray point?',
+    s4body:
+      'Measure the angle between the outgoing ray and the direction away from the Sun. The panel on the right shows φ, the angle from the antisolar direction.',
+    s5title: 'Try different incoming rays',
+    s5body:
+      'Sweep the whole range of the impact parameter and watch the graph below. The exit angle is not constant — but it does not grow without limit either.',
+    s6title: 'Why is there a bright direction?',
+    s6body:
+      'The curve has an extremum. Near it the curve is almost flat, so many different incoming rays leave in almost the same direction. Switch the graph to the ray distribution and add rays.',
+    s7title: 'Now add thousands of droplets',
+    s7body:
+      'Every droplet does the same thing. Light reaches the observer only from those droplets that lie at the right angle. Turn on droplet accumulation.',
+    s8title: 'Why does it look like an arc?',
+    s8body:
+      'In three dimensions all those directions form a cone around the antisolar point. The cone meets the sky in a circle. Switch the horizon on and the lower part disappears.',
+    s9title: 'Where do the colors come from?',
+    s9body:
+      "Water's refractive index depends on wavelength. Move dispersion from 0 % to 100 % and watch a single angle split into a band of colours.",
+    s10title: 'Can there be another rainbow?',
+    s10body:
+      "Set two internal reflections. A fainter bow appears with a larger radius and reversed colour order, with Alexander's dark band between them.",
+
+    /* ---- quiz ---- */
+    quiz: 'Questions',
+    quizIntro: 'You can check every answer in the simulation itself.',
+    showAnswer: 'Show answer',
+    hideAnswer: 'Hide answer',
+    q1: 'What happens if the ray enters the droplet without an internal reflection?',
+    a1: 'It carries on forwards, only slightly deflected. It heads away from an observer who has the Sun behind them, and contributes nothing to the primary bow.',
+    q2: 'Does every one-reflection ray produce a rainbow?',
+    a2: 'No. The bright rainbow results from angular concentration near the caustic.',
+    q3: 'Why is the rainbow about 42° from the antisolar direction?',
+    a3: 'Because the one-reflection ray family has an extremum in its deviation angle.',
+    q4: 'Why is the rainbow circular?',
+    a4: 'Because the relevant outgoing directions form a cone around the antisolar direction.',
+    q5: 'Why do we usually see only an arc?',
+    a5: 'Because the horizon and ground hide the lower part of the circle.',
+    q6: 'Why are there colors?',
+    a6: 'Because water has different refractive indices for different wavelengths.',
+    q7: 'Why is the secondary rainbow outside the primary?',
+    a7: 'Two internal reflections produce a larger angular deviation.',
+
+    /* ---- many-droplets scene ---- */
+    dropCount: 'Number of droplets',
+    dropsHint:
+      'Green droplets send light to the observer, grey ones do not. Only the angle matters, not the distance.',
+    dropsContributing: 'Droplets reaching the observer',
+    animateDrops: 'Animate accumulation',
+
+    /* ---- sky scene ---- */
+    skyHint: 'Drag to rotate, scroll to zoom.',
+    coneAngle: 'Cone angle',
+    visibleAbove: 'Above the horizon',
+    horizonDip: 'Horizon dip',
+    fullCircle: 'Full circle',
+    flyMode: 'Fly above the ground',
+    bowTopElevation: 'Top of the bow above the horizon',
+    bowBelowHorizon: 'The whole primary bow is below the horizon — the Sun is too high.',
+    fullCircleNote:
+      'The complete circle can only be seen when there are droplets below eye level as well and the horizon does not hide them. Altitude alone is not enough: even at one kilometre the horizon drops by only about 1°.',
+    metres: 'm',
+    degrees: '°',
+    nm: 'nm',
+
+    /* ---- misc ---- */
+    derivedFromSim: 'computed by the simulation',
+    notHardCoded: 'None of the values below is entered by hand.',
+    reconstructTitle: 'The chain of reasoning',
+    reconstructBody:
+      'individual rays → distribution of exit angles → caustic → many droplets → 3D cone → circular rainbow → horizon → visible arc',
+    warningNoRender:
+      'Rendering of the bow is switched off. Turn it on once you can already predict where it will be.',
+  },
+};
+
+let current = 'cs';
+
+function setLang(lang) {
+  if (translations[lang]) current = lang;
+  return current;
+}
+function getLang() {
+  return current;
+}
+
+/** Translate. Unknown keys fall back to English, then to the key itself. */
+function t(key, params) {
+  let s = translations[current]?.[key];
+  if (s === undefined) s = translations.en[key];
+  if (s === undefined) return key;
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      s = s.split(`{${k}}`).join(String(v));
+    }
+  }
+  return s;
+}
+
+/** Locale-aware number formatting (Czech uses a decimal comma). */
+function num(value, digits = 1) {
+  if (value === null || value === undefined || Number.isNaN(value)) return '—';
+  const s = value.toFixed(digits);
+  return current === 'cs' ? s.replace('.', ',') : s;
+}
+
+function deg(value, digits = 1) {
+  return `${num(value, digits)}°`;
+}
+
+/** Class-id -> translation key. */
+const CLASS_KEY = {
+  miss: 'classMiss',
+  tangent: 'classTangent',
+  noReflection: 'classNoReflection',
+  primary: 'classPrimary',
+  secondary: 'classSecondary',
+  higherOrder: 'classHigherOrder',
+  nonCaustic: 'classNonCaustic',
+};
+
+/** Class-id -> the explanation the brief requires for that family. */
+const CLASS_EXPLAIN = {
+  noReflection: 'explNoReflection',
+  primary: 'explPrimary',
+  secondary: 'explSecondary',
+  higherOrder: 'explHigherOrder',
+  nonCaustic: 'explNonCaustic',
+};
+
+/* ============ src/state.js ============ */
+
+/**
+ * state.js -- one observable store for the whole application.
+ * Views subscribe; nothing reads the DOM to find out what is going on.
+ */
+
+const listeners = new Set();
+
+const state = {
+  /* shell */
+  lang: 'cs',
+  mode: 'tutorial', // 'tutorial' | 'free'
+  step: 0,
+  scene: 'droplet', // 'droplet' | 'drops' | 'sky'
+  graph: 'exit', // 'exit' | 'dist'
+  panel: 'guide', // 'guide' | 'ray' | 'math' | 'quiz'
+
+  /* light */
+  wavelength: 'white', // 'white' or a number in nm
+  dispersion: 1,
+
+  /* droplet & optics */
+  impact: 0.861, // b/R
+  reflections: 1,
+  dropletRadiusMm: 1.0,
+  indexMode: 'table',
+  indexScale: 1,
+
+  /* rays */
+  showNonRainbow: false,
+  families: { 0: false, 1: true, 2: false, 3: false },
+  fanCount: 0, // 0 = a single ray
+
+  /* graph */
+  angleMode: 'antisolar', // 'antisolar' | 'scattering' | 'deviation'
+  distRays: 60,
+  distAccumulate: false,
+
+  /* many droplets */
+  dropCount: 1,
+  dropsAnimate: false,
+
+  /* sky / observer */
+  sunElevation: 15,
+  sunAzimuth: 180,
+  observerHeight: 1.7,
+  view: 'orbit', // 'orbit' | 'eye'
+  camYaw: -35,
+  camPitch: 14,
+  camDist: 3.1,
+  eyeAzimuth: 0, // relative to the antisolar azimuth
+  eyeElevation: 12,
+  fov: 75,
+
+  /* visualisation toggles */
+  show: {
+    normals: false,
+    angles: true,
+    labels: true,
+    wavelengthLabels: false,
+    droplets: true,
+    cone: true,
+    antisolar: true,
+    horizon: true,
+    ground: true,
+    renderedBow: false,
+    alexander: true,
+    primary: true,
+    secondary: false,
+    higher: false,
+    sky: true,
+    rainBelow: false,
+  },
+
+  /* selection */
+  selectedRay: null,
+};
+
+/** Wavelengths currently in play: one, or all six for white light. */
+function activeLambdas() {
+  if (state.wavelength === 'white') return [650, 610, 580, 540, 480, 420];
+  return [state.wavelength];
+}
+
+/** The refractive-index model implied by the current controls. */
+function indexModel() {
+  return makeIndexModel({
+    mode: state.indexMode,
+    dispersion: state.dispersion,
+    scale: state.indexScale,
+  });
+}
+
+/** Which reflection orders should be traced right now. */
+function activeOrders() {
+  if (state.mode === 'tutorial') {
+    const orders = [state.reflections];
+    if (state.showNonRainbow && !orders.includes(0)) orders.push(0);
+    return orders.sort();
+  }
+  const out = [];
+  for (const k of [0, 1, 2, 3]) if (state.families[k]) out.push(k);
+  if (!out.length) out.push(state.reflections);
+  return out;
+}
+
+function subscribe(fn) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+let queued = false;
+function notify() {
+  if (queued) return;
+  queued = true;
+  requestAnimationFrame(() => {
+    queued = false;
+    for (const fn of listeners) fn(state);
+  });
+}
+
+/** Shallow-merge a patch into the state and notify. Nested `show` is merged. */
+function set(patch) {
+  for (const [k, v] of Object.entries(patch)) {
+    if (k === 'show' || k === 'families') Object.assign(state[k], v);
+    else state[k] = v;
+  }
+  notify();
+}
+
+/* ============ src/ui.js ============ */
+
+/**
+ * ui.js -- tiny DOM helpers and reusable, language-agnostic controls.
+ * Controls are given translation KEYS, never literal text.
+ */
+
+function el(tag, attrs = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v === null || v === undefined || v === false) continue;
+    if (k === 'class') node.className = v;
+    else if (k === 'style') node.setAttribute('style', v);
+    else if (k === 'html') node.innerHTML = v;
+    else if (k.startsWith('on') && typeof v === 'function') {
+      node.addEventListener(k.slice(2).toLowerCase(), v);
+    } else if (k === 'dataset') Object.assign(node.dataset, v);
+    else node.setAttribute(k, v === true ? '' : v);
+  }
+  for (const c of children.flat()) {
+    if (c === null || c === undefined || c === false) continue;
+    node.append(c.nodeType ? c : document.createTextNode(String(c)));
+  }
+  return node;
+}
+
+const clear = (node) => {
+  while (node.firstChild) node.removeChild(node.firstChild);
+  return node;
+};
+
+/** A titled, collapsible group of controls. */
+function group(titleKey, ...children) {
+  const body = el('div', { class: 'group-body' }, ...children);
+  const head = el(
+    'button',
+    {
+      class: 'group-head',
+      type: 'button',
+      onclick: () => {
+        const open = body.classList.toggle('collapsed');
+        head.classList.toggle('closed', open);
+      },
+    },
+    el('span', { class: 'group-caret' }),
+    el('span', {}, t(titleKey))
+  );
+  return el('section', { class: 'group' }, head, body);
+}
+
+/**
+ * Every control carries a `.sync()` that pushes the current state back into
+ * the DOM element. That way a tutorial step (or any programmatic change) can
+ * update the controls without rebuilding them -- rebuilding would interrupt a
+ * drag in progress and lose keyboard focus.
+ */
+function collectSyncers(root, out = []) {
+  if (root.sync) out.push(root.sync);
+  for (const child of root.children) collectSyncers(child, out);
+  return out;
+}
+
+/**
+ * Slider with a live value readout.
+ *   opts: { labelKey, min, max, step, get, format, onInput, hintKey }
+ */
+function slider(opts) {
+  const out = el('output', { class: 'ctl-value' }, opts.format(opts.get()));
+  const input = el('input', {
+    type: 'range',
+    min: opts.min,
+    max: opts.max,
+    step: opts.step,
+    value: opts.get(),
+    oninput: (e) => {
+      const v = parseFloat(e.target.value);
+      out.textContent = opts.format(v);
+      opts.onInput(v);
+    },
+  });
+  const node = el(
+    'label',
+    { class: 'ctl' },
+    el('span', { class: 'ctl-label' }, el('span', {}, t(opts.labelKey)), out),
+    input,
+    opts.hintKey ? el('small', { class: 'ctl-hint' }, t(opts.hintKey)) : null
+  );
+  node.sync = () => {
+    const v = opts.get();
+    if (document.activeElement !== input) input.value = String(v);
+    out.textContent = opts.format(v);
+  };
+  return node;
+}
+
+/** Checkbox bound to a boolean getter. */
+function toggle(labelKey, get, onChange, opts = {}) {
+  const input = el('input', {
+    type: 'checkbox',
+    checked: get(),
+    onchange: (e) => onChange(e.target.checked),
+  });
+  const node = el(
+    'label',
+    { class: 'ctl ctl-toggle' + (opts.strong ? ' strong' : '') },
+    input,
+    el('span', {}, t(labelKey)),
+    opts.swatch ? el('i', { class: 'swatch', style: `background:${opts.swatch}` }) : null
+  );
+  node.sync = () => {
+    input.checked = !!get();
+  };
+  return node;
+}
+
+/**
+ * Segmented radio group. options: [{value, labelKey, label, color}]
+ * `get` may be a function or a plain value (for one-shot renders).
+ */
+function segmented(options, get, onChange, opts = {}) {
+  const read = typeof get === 'function' ? get : () => get;
+  const buttons = options.map((o) =>
+    el(
+      'button',
+      {
+        type: 'button',
+        class: 'seg',
+        style: o.color ? `--seg-accent:${o.color}` : null,
+        onclick: () => onChange(o.value),
+      },
+      o.labelKey ? t(o.labelKey) : o.label
+    )
+  );
+  const node = el('div', { class: 'segmented' + (opts.wrap ? ' wrap' : '') }, buttons);
+  node.sync = () => {
+    const v = read();
+    options.forEach((o, i) => buttons[i].classList.toggle('active', o.value === v));
+  };
+  node.sync();
+  return node;
+}
+
+/** Labelled <select> bound to a getter. */
+function select(labelKey, options, get, onChange) {
+  const read = typeof get === 'function' ? get : () => get;
+  const sel = el(
+    'select',
+    { onchange: (e) => onChange(e.target.value) },
+    options.map((o) =>
+      el('option', { value: o.value }, o.labelKey ? t(o.labelKey) : o.label)
+    )
+  );
+  const node = el('label', { class: 'ctl' }, el('span', { class: 'ctl-label' }, t(labelKey)), sel);
+  node.sync = () => {
+    sel.value = String(read());
+  };
+  node.sync();
+  return node;
+}
+
+/** A key/value row for the readout panels. */
+function row(labelKey, value, opts = {}) {
+  return el(
+    'div',
+    { class: 'row' + (opts.wide ? ' wide' : '') },
+    el('span', { class: 'row-key' }, t(labelKey)),
+    el('span', { class: 'row-val' + (opts.mono === false ? '' : ' mono'), style: opts.color ? `color:${opts.color}` : null }, value)
+  );
+}
+
+/** Canvas that keeps its backing store matched to the CSS size and DPR. */
+function fitCanvas(canvas) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const rect = canvas.getBoundingClientRect();
+  const w = Math.max(1, Math.round(rect.width * dpr));
+  const h = Math.max(1, Math.round(rect.height * dpr));
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w;
+    canvas.height = h;
+  }
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w: rect.width, h: rect.height, dpr };
+}
+
+/** Stroke a polyline given as [{x,y}, ...] in screen coordinates. */
+function strokePath(ctx, pts, style, width = 1.5, dash = null) {
+  if (pts.length < 2) return;
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.strokeStyle = style;
+  ctx.lineWidth = width;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  if (dash) ctx.setLineDash(dash);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function label(ctx, text, x, y, opts = {}) {
+  ctx.save();
+  ctx.font = opts.font || '11px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif';
+  ctx.textAlign = opts.align || 'left';
+  ctx.textBaseline = opts.baseline || 'middle';
+  const m = ctx.measureText(text);
+  if (opts.bg !== false) {
+    const padX = 4;
+    const padY = 3;
+    const w = m.width + padX * 2;
+    const h = 15;
+    let bx = x - padX;
+    if ((opts.align || 'left') === 'center') bx = x - w / 2;
+    if (opts.align === 'right') bx = x - w + padX;
+    ctx.fillStyle = opts.bgColor || 'rgba(9,12,20,0.78)';
+    ctx.beginPath();
+    ctx.roundRect(bx, y - h / 2, w, h, 3);
+    ctx.fill();
+  }
+  ctx.fillStyle = opts.color || '#dfe6f5';
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+/** Arrow head at `to`, pointing along (to - from). */
+function arrowHead(ctx, from, to, color, size = 7) {
+  const a = Math.atan2(to.y - from.y, to.x - from.x);
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(to.x, to.y);
+  ctx.lineTo(to.x - size * Math.cos(a - 0.4), to.y - size * Math.sin(a - 0.4));
+  ctx.lineTo(to.x - size * Math.cos(a + 0.4), to.y - size * Math.sin(a + 0.4));
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+/** Angular arc marker between two directions around a vertex. */
+function angleArc(ctx, cx, cy, r, a0, a1, color, text) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, a0, a1, a1 < a0);
+  ctx.stroke();
+  if (text) {
+    const mid = (a0 + a1) / 2;
+    label(ctx, text, cx + Math.cos(mid) * (r + 12), cy + Math.sin(mid) * (r + 12), {
+      align: 'center',
+      color,
+      font: '10px "IBM Plex Mono", ui-monospace, monospace',
+    });
+  }
+  ctx.restore();
+}
+
+/* ============ src/rays.js ============ */
+
+/**
+ * rays.js -- turns the current control state into a set of traced rays.
+ *
+ * Every ray in the application comes from here, so the 2-D scene, the graph
+ * and the readout panel can never disagree about what is being shown.
+ */
+
+
+/** A demonstrably off-caustic impact parameter for the "ordinary ray" case. */
+const NON_CAUSTIC_B = 0.35;
+
+/** Trace one ray with the canonical geometry: beam along +x, droplet at origin. */
+function traceOne(lambda, n, k, b, radius = 1) {
+  const path = O.traceRay({
+    origin: O.vec(-6 * radius, b * radius, 0),
+    dir: O.vec(1, 0, 0),
+    center: O.vec(0, 0, 0),
+    radius,
+    n,
+    reflections: k,
+    exitLength: 6 * radius,
+  });
+  return {
+    lambda,
+    n,
+    k,
+    b,
+    path,
+    classification: path.classification,
+    color: O.rgbCss(lambda),
+  };
+}
+
+/**
+ * The full set of rays implied by the current state.
+ * role:
+ *   'main'   the ray the user is steering
+ *   'fan'    the surrounding fan that shows the caustic piling up
+ *   'demo0'  Case 1 from the brief: zero internal reflections
+ *   'demoNC' Case 2: one internal reflection at a non-rainbow impact parameter
+ */
+function buildRays() {
+  const idx = indexModel();
+  const lambdas = activeLambdas();
+  const orders = activeOrders();
+  const out = [];
+
+  for (const k of orders) {
+    for (const lambda of lambdas) {
+      const n = idx(lambda);
+      const r = traceOne(lambda, n, k, state.impact);
+      r.role = 'main';
+      out.push(r);
+
+      if (state.fanCount > 0) {
+        for (let i = 0; i < state.fanCount; i++) {
+          const b = (i + 0.5) / state.fanCount;
+          if (Math.abs(b - state.impact) < 1e-6) continue;
+          const f = traceOne(lambda, n, k, b);
+          f.role = 'fan';
+          out.push(f);
+        }
+      }
+    }
+  }
+
+  if (state.showNonRainbow) {
+    const lambda = lambdas.includes(650) ? 650 : lambdas[0];
+    const n = idx(lambda);
+    if (!orders.includes(0)) {
+      const r0 = traceOne(lambda, n, 0, state.impact);
+      r0.role = 'demo0';
+      r0.noteKey = 'explNoReflection';
+      out.push(r0);
+    }
+    const rn = traceOne(lambda, n, 1, NON_CAUSTIC_B);
+    rn.role = 'demoNC';
+    rn.noteKey = 'explNonCaustic';
+    out.push(rn);
+  }
+
+  return out;
+}
+
+/** How far (in degrees) this ray sits from the extremum of its own family. */
+function distanceFromExtremum(ray) {
+  if (ray.k < 1 || ray.path.antisolar === null) return null;
+  const geo = O.rainbowGeometry(ray.n, ray.k);
+  if (!geo) return null;
+  return ray.path.antisolar * O.DEG - geo.antisolarDeg;
+}
+
+/**
+ * Display colour for a wavelength.
+ *
+ * With white light selected and dispersion turned down, the six sampled
+ * wavelengths all take the same path, so they are drawn white and overlap into
+ * a single beam. As dispersion rises they separate AND gain their colour --
+ * which is the honest visual statement that the colours of a rainbow exist
+ * only because n depends on wavelength.
+ */
+function colorFor(lambda, alpha = 1) {
+  const c = O.wavelengthToRGB(lambda);
+  let { r, g, b } = c;
+  if (state.wavelength === 'white') {
+    const m = Math.min(1, state.dispersion * 2.5);
+    r = Math.round(r * m + 255 * (1 - m));
+    g = Math.round(g * m + 255 * (1 - m));
+    b = Math.round(b * m + 255 * (1 - m));
+  }
+  return alpha >= 1 ? `rgb(${r},${g},${b})` : `rgba(${r},${g},${b},${alpha})`;
+}
+
+/** Named colour id for a wavelength, if it is one of the six. */
+function colorIdFor(lambda) {
+  const c = O.NAMED_COLORS.find((x) => x.lambda === lambda);
+  return c ? c.id : null;
+}
+
+/* ============ src/dropletView.js ============ */
+
+/**
+ * dropletView.js -- Mode A: cross-section of a single spherical droplet.
+ *
+ * Nothing in here knows any optics: it renders the polylines that
+ * optics.traceRay() produced. Dragging changes the impact parameter, which
+ * re-runs the trace.
+ */
+
+
+
+
+
+const SEG_LABELS = ['R0', 'R1', 'R2', 'R3', 'R4', 'R5'];
+
+function createDropletView(canvas) {
+  let layout = null;
+  let hover = null;
+
+  function project(p) {
+    return { x: layout.cx + p.x * layout.s, y: layout.cy - p.y * layout.s };
+  }
+
+  function draw() {
+    const { ctx, w, h } = fitCanvas(canvas);
+    ctx.clearRect(0, 0, w, h);
+
+    const s = Math.min(w * 0.19, h * 0.34);
+    layout = { cx: w * 0.47, cy: h * 0.5, s, w, h };
+
+    drawBackground(ctx, w, h);
+    drawDroplet(ctx);
+    drawSun(ctx, w, h);
+
+    const rays = buildRays();
+    // fans first, main rays on top
+    const order = { fan: 0, demo0: 1, demoNC: 1, main: 2 };
+    rays.sort((a, b) => order[a.role] - order[b.role]);
+    for (const ray of rays) drawRay(ctx, ray);
+
+    const main = rays.filter((r) => r.role === 'main');
+    if (main.length) {
+      const ref = main[main.length - 1];
+      if (state.show.angles) drawAngles(ctx, ref);
+      if (state.show.labels) drawSegmentLabels(ctx, ref);
+      if (state.show.angles && ref.path.dirOut) drawExitAngle(ctx, ref);
+      if (state.show.normals) for (const r of main) drawNormals(ctx, r);
+    }
+    drawImpactHandle(ctx);
+    drawLegend(ctx, w, h, rays);
+  }
+
+  function drawBackground(ctx, w, h) {
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, '#080b14');
+    g.addColorStop(1, '#0d1220');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+
+    // optical axis through the droplet centre
+    strokePath(
+      ctx,
+      [{ x: 0, y: layout.cy }, { x: w, y: layout.cy }],
+      'rgba(120,140,180,0.18)',
+      1,
+      [4, 6]
+    );
+    if (state.show.labels) {
+      label(ctx, t('antisolarPoint'), 14, layout.cy - 13, {
+        color: '#8fa4c8', bg: false, font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
+      });
+    }
+  }
+
+  function drawDroplet(ctx) {
+    const { cx, cy, s } = layout;
+    const g = ctx.createRadialGradient(cx - s * 0.35, cy - s * 0.35, s * 0.1, cx, cy, s);
+    g.addColorStop(0, 'rgba(120,190,255,0.16)');
+    g.addColorStop(1, 'rgba(60,110,190,0.06)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(cx, cy, s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(140,190,255,0.55)';
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+
+    // centre mark
+    ctx.fillStyle = 'rgba(160,200,255,0.6)';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (state.show.labels) {
+      const idx = indexModel();
+      const lam = state.wavelength === 'white' ? 589 : state.wavelength;
+      label(ctx, `${t('raindrop')} · n = ${num(idx(lam), 3)}`, cx, cy + s + 16, {
+        align: 'center', color: '#9fc4ee',
+      });
+      label(ctx, `R = ${num(state.dropletRadiusMm, 2)} mm`, cx, cy + s + 34, {
+        align: 'center', color: '#6f86ab', bg: false, font: '10px "IBM Plex Mono", ui-monospace, monospace',
+      });
+    }
+  }
+
+  function drawSun(ctx, w, h) {
+    const y = layout.cy - state.impact * layout.s;
+    ctx.save();
+    const g = ctx.createRadialGradient(24, y, 2, 24, y, 16);
+    g.addColorStop(0, 'rgba(255,238,180,0.95)');
+    g.addColorStop(1, 'rgba(255,210,90,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(24, y, 16, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffe9a8';
+    ctx.beginPath();
+    ctx.arc(24, y, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    if (state.show.labels) {
+      label(ctx, t('sunLabel'), 24, y - 24, { align: 'center', color: '#ffe9a8' });
+    }
+  }
+
+  function rayAlpha(ray) {
+    if (ray.role === 'fan') return 0.24;
+    if (ray.role === 'demo0' || ray.role === 'demoNC') return 0.75;
+    return 1;
+  }
+
+  function drawRay(ctx, ray) {
+    const p = ray.path;
+    if (!p.hit && !p.miss) return;
+    const a = rayAlpha(ray);
+    const selected =
+      state.selectedRay &&
+      state.selectedRay.k === ray.k &&
+      Math.abs(state.selectedRay.b - ray.b) < 1e-9 &&
+      state.selectedRay.lambda === ray.lambda;
+
+    const base = colorFor(ray.lambda, a);
+    const dashed = ray.role === 'demo0' || ray.role === 'demoNC';
+
+    for (const seg of p.segments) {
+      const A = project(seg.a);
+      const B = project(seg.b);
+      let width = ray.role === 'fan' ? 1 : 1.9;
+      if (selected) width += 1.6;
+      let style = base;
+      if (seg.medium === 'water') {
+        style = colorFor(ray.lambda, Math.min(1, a * 0.95));
+        width += 0.2;
+      }
+      if (seg.kind === 'incident' && ray.role !== 'fan') {
+        style = state.wavelength === 'white' ? `rgba(255,246,214,${a})` : base;
+      }
+      strokePath(ctx, [A, B], style, width, dashed && seg.kind !== 'internal' ? [5, 4] : null);
+    }
+
+    if (p.dirOut && p.segments.length) {
+      const last = p.segments[p.segments.length - 1];
+      arrowHead(ctx, project(last.a), project(last.b), base, ray.role === 'fan' ? 4 : 7);
+    }
+
+    if (ray.role !== 'fan') {
+      for (const v of p.vertices) {
+        const q = project(v.point);
+        ctx.fillStyle = v.type === 'reflection' ? '#ffd166' : '#8be0ff';
+        ctx.beginPath();
+        ctx.arc(q.x, q.y, selected ? 3.6 : 2.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    if (ray.noteKey && state.show.labels) {
+      const last = p.segments[p.segments.length - 1];
+      const q = project(last.b);
+      const txt = t(ray.noteKey);
+      label(ctx, txt.length > 62 ? txt.slice(0, 60) + '…' : txt,
+        Math.min(q.x, layout.w - 12), q.y + (ray.k === 0 ? 16 : -16), {
+        align: 'right', color: '#c3b6ff', font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
+      });
+    }
+  }
+
+  function drawNormals(ctx, ray) {
+    for (const v of ray.path.vertices) {
+      const a = project(v.point);
+      const nEnd = O.vadd(v.point, O.vmul(v.normal, 0.42));
+      const b = project(nEnd);
+      strokePath(ctx, [a, b], 'rgba(180,200,240,0.5)', 1, [3, 3]);
+      const inner = project(O.vsub(v.point, O.vmul(v.normal, 0.42)));
+      strokePath(ctx, [a, inner], 'rgba(180,200,240,0.22)', 1, [3, 3]);
+    }
+  }
+
+  function drawSegmentLabels(ctx, ray) {
+    const segs = ray.path.segments;
+    for (let i = 0; i < segs.length && i < SEG_LABELS.length; i++) {
+      const s = segs[i];
+      const mid = { x: (s.a.x + s.b.x) / 2, y: (s.a.y + s.b.y) / 2 };
+      const q = project(mid);
+      label(ctx, SEG_LABELS[i], q.x, q.y - 12, {
+        align: 'center', color: '#93a7c9', font: '10px "IBM Plex Mono", ui-monospace, monospace',
+      });
+    }
+  }
+
+  function drawAngles(ctx, ray) {
+    const v = ray.path.vertices[0];
+    if (!v) return;
+    const c = project(v.point);
+    const nDir = { x: v.normal.x, y: -v.normal.y };
+    const nAng = Math.atan2(nDir.y, nDir.x);
+    const inAng = Math.atan2(0, -1); // incoming ray reversed = pointing back to the Sun
+    const r = 30;
+    angleArc(ctx, c.x, c.y, r, nAng, inAng, 'rgba(139,224,255,0.8)', `θi=${deg(v.thetaIn * O.DEG, 1)}`);
+    const refr = ray.path.segments[1];
+    if (refr) {
+      const d = { x: refr.b.x - refr.a.x, y: -(refr.b.y - refr.a.y) };
+      const rAng = Math.atan2(d.y, d.x);
+      angleArc(ctx, c.x, c.y, r * 0.62, nAng + Math.PI, rAng, 'rgba(255,209,102,0.85)',
+        `θr=${deg(v.thetaOut * O.DEG, 1)}`);
+    }
+  }
+
+  function drawExitAngle(ctx, ray) {
+    const p = ray.path;
+    const exitSeg = p.segments[p.segments.length - 1];
+    const origin = project(exitSeg.a);
+    // reference direction = away from the Sun (the antisolar direction), i.e. +x
+    const refEnd = { x: origin.x + 78, y: origin.y };
+    strokePath(ctx, [origin, refEnd], 'rgba(120,140,180,0.5)', 1, [3, 4]);
+    const d = { x: exitSeg.b.x - exitSeg.a.x, y: -(exitSeg.b.y - exitSeg.a.y) };
+    const outAng = Math.atan2(d.y, d.x);
+    const phi = p.antisolar * O.DEG;
+    angleArc(ctx, origin.x, origin.y, 46, 0, outAng, 'rgba(111,211,164,0.95)', `φ=${deg(phi, 1)}`);
+  }
+
+  function drawImpactHandle(ctx) {
+    const y = layout.cy - state.impact * layout.s;
+    const x = layout.cx - layout.s * 1.9;
+    ctx.save();
+    ctx.strokeStyle = hover ? 'rgba(255,255,255,0.75)' : 'rgba(180,200,240,0.45)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2, 3]);
+    ctx.beginPath();
+    ctx.moveTo(x, layout.cy);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = hover ? '#ffffff' : 'rgba(200,220,255,0.85)';
+    ctx.beginPath();
+    ctx.arc(x, y, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    if (state.show.labels) {
+      label(ctx, `b/R = ${num(state.impact, 3)}`, x, y - 16, { align: 'center', color: '#cfe0ff' });
+    }
+  }
+
+  function drawLegend(ctx, w, h, rays) {
+    if (!state.show.wavelengthLabels) return;
+    const main = rays.filter((r) => r.role === 'main');
+    const seen = new Set();
+    let y = 18;
+    for (const r of main) {
+      if (seen.has(r.lambda)) continue;
+      seen.add(r.lambda);
+      const txt = `${r.lambda} ${t('nm')} · n=${num(r.n, 4)} · φ=${
+        r.path.antisolar === null ? '—' : deg(r.path.antisolar * O.DEG, 2)
+      }`;
+      label(ctx, txt, w - 12, y, { align: 'right', color: colorFor(r.lambda) });
+      y += 18;
+    }
+  }
+
+  /* ---------------------------------------------------------- interaction */
+
+  function impactFromEvent(e) {
+    const rect = canvas.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const b = (layout.cy - y) / layout.s;
+    return Math.max(-0.999, Math.min(0.999, b));
+  }
+
+  let dragging = false;
+  canvas.addEventListener('pointerdown', (e) => {
+    if (!layout) return;
+    dragging = true;
+    canvas.setPointerCapture(e.pointerId);
+    set({ impact: impactFromEvent(e) });
+    selectNearest(e);
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!layout) return;
+    if (dragging) {
+      set({ impact: impactFromEvent(e) });
+    } else {
+      const rect = canvas.getBoundingClientRect();
+      const y = e.clientY - rect.top;
+      const hy = layout.cy - state.impact * layout.s;
+      const nowHover = Math.abs(y - hy) < 14;
+      if (nowHover !== hover) {
+        hover = nowHover;
+        canvas.style.cursor = hover ? 'ns-resize' : 'crosshair';
+        draw();
+      }
+    }
+  });
+  const stop = () => { dragging = false; };
+  canvas.addEventListener('pointerup', stop);
+  canvas.addEventListener('pointercancel', stop);
+
+  function selectNearest(e) {
+    const rect = canvas.getBoundingClientRect();
+    const px = e.clientX - rect.left;
+    const py = e.clientY - rect.top;
+    let best = null;
+    let bestD = 14;
+    for (const ray of buildRays()) {
+      for (const seg of ray.path.segments) {
+        const A = project(seg.a);
+        const B = project(seg.b);
+        const d = distToSegment(px, py, A, B);
+        if (d < bestD) {
+          bestD = d;
+          best = ray;
+        }
+      }
+    }
+    if (best) {
+      set({ selectedRay: { lambda: best.lambda, k: best.k, b: best.b }, panel: 'ray' });
+    }
+  }
+
+  return { draw, tick: () => false, reset: () => {} };
+}
+
+function distToSegment(px, py, a, b) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const l2 = dx * dx + dy * dy;
+  if (l2 === 0) return Math.hypot(px - a.x, py - a.y);
+  let tt = ((px - a.x) * dx + (py - a.y) * dy) / l2;
+  tt = Math.max(0, Math.min(1, tt));
+  return Math.hypot(px - (a.x + tt * dx), py - (a.y + tt * dy));
+}
+
+/* ============ src/graphView.js ============ */
+
+/**
+ * graphView.js -- the two diagnostic plots.
+ *
+ *   'exit'  exit angle versus impact parameter, one curve per wavelength and
+ *           per reflection order. The extremum is found by the optics engine,
+ *           never drawn as a decorative horizontal line.
+ *   'dist'  the angular distribution of outgoing rays, accumulated ray by ray
+ *           so that the caustic peak visibly emerges.
+ *
+ * Both directions of the interaction are wired: dragging the ray moves the
+ * marker, clicking the graph moves the ray.
+ */
+
+
+
+
+
+const PAD = { l: 58, r: 16, t: 26, b: 34 };
+
+function createGraphView(canvas) {
+  let box = null;
+  const accum = { key: '', data: new Map(), count: 0, target: 0 };
+  let raf = null;
+
+  /* --------------------------------------------------------- accumulator */
+
+  function accumKey() {
+    return [
+      activeOrders().join(','),
+      activeLambdas().join(','),
+      state.dispersion,
+      state.indexMode,
+      state.indexScale,
+      distRange().join(','),
+    ].join('|');
+  }
+
+  function distRange() {
+    const orders = activeOrders();
+    const maxK = Math.max(...orders);
+    const minK = Math.min(...orders);
+    if (maxK <= 2 && minK >= 1) return [0, 90];
+    return [0, 180];
+  }
+
+  const BINS = 540;
+
+  function resetAccum() {
+    accum.key = accumKey();
+    accum.data = new Map();
+    accum.count = 0;
+    for (const lam of activeLambdas()) accum.data.set(lam, new Float64Array(BINS));
+  }
+
+  /** Add `m` randomly sampled rays per wavelength (area-weighted in b). */
+  function addRays(m) {
+    const idx = indexModel();
+    const orders = activeOrders();
+    const [lo, hi] = distRange();
+    const bw = (hi - lo) / BINS;
+    for (const lam of activeLambdas()) {
+      const arr = accum.data.get(lam);
+      if (!arr) continue;
+      const n = idx(lam);
+      for (let i = 0; i < m; i++) {
+        const b = Math.sqrt(Math.random());
+        const thetaI = Math.asin(O.clamp(b, 0, 1));
+        for (const k of orders) {
+          const D = O.deviation(thetaI, n, k);
+          if (D === null) continue;
+          const phi = O.antisolarAngle(D) * O.DEG;
+          const R = O.fresnelReflectance(thetaI, 1, n);
+          const w = (1 - R) * (1 - R) * Math.pow(R, k);
+          const bin = Math.floor((phi - lo) / bw);
+          if (bin >= 0 && bin < BINS) arr[bin] += w;
+        }
+      }
+    }
+    accum.count += m;
+  }
+
+  function stepAccum() {
+    if (accum.key !== accumKey()) resetAccum();
+    const target = state.distAccumulate ? Infinity : state.distRays;
+    if (accum.count > state.distRays && !state.distAccumulate) resetAccum();
+    if (accum.count < target) {
+      const remaining = target - accum.count;
+      const batch = Math.min(
+        Math.max(1, Math.ceil(accum.count * 0.35) || 1),
+        remaining,
+        state.distAccumulate ? 3000 : 8000
+      );
+      addRays(batch);
+      return true; // more to come
+    }
+    return false;
+  }
+
+  /* -------------------------------------------------------------- drawing */
+
+  function draw() {
+    const { ctx, w, h } = fitCanvas(canvas);
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = '#080b14';
+    ctx.fillRect(0, 0, w, h);
+    box = { x: PAD.l, y: PAD.t, w: w - PAD.l - PAD.r, h: h - PAD.t - PAD.b };
+    if (box.w < 40 || box.h < 30) return;
+    if (state.graph === 'exit') drawExit(ctx, w, h);
+    else drawDist(ctx, w, h);
+  }
+
+  function frame(ctx, xLabel, yLabel, xTicks, yTicks, fx, fy) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(120,140,180,0.28)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(box.x, box.y, box.w, box.h);
+    ctx.font = '10px "IBM Plex Mono", ui-monospace, monospace';
+    ctx.fillStyle = '#7c8fb3';
+    for (const v of xTicks) {
+      const x = fx(v);
+      ctx.strokeStyle = 'rgba(120,140,180,0.13)';
+      ctx.beginPath();
+      ctx.moveTo(x, box.y);
+      ctx.lineTo(x, box.y + box.h);
+      ctx.stroke();
+      ctx.textAlign = 'center';
+      ctx.fillText(num(v, v % 1 === 0 ? 0 : 1), x, box.y + box.h + 13);
+    }
+    for (const v of yTicks) {
+      const y = fy(v);
+      ctx.strokeStyle = 'rgba(120,140,180,0.13)';
+      ctx.beginPath();
+      ctx.moveTo(box.x, y);
+      ctx.lineTo(box.x + box.w, y);
+      ctx.stroke();
+      ctx.textAlign = 'right';
+      ctx.fillText(num(v, v % 1 === 0 ? 0 : 1), box.x - 7, y + 3);
+    }
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#8ea3c6';
+    ctx.font = '11px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif';
+    ctx.fillText(xLabel, box.x + box.w / 2, box.y + box.h + 28);
+    ctx.save();
+    ctx.translate(13, box.y + box.h / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText(yLabel, 0, 0);
+    ctx.restore();
+    ctx.restore();
+  }
+
+  function niceTicks(lo, hi, count = 6) {
+    const span = hi - lo;
+    if (!(span > 0)) return [lo];
+    const raw = span / count;
+    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const norm = raw / mag;
+    const stepN = norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10;
+    const step = stepN * mag;
+    const out = [];
+    for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) {
+      out.push(Math.abs(v) < 1e-9 ? 0 : v);
+    }
+    return out;
+  }
+
+  /* ------------------------------------------------ exit-angle vs impact */
+
+  let exitMap = null;
+
+  function drawExit(ctx, w, h) {
+    const idx = indexModel();
+    const orders = activeOrders();
+    const lambdas = activeLambdas();
+    const curves = [];
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (const k of orders) {
+      for (const lam of lambdas) {
+        const n = idx(lam);
+        const c = O.exitAngleCurve(n, k, 320);
+        const vals =
+          state.angleMode === 'deviation' ? c.D : state.angleMode === 'scattering' ? c.theta : c.phi;
+        for (const v of vals) {
+          if (v < lo) lo = v;
+          if (v > hi) hi = v;
+        }
+        curves.push({ k, lam, n, b: c.b, vals });
+      }
+    }
+    if (!curves.length) return;
+    const padY = Math.max(2, (hi - lo) * 0.12);
+    lo = Math.max(0, lo - padY);
+    hi = hi + padY;
+
+    const fx = (b) => box.x + b * box.w;
+    const fy = (v) => box.y + box.h - ((v - lo) / (hi - lo)) * box.h;
+    exitMap = { fx, fy, lo, hi };
+
+    const yKey =
+      state.angleMode === 'deviation'
+        ? 'axisAngleDeviation'
+        : state.angleMode === 'scattering'
+        ? 'axisAngleScattering'
+        : 'axisAngleAntisolar';
+    frame(ctx, t('axisImpact'), t(yKey), niceTicks(0, 1, 5), niceTicks(lo, hi, 6), fx, fy);
+
+    // extremum guide lines, computed by the engine
+    for (const k of orders) {
+      if (k < 1) continue;
+      for (const lam of lambdas) {
+        const geo = O.rainbowGeometry(idx(lam), k);
+        if (!geo) continue;
+        const v =
+          state.angleMode === 'deviation'
+            ? geo.deviationDeg
+            : state.angleMode === 'scattering'
+            ? geo.scatteringDeg
+            : geo.antisolarDeg;
+        if (v < lo || v > hi) continue;
+        const y = fy(v);
+        strokePath(
+          ctx,
+          [{ x: box.x, y }, { x: box.x + box.w, y }],
+          colorFor(lam, 0.28), 1, [3, 5]
+        );
+        const x = fx(geo.impactParameter);
+        strokePath(ctx, [{ x, y: box.y + box.h }, { x, y }], colorFor(lam, 0.22), 1, [3, 5]);
+        ctx.fillStyle = colorFor(lam, 0.95);
+        ctx.beginPath();
+        ctx.arc(x, y, 3.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    for (const c of curves) {
+      const pts = [];
+      for (let i = 0; i < c.b.length; i++) pts.push({ x: fx(c.b[i]), y: fy(c.vals[i]) });
+      strokePath(ctx, pts, colorFor(c.lam, c.k === 1 ? 0.95 : 0.7),
+        c.k === 1 ? 2 : 1.5, c.k === 2 ? [6, 3] : c.k >= 3 ? [2, 3] : null);
+    }
+
+    // label each extremum once (using the longest wavelength present)
+    const lamLabel = lambdas.includes(650) ? 650 : lambdas[0];
+    for (const k of orders) {
+      if (k < 1) continue;
+      const geo = O.rainbowGeometry(idx(lamLabel), k);
+      if (!geo) continue;
+      const v =
+        state.angleMode === 'deviation'
+          ? geo.deviationDeg
+          : state.angleMode === 'scattering'
+          ? geo.scatteringDeg
+          : geo.antisolarDeg;
+      if (v < lo || v > hi) continue;
+      label(ctx, `k=${k} · ${t('extremumLabel')} ${deg(v, 2)}`, fx(geo.impactParameter) + 8, fy(v) - 14, {
+        color: colorFor(lamLabel), font: '10px "IBM Plex Mono", ui-monospace, monospace',
+      });
+    }
+
+    // the moving marker for the ray currently in the droplet
+    const bNow = Math.abs(state.impact);
+    const x = fx(bNow);
+    strokePath(ctx, [{ x, y: box.y }, { x, y: box.y + box.h }], 'rgba(255,255,255,0.4)', 1);
+    for (const c of curves) {
+      const v = O.angleFor(c.n, c.k, bNow, state.angleMode);
+      if (v === null || v < lo || v > hi) continue;
+      ctx.fillStyle = colorFor(c.lam);
+      ctx.beginPath();
+      ctx.arc(x, fy(v), 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    label(ctx, `b/R = ${num(bNow, 3)}`, x, box.y + 10, { align: 'center', color: '#e8eefc' });
+  }
+
+  /* ------------------------------------------------- angular distribution */
+
+  function drawDist(ctx, w, h) {
+    if (accum.key !== accumKey()) resetAccum();
+    const [lo, hi] = distRange();
+    const bw = (hi - lo) / BINS;
+
+    // radiance = energy per bin divided by the solid angle of the annulus
+    let peak = 0;
+    const shown = [];
+    for (const [lam, arr] of accum.data) {
+      const rad = new Float64Array(BINS);
+      for (let i = 0; i < BINS; i++) {
+        const phiMid = (lo + (i + 0.5) * bw) * O.RAD;
+        rad[i] = arr[i] / Math.max(Math.sin(phiMid), 0.02);
+        if (rad[i] > peak) peak = rad[i];
+      }
+      shown.push({ lam, rad });
+    }
+    if (peak <= 0) peak = 1;
+
+    const fx = (a) => box.x + ((a - lo) / (hi - lo)) * box.w;
+    const fy = (v) => box.y + box.h - (v / peak) * box.h * 0.92;
+    frame(ctx, t('axisAngleAntisolar'), t('axisRayCount'),
+      niceTicks(lo, hi, 7), [], fx, fy);
+
+    for (const { lam, rad } of shown) {
+      const pts = [];
+      for (let i = 0; i < BINS; i++) pts.push({ x: fx(lo + (i + 0.5) * bw), y: fy(rad[i]) });
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(box.x, box.y + box.h);
+      for (const p of pts) ctx.lineTo(p.x, p.y);
+      ctx.lineTo(box.x + box.w, box.y + box.h);
+      ctx.closePath();
+      ctx.fillStyle = colorFor(lam, shown.length > 1 ? 0.3 : 0.35);
+      ctx.fill();
+      ctx.restore();
+      strokePath(ctx, pts, colorFor(lam, 0.9), 1.2);
+    }
+
+    // where the engine says the extremum is
+    const idx = indexModel();
+    for (const k of activeOrders()) {
+      if (k < 1) continue;
+      for (const lam of activeLambdas()) {
+        const geo = O.rainbowGeometry(idx(lam), k);
+        if (!geo || geo.antisolarDeg < lo || geo.antisolarDeg > hi) continue;
+        const x = fx(geo.antisolarDeg);
+        strokePath(ctx, [{ x, y: box.y }, { x, y: box.y + box.h }], colorFor(lam, 0.35), 1, [4, 4]);
+      }
+    }
+
+    label(ctx, `${t('rayCount')}: ${formatCount(accum.count)}`, box.x + box.w - 8, box.y + 12, {
+      align: 'right', color: '#e8eefc',
+    });
+    const peakDeg = peakAngle(shown, lo, bw);
+    if (peakDeg !== null) {
+      label(ctx, `${t('extremumLabel')} ${deg(peakDeg, 2)}`, fx(peakDeg), box.y + 30, {
+        align: 'center', color: '#6fd3a4',
+      });
+    }
+  }
+
+  function peakAngle(shown, lo, bw) {
+    let best = -1;
+    let bi = -1;
+    for (const { rad } of shown) {
+      for (let i = 0; i < rad.length; i++) {
+        if (rad[i] > best) {
+          best = rad[i];
+          bi = i;
+        }
+      }
+    }
+    return bi < 0 || best <= 0 ? null : lo + (bi + 0.5) * bw;
+  }
+
+  function formatCount(c) {
+    if (c >= 1000000) return `${num(c / 1000000, 1)}M`;
+    if (c >= 1000) return `${num(c / 1000, c >= 10000 ? 0 : 1)}k`;
+    return String(c);
+  }
+
+  /* --------------------------------------------------------- interaction */
+
+  canvas.addEventListener('pointerdown', (e) => {
+    if (state.graph !== 'exit' || !box || !exitMap) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const b = O.clamp((x - box.x) / box.w, 0, 0.999);
+    set({ impact: b });
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (state.graph !== 'exit' || !box) return;
+    canvas.style.cursor = e.offsetX > box.x && e.offsetX < box.x + box.w ? 'ew-resize' : 'default';
+  });
+
+  /** Called every animation frame by the app while the dist plot is visible. */
+  function tick() {
+    if (state.graph !== 'dist') return false;
+    return stepAccum();
+  }
+
+  return { draw, tick, reset: resetAccum };
+}
+
+/* ============ src/dropsView.js ============ */
+
+/**
+ * dropsView.js -- Mode B: from one droplet to thousands.
+ *
+ * A vertical cross-section through the observer, containing the antisolar
+ * direction and the vertical. Each droplet is tested for one thing only:
+ * does the observer see it at the angle phi at which that droplet sends out
+ * its concentrated light? Distance never enters the test -- which is exactly
+ * the point the brief asks us to make.
+ */
+
+
+
+
+
+const MAX_DRAWN_RAYS = 34;
+
+function createDropsView(canvas) {
+  let drops = [];
+  let seedKey = '';
+  let layout = null;
+
+  function makeKey() {
+    return `${state.dropCount}|${state.show.rainBelow}`;
+  }
+
+  function regenerate() {
+    const target = state.dropCount;
+    if (drops.length > target) drops.length = target;
+    while (drops.length < target) {
+      // spread in depth and height; log-ish depth so near and far are both seen
+      const depth = 0.12 + Math.pow(Math.random(), 0.6) * 0.88;
+      const spread = state.show.rainBelow ? 1 : 0.62;
+      const height = (Math.random() * 2 - 1) * spread;
+      drops.push({ x: depth, y: height * depth * 1.25 });
+    }
+    seedKey = makeKey();
+  }
+
+  /** Bow bands, derived from the engine, as [{k, lo, hi}] in degrees. */
+  function bands() {
+    const idx = indexModel();
+    const out = [];
+    for (const k of [1, 2]) {
+      if (k === 1 && !state.show.primary) continue;
+      if (k === 2 && !state.show.secondary) continue;
+      const angles = O.NAMED_COLORS.map((c) => ({
+        lambda: c.lambda,
+        phi: O.rainbowGeometry(idx(c.lambda), k).antisolarDeg,
+      }));
+      const lo = Math.min(...angles.map((a) => a.phi));
+      const hi = Math.max(...angles.map((a) => a.phi));
+      out.push({ k, lo, hi, angles });
+    }
+    return out;
+  }
+
+  /** Which wavelength (if any) does a droplet seen at angle phi deliver? */
+  function colorAt(phi, bs) {
+    let best = null;
+    for (const band of bs) {
+      for (const a of band.angles) {
+        const d = Math.abs(a.phi - phi);
+        if (d < 0.45 && (!best || d < best.d)) best = { d, lambda: a.lambda, k: band.k };
+      }
+    }
+    return best;
+  }
+
+  function draw() {
+    const { ctx, w, h } = fitCanvas(canvas);
+    if (seedKey !== makeKey()) regenerate();
+
+    ctx.clearRect(0, 0, w, h);
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, '#070a12');
+    g.addColorStop(1, '#0c1120');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+
+    const ox = w * 0.1;
+    const oy = h * 0.52;
+    const s = Math.min(w * 0.82, h * 1.25);
+    layout = { ox, oy, s };
+    const P = (p) => ({ x: ox + p.x * s, y: oy - p.y * s });
+
+    const alpha = state.sunElevation;
+    const anti = { x: Math.cos(alpha * O.RAD), y: -Math.sin(alpha * O.RAD) };
+    const sun = { x: -anti.x, y: -anti.y };
+    const bs = bands();
+
+    // antisolar axis
+    strokePath(ctx, [P({ x: 0, y: 0 }), P({ x: anti.x * 1.35, y: anti.y * 1.35 })],
+      'rgba(150,170,210,0.35)', 1, [5, 5]);
+    if (state.show.labels) {
+      const e = P({ x: anti.x * 1.2, y: anti.y * 1.2 });
+      label(ctx, t('antisolarPoint'), e.x, e.y - 12, { align: 'center', color: '#9fb4d8' });
+    }
+
+    // the two directions that can deliver bow light, in this cross-section
+    for (const band of bs) {
+      for (const sign of [1, -1]) {
+        for (const edge of [band.lo, band.hi]) {
+          const a = (alpha * -1 + sign * edge) * O.RAD;
+          const d = { x: Math.cos(a) * (sign > 0 ? 1 : 1), y: Math.sin(a) };
+          const dir = rotate(anti, sign * edge * O.RAD);
+          strokePath(ctx, [P({ x: 0, y: 0 }), P({ x: dir.x * 1.35, y: dir.y * 1.35 })],
+            band.k === 1 ? 'rgba(111,211,164,0.22)' : 'rgba(155,140,240,0.2)', 1,
+            band.k === 1 ? [3, 4] : [2, 5]);
+        }
+      }
+    }
+
+    // ground
+    if (state.show.ground) {
+      const gy = groundY();
+      const yy = P({ x: 0, y: gy }).y;
+      const gg = ctx.createLinearGradient(0, yy, 0, h);
+      gg.addColorStop(0, 'rgba(30,45,35,0.85)');
+      gg.addColorStop(1, 'rgba(12,18,16,0.95)');
+      ctx.fillStyle = gg;
+      ctx.fillRect(0, yy, w, h - yy);
+      strokePath(ctx, [{ x: 0, y: yy }, { x: w, y: yy }], 'rgba(120,170,140,0.45)', 1.2);
+      if (state.show.labels) label(ctx, t('horizon'), w - 12, yy - 12, { align: 'right', color: '#9ec9ab' });
+    }
+
+    // droplets. The non-contributing ones are by far the most numerous, so
+    // they go into a single path and a single fill() -- one fill per droplet
+    // is what makes ten thousand of them slow.
+    let contributing = 0;
+    let drawnRays = 0;
+    const dotR = state.dropCount > 3000 ? 0.7 : state.dropCount > 600 ? 1.1 : state.dropCount > 60 ? 1.8 : 3;
+    const greyPath = new Path2D();
+    let greyCount = 0;
+    for (const d of drops) {
+      const len = Math.hypot(d.x, d.y);
+      if (len < 1e-6) continue;
+      const dir = { x: d.x / len, y: d.y / len };
+      const phi = Math.acos(O.clamp(dir.x * anti.x + dir.y * anti.y, -1, 1)) * O.DEG;
+      const hitc = colorAt(phi, bs);
+      const q = P(d);
+      if (q.x < -20 || q.x > w + 20 || q.y < -20 || q.y > h + 20) continue;
+
+      if (hitc) {
+        contributing++;
+        ctx.fillStyle = colorFor(hitc.lambda, 0.95);
+        ctx.beginPath();
+        ctx.arc(q.x, q.y, dotR + 1.2, 0, Math.PI * 2);
+        ctx.fill();
+        if (drawnRays < MAX_DRAWN_RAYS && state.show.droplets) {
+          drawnRays++;
+          // incoming sunlight
+          const back = { x: d.x - sun.x * 0.22, y: d.y - sun.y * 0.22 };
+          strokePath(ctx, [P(back), q], 'rgba(255,246,214,0.5)', 1);
+          // the ray that actually reaches the eye
+          strokePath(ctx, [q, P({ x: 0, y: 0 })], colorFor(hitc.lambda, 0.6), 1);
+        }
+      } else if (state.show.droplets) {
+        greyPath.moveTo(q.x + dotR, q.y);
+        greyPath.arc(q.x, q.y, dotR, 0, Math.PI * 2);
+        greyCount++;
+      }
+    }
+    if (greyCount) {
+      ctx.fillStyle = 'rgba(150,175,215,0.24)';
+      ctx.fill(greyPath);
+    }
+
+    // observer
+    const o = P({ x: 0, y: 0 });
+    ctx.save();
+    ctx.fillStyle = '#e8eefc';
+    ctx.beginPath();
+    ctx.arc(o.x, o.y, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(232,238,252,0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(o.x, o.y, 10, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    if (state.show.labels) label(ctx, t('observerLabel'), o.x, o.y + 22, { align: 'center', color: '#e8eefc' });
+
+    // sun, behind the observer
+    const sp = P({ x: sun.x * 0.55, y: sun.y * 0.55 });
+    const sg = ctx.createRadialGradient(sp.x, sp.y, 2, sp.x, sp.y, 22);
+    sg.addColorStop(0, 'rgba(255,238,180,0.9)');
+    sg.addColorStop(1, 'rgba(255,210,90,0)');
+    ctx.fillStyle = sg;
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, 22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffe9a8';
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, 5, 0, Math.PI * 2);
+    ctx.fill();
+    if (state.show.labels) label(ctx, t('sunLabel'), sp.x, sp.y - 26, { align: 'center', color: '#ffe9a8' });
+
+    // readout
+    label(ctx, `${t('dropCount')}: ${fmt(drops.length)}`, 12, 16, { color: '#cfe0ff' });
+    label(ctx, `${t('dropsContributing')}: ${fmt(contributing)}`, 12, 36, { color: '#6fd3a4' });
+    if (state.show.labels) {
+      const hint = t('dropsHint');
+      label(ctx, hint, 12, h - 14, { color: '#8ea3c6', font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif' });
+    }
+  }
+
+  function groundY() {
+    // observer height in metres mapped onto the scene, purely for legibility
+    const hm = state.observerHeight;
+    return -Math.min(0.55, 0.06 + Math.log10(1 + hm) * 0.16);
+  }
+
+  function fmt(n) {
+    return n >= 1000 ? `${num(n / 1000, n >= 10000 ? 0 : 1)}k` : String(n);
+  }
+
+  /** Grow the droplet field towards the target while animating. */
+  function tick() {
+    if (state.scene !== 'drops' || !state.dropsAnimate) return false;
+    if (drops.length >= state.dropCount) return false;
+    const add = Math.max(1, Math.ceil(drops.length * 0.25));
+    const target = Math.min(state.dropCount, drops.length + add);
+    while (drops.length < target) {
+      const depth = 0.12 + Math.pow(Math.random(), 0.6) * 0.88;
+      const spread = state.show.rainBelow ? 1 : 0.62;
+      drops.push({ x: depth, y: (Math.random() * 2 - 1) * spread * depth * 1.25 });
+    }
+    seedKey = makeKey();
+    return true;
+  }
+
+  function reset() {
+    drops = [];
+    seedKey = '';
+  }
+
+  canvas.addEventListener('pointerdown', () => set({ panel: 'guide' }));
+
+  return { draw, tick, reset };
+}
+
+function rotate(v, a) {
+  const c = Math.cos(a);
+  const s = Math.sin(a);
+  return { x: v.x * c - v.y * s, y: v.x * s + v.y * c };
+}
+
+/* ============ src/skyView.js ============ */
+
+/**
+ * skyView.js -- Mode C: the 3-D geometry.
+ *
+ * The observer sits at the origin. Every direction is a unit vector, so the
+ * "sky" is the unit sphere and the bow is literally the set of directions at
+ * angle phi from the antisolar direction. The ground is a plane below the
+ * observer, which is what produces the horizon -- the arc is never drawn as
+ * an arc, it is a circle with part of it cut away.
+ *
+ * A small hand-written perspective camera keeps the whole app dependency-free.
+ */
+
+
+
+
+
+const NEAR = 0.02;
+
+/* ------------------------------------------------------------- camera ---- */
+
+function makeCamera(eye, forward, fovDeg, w, h) {
+  const zA = O.vnorm(O.vneg(forward));
+  let upHint = O.vec(0, 1, 0);
+  if (Math.abs(O.vdot(zA, upHint)) > 0.999) upHint = O.vec(0, 0, 1);
+  const xA = O.vnorm(O.vcross(upHint, zA));
+  const yA = O.vcross(zA, xA);
+  const f = 1 / Math.tan((fovDeg * O.RAD) / 2);
+  const scale = (h / 2) * f;
+  return {
+    eye,
+    project(p) {
+      const d = O.vsub(p, eye);
+      const cx = O.vdot(d, xA);
+      const cy = O.vdot(d, yA);
+      const cz = -O.vdot(d, zA);
+      return { x: w / 2 + (cx / cz) * scale, y: h / 2 - (cy / cz) * scale, z: cz };
+    },
+    /** Camera-space depth only, used for near-plane clipping. */
+    depth(p) {
+      return -O.vdot(O.vsub(p, eye), zA);
+    },
+  };
+}
+
+/** Project a world polyline, splitting it wherever it crosses the near plane. */
+function clipPolyline(cam, pts) {
+  const out = [];
+  let run = [];
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    const z = cam.depth(p);
+    if (z > NEAR) {
+      run.push(cam.project(p));
+    } else {
+      if (run.length > 1) out.push(run);
+      run = [];
+      // enter/exit points keep the line touching the edge instead of jumping
+      const prev = pts[i - 1];
+      if (prev && cam.depth(prev) > NEAR) {
+        run.push(cam.project(lerpToNear(cam, prev, p)));
+        out.push(run);
+        run = [];
+      }
+      const next = pts[i + 1];
+      if (next && cam.depth(next) > NEAR) run.push(cam.project(lerpToNear(cam, next, p)));
+    }
+  }
+  if (run.length > 1) out.push(run);
+  return out;
+}
+
+function lerpToNear(cam, inside, outside) {
+  const zi = cam.depth(inside);
+  const zo = cam.depth(outside);
+  const tt = (zi - NEAR) / (zi - zo);
+  return O.vadd(inside, O.vmul(O.vsub(outside, inside), Math.max(0, Math.min(1, tt))));
+}
+
+/* --------------------------------------------------- cached bow profile -- */
+
+let profileCache = { key: '', profile: null };
+
+function bowProfile() {
+  const key = `${state.dispersion}|${state.indexMode}|${state.indexScale}|${state.show.primary}|${state.show.secondary}|${state.show.higher}`;
+  if (profileCache.key === key) return profileCache.profile;
+  const orders = [];
+  if (state.show.primary) orders.push(1);
+  if (state.show.secondary) orders.push(2);
+  const profile = orders.length
+    ? O.spectralProfile({
+        indexModel: indexModel(),
+        orders,
+        minDeg: 34,
+        maxDeg: 60,
+        bins: 260,
+        rays: 5000,
+      })
+    : null;
+  profileCache = { key, profile };
+  return profile;
+}
+
+/* ------------------------------------------------------------- the view -- */
+
+function createSkyView(canvas) {
+  let cam = null;
+  let size = { w: 0, h: 0 };
+
+  function groundDepth() {
+    // observer height, compressed logarithmically so 1.7 m and 1000 m both fit
+    return Math.min(0.62, 0.05 + Math.log10(1 + state.observerHeight) * 0.16);
+  }
+
+  function draw() {
+    const { ctx, w, h } = fitCanvas(canvas);
+    size = { w, h };
+    ctx.clearRect(0, 0, w, h);
+
+    const anti = O.antisolarDirection(state.sunElevation, state.sunAzimuth);
+    const sun = O.sunDirection(state.sunElevation, state.sunAzimuth);
+    const gh = groundDepth();
+    const dip = O.horizonDipDeg(state.observerHeight);
+
+    if (state.view === 'eye') {
+      const az = state.sunAzimuth + 180 + state.eyeAzimuth;
+      const fwd = O.sunDirection(state.eyeElevation, az);
+      cam = makeCamera(O.vec(0, 0, 0), fwd, state.fov, w, h);
+      drawSkyBackdrop(ctx, w, h, sun);
+    } else {
+      const eye = O.vmul(O.sunDirection(state.camPitch, state.camYaw), state.camDist);
+      const target = O.vmul(anti, 0.33);
+      cam = makeCamera(eye, O.vnorm(O.vsub(target, eye)), 42, w, h);
+      const g = ctx.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, '#070a12');
+      g.addColorStop(1, '#0c1020');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+    }
+
+    if (state.show.ground) drawGround(ctx, gh, w, h);
+    if (state.show.horizon) drawHorizon(ctx, dip);
+    if (state.show.sky && state.view === 'orbit') drawSphereGuides(ctx);
+
+    if (state.show.renderedBow) drawRenderedBow(ctx, anti, dip);
+    drawBowCircles(ctx, anti, dip);
+    if (state.show.alexander) drawAlexander(ctx, anti, dip);
+    if (state.show.cone) drawCone(ctx, anti);
+
+    drawSunAndAntisolar(ctx, sun, anti, w, h);
+    if (state.view === 'orbit') drawObserver(ctx);
+    drawReadout(ctx, w, h, dip);
+  }
+
+  /* ------------------------------------------------------------ elements */
+
+  function visibleDir(d, dip) {
+    if (state.show.rainBelow) return true;
+    if (!state.show.horizon && !state.show.ground) return true;
+    return Math.asin(O.clamp(d.y, -1, 1)) * O.DEG > -dip;
+  }
+
+  function drawSkyBackdrop(ctx, w, h, sun) {
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, '#0a1730');
+    g.addColorStop(0.55, '#12294d');
+    g.addColorStop(1, '#1d3a63');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  function drawGround(ctx, gh, w, h) {
+    const y0 = -gh;
+    const isEye = state.view === 'eye';
+    if (isEye) {
+      // fill everything below the projected horizon line
+      const horizonY = horizonScreenY();
+      if (horizonY !== null && horizonY < h) {
+        const g = ctx.createLinearGradient(0, horizonY, 0, h);
+        g.addColorStop(0, 'rgba(26,42,32,0.98)');
+        g.addColorStop(1, 'rgba(8,14,11,1)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, Math.max(0, horizonY), w, h - Math.max(0, horizonY));
+      }
+    }
+    const col = state.show.rainBelow ? 'rgba(120,170,140,0.16)' : 'rgba(120,170,140,0.3)';
+    for (let r = 0.5; r <= 6.001; r += 0.5) {
+      const pts = [];
+      for (let i = 0; i <= 96; i++) {
+        const a = (i / 96) * Math.PI * 2;
+        pts.push(O.vec(Math.cos(a) * r, y0, Math.sin(a) * r));
+      }
+      for (const run of clipPolyline(cam, pts)) strokePath(ctx, run, col, r % 2 === 0 ? 0.9 : 0.5);
+    }
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      const pts = [
+        O.vec(0, y0, 0),
+        O.vec(Math.cos(a) * 6, y0, Math.sin(a) * 6),
+      ];
+      for (const run of clipPolyline(cam, pts)) strokePath(ctx, run, col, 0.5);
+    }
+  }
+
+  function horizonScreenY() {
+    // the horizon in eye view: direction with elevation -dip, straight ahead
+    const az = state.sunAzimuth + 180 + state.eyeAzimuth;
+    const d = O.sunDirection(-O.horizonDipDeg(state.observerHeight), az);
+    const p = cam.project(O.vmul(d, 50));
+    return cam.depth(O.vmul(d, 50)) > NEAR ? p.y : null;
+  }
+
+  function drawHorizon(ctx, dip) {
+    const pts = [];
+    for (let i = 0; i <= 180; i++) {
+      const a = (i / 180) * Math.PI * 2;
+      const el = -dip * O.RAD;
+      pts.push(O.vec(Math.cos(el) * Math.cos(a), Math.sin(el), Math.cos(el) * Math.sin(a)));
+    }
+    for (const run of clipPolyline(cam, pts)) {
+      strokePath(ctx, run, 'rgba(150,200,170,0.55)', 1.3, [7, 4]);
+    }
+  }
+
+  function drawSphereGuides(ctx) {
+    for (const el of [30, 60]) {
+      const pts = [];
+      for (let i = 0; i <= 120; i++) {
+        const a = (i / 120) * Math.PI * 2;
+        const e = el * O.RAD;
+        pts.push(O.vec(Math.cos(e) * Math.cos(a), Math.sin(e), Math.cos(e) * Math.sin(a)));
+      }
+      for (const run of clipPolyline(cam, pts)) {
+        strokePath(ctx, run, 'rgba(120,150,200,0.13)', 0.8);
+      }
+    }
+  }
+
+  function drawCone(ctx, anti) {
+    const idx = indexModel();
+    const orders = [];
+    if (state.show.primary) orders.push(1);
+    if (state.show.secondary) orders.push(2);
+    if (state.show.higher) orders.push(3);
+    for (const k of orders) {
+      const geo = O.rainbowGeometry(idx(state.wavelength === 'white' ? 650 : state.wavelength), k);
+      if (!geo) continue;
+      const col = k === 1 ? 'rgba(111,211,164,0.5)' : k === 2 ? 'rgba(155,140,240,0.45)' : 'rgba(240,136,93,0.35)';
+      const dash = k === 1 ? null : k === 2 ? [6, 4] : [2, 4];
+      const circle = O.rainbowCircle(anti, geo.antisolarDeg, 128);
+      for (let i = 0; i < circle.length - 1; i += 8) {
+        const seg = [O.vec(0, 0, 0), circle[i]];
+        for (const run of clipPolyline(cam, seg)) strokePath(ctx, run, col, 0.7, dash);
+      }
+      for (const run of clipPolyline(cam, circle)) strokePath(ctx, run, col, 1.1, dash);
+      // the cone axis
+      for (const run of clipPolyline(cam, [O.vec(0, 0, 0), O.vmul(anti, 1.15)])) {
+        strokePath(ctx, run, 'rgba(160,180,220,0.5)', 1, [4, 4]);
+      }
+    }
+  }
+
+  function drawBowCircles(ctx, anti, dip) {
+    const idx = indexModel();
+    const orders = [];
+    if (state.show.primary) orders.push(1);
+    if (state.show.secondary) orders.push(2);
+    if (state.show.higher) orders.push(3);
+    const lambdas =
+      state.wavelength === 'white' ? O.NAMED_COLORS.map((c) => c.lambda) : [state.wavelength];
+
+    for (const k of orders) {
+      for (const lam of lambdas) {
+        const geo = O.rainbowGeometry(idx(lam), k);
+        if (!geo) continue;
+        const circle = O.rainbowCircle(anti, geo.antisolarDeg, 220);
+        // split into runs of visible directions, so the horizon does the cutting
+        let run = [];
+        const runs = [];
+        for (const d of circle) {
+          if (visibleDir(d, dip)) run.push(d);
+          else {
+            if (run.length > 1) runs.push(run);
+            run = [];
+          }
+        }
+        if (run.length > 1) runs.push(run);
+        for (const r of runs) {
+          for (const seg of clipPolyline(cam, r)) {
+            strokePath(ctx, seg, colorFor(lam, k === 1 ? 0.95 : 0.7), k === 1 ? 2 : 1.4);
+          }
+        }
+      }
+    }
+
+    if (state.show.wavelengthLabels && orders.length) {
+      for (const k of orders) {
+        const lam = lambdas[0];
+        const geo = O.rainbowGeometry(idx(lam), k);
+        if (!geo) continue;
+        const top = topOfBow(anti, geo.antisolarDeg);
+        if (top && cam.depth(top) > NEAR) {
+          const p = cam.project(top);
+          label(ctx, `k=${k} · φ=${deg(geo.antisolarDeg, 2)}`, p.x, p.y - 14, {
+            align: 'center', color: colorFor(lam),
+          });
+        }
+      }
+    }
+  }
+
+  function topOfBow(anti, phiDeg) {
+    let best = null;
+    for (const d of O.rainbowCircle(anti, phiDeg, 128)) {
+      if (!best || d.y > best.y) best = d;
+    }
+    return best;
+  }
+
+  function drawAlexander(ctx, anti, dip) {
+    if (!state.show.primary || !state.show.secondary) return;
+    const band = O.alexandersBand(indexModel());
+    if (!(band.outerDeg > band.innerDeg)) return;
+    const steps = 8;
+    for (let i = 0; i <= steps; i++) {
+      const phi = band.innerDeg + ((band.outerDeg - band.innerDeg) * i) / steps;
+      const circle = O.rainbowCircle(anti, phi, 160).filter((d) => visibleDir(d, dip));
+      if (circle.length < 2) continue;
+      for (const seg of clipPolyline(cam, circle)) {
+        strokePath(ctx, seg, 'rgba(0,0,0,0.22)', 6);
+      }
+    }
+  }
+
+  function drawRenderedBow(ctx, anti, dip) {
+    const prof = bowProfile();
+    if (!prof) return;
+    const maxR = prof.maxRadiance || 1;
+    for (let i = 0; i < prof.bins; i++) {
+      const c = prof.rgb[i];
+      const m = Math.max(c.r, c.g, c.b) / maxR;
+      if (m < 0.012) continue;
+      const gain = Math.pow(m, 0.55);
+      const col = `rgba(${Math.round((255 * c.r) / Math.max(c.r, c.g, c.b, 1e-9))},${Math.round(
+        (255 * c.g) / Math.max(c.r, c.g, c.b, 1e-9)
+      )},${Math.round((255 * c.b) / Math.max(c.r, c.g, c.b, 1e-9))},${(gain * 0.85).toFixed(3)})`;
+      const circle = O.rainbowCircle(anti, prof.phi[i], 150);
+      let run = [];
+      const runs = [];
+      for (const d of circle) {
+        if (visibleDir(d, dip)) run.push(d);
+        else {
+          if (run.length > 1) runs.push(run);
+          run = [];
+        }
+      }
+      if (run.length > 1) runs.push(run);
+      for (const r of runs) {
+        for (const seg of clipPolyline(cam, r)) strokePath(ctx, seg, col, 3.2);
+      }
+    }
+  }
+
+  function drawSunAndAntisolar(ctx, sun, anti, w, h) {
+    const sp = O.vmul(sun, 1.25);
+    if (cam.depth(sp) > NEAR) {
+      const p = cam.project(sp);
+      const g = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, 26);
+      g.addColorStop(0, 'rgba(255,240,190,0.95)');
+      g.addColorStop(1, 'rgba(255,215,110,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 26, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fff2c4';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+      if (state.show.labels) {
+        label(ctx, `${t('sunLabel')} · ${deg(state.sunElevation, 0)}`, p.x, p.y - 30, {
+          align: 'center', color: '#ffe9a8',
+        });
+      }
+    }
+    if (state.show.antisolar) {
+      const ap = O.vmul(anti, 1.0);
+      if (cam.depth(ap) > NEAR) {
+        const p = cam.project(ap);
+        ctx.strokeStyle = '#8fd7ff';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 7, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(p.x - 11, p.y);
+        ctx.lineTo(p.x + 11, p.y);
+        ctx.moveTo(p.x, p.y - 11);
+        ctx.lineTo(p.x, p.y + 11);
+        ctx.stroke();
+        if (state.show.labels) {
+          label(ctx, t('antisolarLabelLong'), p.x, p.y + 24, { align: 'center', color: '#8fd7ff' });
+        }
+      }
+    }
+  }
+
+  function drawObserver(ctx) {
+    const p = cam.project(O.vec(0, 0, 0));
+    if (cam.depth(O.vec(0, 0, 0)) <= NEAR) return;
+    ctx.fillStyle = '#e8eefc';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    if (state.show.labels) {
+      label(ctx, `${t('observerLabel')} · ${num(state.observerHeight, state.observerHeight < 10 ? 1 : 0)} ${t('metres')}`,
+        p.x, p.y + 18, { align: 'center', color: '#e8eefc' });
+    }
+  }
+
+  function drawReadout(ctx, w, h, dip) {
+    const idx = indexModel();
+    const geo = O.rainbowGeometry(idx(650), 1);
+    const vis = O.visibleFraction(state.sunElevation, geo.antisolarDeg, dip);
+    let y = 16;
+    const put = (s, color) => {
+      label(ctx, s, 12, y, { color });
+      y += 19;
+    };
+    put(`${t('coneAngle')} (k=1): ${deg(geo.antisolarDeg, 2)} — ${t('derivedFromSim')}`, '#6fd3a4');
+    if (state.show.secondary) {
+      put(`${t('coneAngle')} (k=2): ${deg(O.rainbowGeometry(idx(650), 2).antisolarDeg, 2)}`, '#9b8cf0');
+    }
+    put(`${t('bowTopElevation')}: ${deg(vis.topElevationDeg, 1)}`, '#cfe0ff');
+    put(`${t('visibleAbove')}: ${num(vis.fraction * 100, 0)} %`, '#cfe0ff');
+    put(`${t('horizonDip')}: ${deg(dip, 3)}`, '#8ea3c6');
+    if (vis.fraction <= 0) {
+      label(ctx, t('bowBelowHorizon'), 12, y + 4, { color: '#ff9a8a' });
+    }
+  }
+
+  /* --------------------------------------------------------- interaction */
+
+  let drag = null;
+  canvas.addEventListener('pointerdown', (e) => {
+    drag = { x: e.clientX, y: e.clientY };
+    canvas.setPointerCapture(e.pointerId);
+    canvas.style.cursor = 'grabbing';
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x;
+    const dy = e.clientY - drag.y;
+    drag = { x: e.clientX, y: e.clientY };
+    if (state.view === 'orbit') {
+      set({
+        camYaw: state.camYaw + dx * 0.4,
+        camPitch: O.clamp(state.camPitch + dy * 0.3, -85, 85),
+      });
+    } else {
+      set({
+        eyeAzimuth: state.eyeAzimuth - dx * 0.15,
+        eyeElevation: O.clamp(state.eyeElevation + dy * 0.12, -60, 85),
+      });
+    }
+  });
+  const stop = () => {
+    drag = null;
+    canvas.style.cursor = 'grab';
+  };
+  canvas.addEventListener('pointerup', stop);
+  canvas.addEventListener('pointercancel', stop);
+  canvas.addEventListener(
+    'wheel',
+    (e) => {
+      e.preventDefault();
+      if (state.view === 'orbit') {
+        set({ camDist: O.clamp(state.camDist * (1 + Math.sign(e.deltaY) * 0.08), 1.2, 9) });
+      } else {
+        set({ fov: O.clamp(state.fov + Math.sign(e.deltaY) * 3, 25, 120) });
+      }
+    },
+    { passive: false }
+  );
+  canvas.style.cursor = 'grab';
+
+  return { draw, tick: () => false, reset: () => { profileCache = { key: '', profile: null }; } };
+}
+
+/* ============ src/panels.js ============ */
+
+/**
+ * panels.js -- the explanation column: tutorial, ray readout, mathematics
+ * and the question set. All text comes from i18n.
+ */
+
+
+
+
+
+/* ==========================================================================
+ * Tutorial
+ * ======================================================================== */
+
+const TUTORIAL = [
+  {
+    title: 's1title', body: 's1body',
+    apply: {
+      scene: 'droplet', graph: 'exit', reflections: 0, dispersion: 0, wavelength: 'white',
+      impact: 0.6, fanCount: 0, showNonRainbow: false, angleMode: 'antisolar',
+      show: { angles: false, normals: false, labels: true, renderedBow: false },
+      families: { 0: true, 1: false, 2: false, 3: false },
+    },
+  },
+  {
+    title: 's2title', body: 's2body',
+    apply: {
+      scene: 'droplet', reflections: 0, show: { angles: true, normals: true },
+      families: { 0: true, 1: false, 2: false, 3: false },
+    },
+    actions: [
+      { label: 'b/R = 0.2', patch: { impact: 0.2 } },
+      { label: 'b/R = 0.6', patch: { impact: 0.6 } },
+      { label: 'b/R = 0.95', patch: { impact: 0.95 } },
+    ],
+  },
+  {
+    title: 's3title', body: 's3body',
+    apply: {
+      scene: 'droplet', reflections: 1, impact: 0.7, showNonRainbow: true,
+      families: { 0: false, 1: true, 2: false, 3: false },
+      show: { normals: false, angles: true },
+    },
+  },
+  {
+    title: 's4title', body: 's4body',
+    apply: { scene: 'droplet', reflections: 1, showNonRainbow: false, panel: 'guide', show: { angles: true } },
+    actions: [{ labelKey: 'extremumLabel', patch: { impact: 0.861 } }],
+    showRay: true,
+  },
+  {
+    title: 's5title', body: 's5body',
+    apply: { scene: 'droplet', graph: 'exit', reflections: 1, fanCount: 9, panel: 'guide' },
+    actions: [
+      { label: '1', patch: { fanCount: 0 } },
+      { label: '9', patch: { fanCount: 9 } },
+      { label: '25', patch: { fanCount: 25 } },
+    ],
+  },
+  {
+    title: 's6title', body: 's6body',
+    apply: { scene: 'droplet', graph: 'dist', reflections: 1, fanCount: 25, distRays: 40 },
+    actions: [
+      { label: '10', patch: { distRays: 10 } },
+      { label: '100', patch: { distRays: 100 } },
+      { label: '1 000', patch: { distRays: 1000 } },
+      { label: '100 000', patch: { distRays: 100000 } },
+    ],
+    note: 'explCaustic',
+  },
+  {
+    title: 's7title', body: 's7body',
+    apply: {
+      scene: 'drops', graph: 'dist', dropCount: 1, dropsAnimate: true,
+      show: { droplets: true, primary: true, secondary: false },
+    },
+    actions: [
+      { label: '1', patch: { dropCount: 1 } },
+      { label: '10', patch: { dropCount: 10 } },
+      { label: '100', patch: { dropCount: 100 } },
+      { label: '1 000', patch: { dropCount: 1000 } },
+      { label: '10 000', patch: { dropCount: 10000 } },
+    ],
+    note: 'explNotAnObject',
+  },
+  {
+    title: 's8title', body: 's8body',
+    apply: {
+      scene: 'sky', view: 'orbit', sunElevation: 15,
+      show: { cone: true, horizon: false, ground: false, antisolar: true, primary: true, secondary: false, renderedBow: false },
+    },
+    actions: [
+      { labelKey: 'showCone', patch: { show: { cone: true } } },
+      { labelKey: 'showHorizon', patch: { show: { horizon: true, ground: true } } },
+      { labelKey: 'viewEye', patch: { view: 'eye' } },
+    ],
+  },
+  {
+    title: 's9title', body: 's9body',
+    apply: {
+      scene: 'droplet', graph: 'exit', wavelength: 'white', dispersion: 0, reflections: 1,
+      show: { wavelengthLabels: true },
+    },
+    actions: [
+      { label: '0 %', patch: { dispersion: 0 } },
+      { label: '50 %', patch: { dispersion: 0.5 } },
+      { label: '100 %', patch: { dispersion: 1 } },
+    ],
+  },
+  {
+    title: 's10title', body: 's10body',
+    apply: {
+      scene: 'sky', view: 'eye', dispersion: 1, wavelength: 'white', reflections: 2,
+      families: { 0: false, 1: true, 2: true, 3: false },
+      show: {
+        primary: true, secondary: true, alexander: true, horizon: true, ground: true,
+        renderedBow: true, cone: false, wavelengthLabels: true,
+      },
+    },
+    actions: [
+      { labelKey: 'showRenderedBow', patch: { show: { renderedBow: true } } },
+      { labelKey: 'showAlexander', patch: { show: { alexander: true } } },
+      { labelKey: 'showCone', patch: { show: { cone: true } } },
+    ],
+    note: 'explAlexander',
+  },
+];
+
+function applyStep(i) {
+  const s = TUTORIAL[i];
+  if (!s) return;
+  set({ ...s.apply, step: i });
+}
+
+function renderTutorial() {
+  const s = TUTORIAL[state.step];
+  const nodes = [
+    el('div', { class: 'step-counter' }, `${t('step')} ${state.step + 1} ${t('of')} ${TUTORIAL.length}`),
+    el('h2', {}, t(s.title)),
+    el('p', {}, t(s.body)),
+  ];
+  if (s.actions) {
+    nodes.push(
+      el('div', { class: 'action-row' },
+        s.actions.map((a) =>
+          el('button', { class: 'chip', type: 'button', onclick: () => set(a.patch) },
+            a.labelKey ? t(a.labelKey) : a.label)
+        ))
+    );
+  }
+  if (s.showRay) nodes.push(...rayInfoNodes({ compact: true }));
+  if (s.note) nodes.push(el('p', { class: 'note' }, t(s.note)));
+
+  nodes.push(
+    el('div', { class: 'step-nav' },
+      el('button', {
+        class: 'btn', type: 'button', disabled: state.step === 0,
+        onclick: () => applyStep(state.step - 1),
+      }, t('prev')),
+      el('button', {
+        class: 'btn primary', type: 'button',
+        onclick: () => {
+          if (state.step < TUTORIAL.length - 1) applyStep(state.step + 1);
+          else set({ mode: 'free' });
+        },
+      }, state.step < TUTORIAL.length - 1 ? t('next') : t('startFree'))
+    ),
+    el('div', { class: 'progress' },
+      TUTORIAL.map((_, i) =>
+        el('button', {
+          class: 'dot' + (i === state.step ? ' on' : '') + (i < state.step ? ' done' : ''),
+          type: 'button', title: `${t('step')} ${i + 1}`, onclick: () => applyStep(i),
+        })
+      ))
+  );
+  return nodes;
+}
+
+function renderFreeGuide() {
+  const idx = indexModel();
+  const p = O.rainbowGeometry(idx(650), 1);
+  const s = O.rainbowGeometry(idx(650), 2);
+  return [
+    el('h2', {}, t('reconstructTitle')),
+    el('p', { class: 'chain' }, t('reconstructBody')),
+    el('div', { class: 'panel-block' },
+      el('h3', {}, t('notHardCoded')),
+      row('primaryRainbow', deg(p.antisolarDeg, 2)),
+      row('secondaryRainbow', deg(s.antisolarDeg, 2)),
+      row('showAlexander', `${deg(O.alexandersBand(idx).innerDeg, 1)} – ${deg(O.alexandersBand(idx).outerDeg, 1)}`)
+    ),
+    el('p', { class: 'note' }, t('explObserverHeight')),
+    el('p', { class: 'note' }, t('dropletSizeNote')),
+    !state.show.renderedBow ? el('p', { class: 'note warn' }, t('warningNoRender')) : null,
+  ];
+}
+
+/* ==========================================================================
+ * Ray readout
+ * ======================================================================== */
+
+function rayInfoNodes(opts = {}) {
+  const idx = indexModel();
+  const sel = state.selectedRay;
+  const lambda = sel ? sel.lambda : activeLambdas()[0];
+  const k = sel ? sel.k : state.reflections;
+  const b = sel ? sel.b : state.impact;
+  const n = idx(lambda);
+  const ray = traceOne(lambda, n, k, Math.abs(b));
+  const p = ray.path;
+  const cls = p.classification;
+  const dist = distanceFromExtremum(ray);
+
+  const nodes = [
+    opts.compact ? null : el('h2', {}, t('rayInfo')),
+    el('div', { class: 'panel-block' },
+      row('infoWavelength', `${lambda} ${t('nm')}`, { color: O.rgbCss(lambda) }),
+      row('infoIndex', num(n, 4)),
+      row('infoImpact', num(Math.abs(b), 3)),
+      row('infoIncidence', p.thetaI === null ? '—' : deg(p.thetaI * O.DEG, 2)),
+      row('infoRefraction', p.thetaR === null ? '—' : deg(p.thetaR * O.DEG, 2)),
+      row('infoReflections', String(k)),
+      row('infoExitAngle', p.antisolar === null ? '—' : deg(p.antisolar * O.DEG, 2)),
+      row('infoScattering', p.scattering === null ? '—' : deg(p.scattering * O.DEG, 2)),
+      row('infoDeviation', p.deviation === null ? '—' : deg(p.deviation * O.DEG, 2)),
+      row('infoIntensity', `${num(p.intensity * 100, 2)} %`),
+      dist === null ? null : row('infoDistanceFromBow', `${dist >= 0 ? '+' : ''}${num(dist, 2)}°`)
+    ),
+    el('div', { class: `classification cls-${cls}` }, t(CLASS_KEY[cls] || 'classNonCaustic')),
+  ];
+  if (CLASS_EXPLAIN[cls]) nodes.push(el('p', { class: 'note' }, t(CLASS_EXPLAIN[cls])));
+  if (cls === 'nonCaustic' && k === 1) {
+    nodes.push(el('p', { class: 'note' }, t('explNotOneReflection')));
+  }
+  if (!opts.compact) nodes.push(el('p', { class: 'hint' }, t('rayInfoHint')));
+  return nodes.filter(Boolean);
+}
+
+const renderRayInfo = () => rayInfoNodes();
+
+/* ==========================================================================
+ * Mathematics
+ * ======================================================================== */
+
+function renderMath() {
+  const idx = indexModel();
+  const n = idx(650);
+  const k = Math.max(1, state.reflections);
+  const analytic = O.rainbowIncidenceAnalytic(n, k);
+  const numeric = O.rainbowIncidenceNumeric(n, k);
+
+  const table = el('table', { class: 'math-table' },
+    el('thead', {}, el('tr', {},
+      el('th', {}, 'λ'), el('th', {}, 'n'), el('th', {}, 'θᵢ'), el('th', {}, 'θᵣ'),
+      el('th', {}, 'D'), el('th', {}, 'φ (k=1)'), el('th', {}, 'φ (k=2)'))),
+    el('tbody', {},
+      O.NAMED_COLORS.map((c) => {
+        const nn = idx(c.lambda);
+        const g1 = O.rainbowGeometry(nn, 1);
+        const g2 = O.rainbowGeometry(nn, 2);
+        return el('tr', {},
+          el('td', { style: `color:${O.rgbCss(c.lambda)}` }, `${c.lambda}`),
+          el('td', {}, num(nn, 4)),
+          el('td', {}, num(g1.thetaIDeg, 2)),
+          el('td', {}, num(g1.thetaRDeg, 2)),
+          el('td', {}, num(g1.deviationDeg, 2)),
+          el('td', {}, num(g1.antisolarDeg, 3)),
+          el('td', {}, num(g2.antisolarDeg, 3)));
+      }))
+  );
+
+  return [
+    el('h2', {}, t('mathematics')),
+    el('p', {}, t('mathIntro')),
+
+    el('h3', {}, t('mathConventions')),
+    el('ul', { class: 'conv' },
+      el('li', {}, t('mathConvTheta')),
+      el('li', {}, t('mathConvThetaR')),
+      el('li', {}, t('mathConvD')),
+      el('li', {}, t('mathConvTheta2')),
+      el('li', {}, t('mathConvPhi'))),
+    el('p', { class: 'note warn' }, t('mathWarning')),
+
+    el('h3', {}, t('mathDeviation')),
+    el('div', { class: 'formula' }, 'D_k(θᵢ) = 2 (θᵢ − θᵣ) + k (180° − 2 θᵣ)'),
+    el('p', { class: 'note' }, t('mathDeviationNote')),
+
+    el('h3', {}, t('mathExtremum')),
+    el('div', { class: 'formula' }, 'dD_k/dθᵢ = 2 − 2(k+1) · dθᵣ/dθᵢ = 0'),
+    el('p', { class: 'note' }, t('mathExtremumNote')),
+    el('div', { class: 'formula' }, 'cos²θᵢ = (n² − 1) / ((k+1)² − 1)'),
+
+    el('h3', {}, t('mathResult')),
+    el('div', { class: 'panel-block' },
+      row('infoIndex', `${num(n, 4)}  (λ = 650 ${t('nm')})`),
+      row('infoReflections', String(k)),
+      row('infoIncidence', deg(analytic * O.DEG, 4)),
+      row('infoExitAngle', deg(O.rainbowGeometry(n, k).antisolarDeg, 4))),
+    el('p', { class: 'note' }, t('mathResultNote')),
+
+    el('h3', {}, t('mathNumericCheck')),
+    el('p', { class: 'note' }, t('mathNumericNote')),
+    el('div', { class: 'panel-block' },
+      row('infoIncidence', `${deg(numeric * O.DEG, 6)}  (Δ = ${num(Math.abs(numeric - analytic) * O.DEG, 6)}°)`)),
+
+    el('h3', {}, t('mathResult')),
+    table,
+
+    el('h3', {}, t('mathIntensityTitle')),
+    el('p', { class: 'note' }, t('mathIntensityNote')),
+    el('h3', {}, t('mathLimits')),
+    el('p', { class: 'note' }, t('mathLimitsNote')),
+    el('p', { class: 'note' }, t('dropletSizeNote')),
+  ];
+}
+
+/* ==========================================================================
+ * Questions
+ * ======================================================================== */
+
+const QUESTIONS = [
+  ['q1', 'a1'], ['q2', 'a2'], ['q3', 'a3'], ['q4', 'a4'],
+  ['q5', 'a5'], ['q6', 'a6'], ['q7', 'a7'],
+];
+
+function renderQuiz() {
+  return [
+    el('h2', {}, t('quiz')),
+    el('p', { class: 'note' }, t('quizIntro')),
+    ...QUESTIONS.map(([q, a]) => {
+      const answer = el('p', { class: 'answer hidden' }, t(a));
+      const btn = el('button', {
+        class: 'chip', type: 'button',
+        onclick: () => {
+          const hidden = answer.classList.toggle('hidden');
+          btn.textContent = hidden ? t('showAnswer') : t('hideAnswer');
+        },
+      }, t('showAnswer'));
+      return el('div', { class: 'qa' }, el('h3', {}, t(q)), btn, answer);
+    }),
+  ];
+}
+
+/* ==========================================================================
+ * Panel shell
+ * ======================================================================== */
+
+function renderPanel(container) {
+  container.textContent = '';
+  const tabs = segmented(
+    [
+      { value: 'guide', labelKey: state.mode === 'tutorial' ? 'tutorial' : 'explanation' },
+      { value: 'ray', labelKey: 'rayInfo' },
+      { value: 'math', labelKey: 'mathematics' },
+      { value: 'quiz', labelKey: 'quiz' },
+    ],
+    state.panel,
+    (v) => set({ panel: v }),
+    { wrap: true }
+  );
+  container.append(tabs);
+
+  const body = el('div', { class: 'panel-body' });
+  let nodes;
+  if (state.panel === 'ray') nodes = renderRayInfo();
+  else if (state.panel === 'math') nodes = renderMath();
+  else if (state.panel === 'quiz') nodes = renderQuiz();
+  else nodes = state.mode === 'tutorial' ? renderTutorial() : renderFreeGuide();
+  body.append(...nodes.filter(Boolean));
+  container.append(body);
+}
+
+/* ============ src/app.js ============ */
+
+/**
+ * app.js -- assembly. Builds the shell, the control column and the render
+ * loop, and keeps the four views in step with the store.
+ */
+
+
+
+
+
+
+
+
+
+/* ------------------------------------------------------------ shell DOM -- */
+
+const root = document.getElementById('app');
+
+const sceneCanvases = {
+  droplet: el('canvas', { class: 'scene-canvas' }),
+  drops: el('canvas', { class: 'scene-canvas' }),
+  sky: el('canvas', { class: 'scene-canvas' }),
+};
+const graphCanvas = el('canvas', { class: 'graph-canvas' });
+
+const controlsEl = el('div', { class: 'controls' });
+const panelEl = el('div', { class: 'panel' });
+const headerEl = el('header', { class: 'app-header' });
+const sceneTabsEl = el('div', { class: 'scene-tabs' });
+const sceneDescEl = el('p', { class: 'scene-desc' });
+const graphTabsEl = el('div', { class: 'graph-tabs' });
+
+root.append(
+  headerEl,
+  el(
+    'main',
+    { class: 'layout' },
+    el('aside', { class: 'col col-controls' }, el('h2', { class: 'col-title' }, t('controls')), controlsEl),
+    el(
+      'section',
+      { class: 'col col-scene' },
+      sceneTabsEl,
+      sceneDescEl,
+      el('div', { class: 'scene-stage' }, sceneCanvases.droplet, sceneCanvases.drops, sceneCanvases.sky)
+    ),
+    el('aside', { class: 'col col-panel' }, panelEl)
+  ),
+  el('section', { class: 'graph-wrap' }, graphTabsEl, el('div', { class: 'graph-stage' }, graphCanvas))
+);
+
+const views = {
+  droplet: createDropletView(sceneCanvases.droplet),
+  drops: createDropsView(sceneCanvases.drops),
+  sky: createSkyView(sceneCanvases.sky),
+};
+const graph = createGraphView(graphCanvas);
+
+/* --------------------------------------------------------------- header -- */
+
+function buildHeader() {
+  clear(headerEl);
+  headerEl.append(
+    el(
+      'div',
+      { class: 'brand' },
+      el('h1', {}, t('appTitle')),
+      el('span', { class: 'sub' }, t('appSubtitle'))
+    ),
+    el(
+      'div',
+      { class: 'header-tools' },
+      segmented(
+        [
+          { value: 'tutorial', labelKey: 'tabTutorial' },
+          { value: 'free', labelKey: 'tabFree' },
+        ],
+        () => state.mode,
+        (v) => {
+          if (v === 'tutorial') applyStep(state.step);
+          set({ mode: v, panel: 'guide' });
+          rebuild();
+        }
+      ),
+      el(
+        'div',
+        { class: 'lang' },
+        LANGS.map((l) =>
+          el(
+            'button',
+            {
+              type: 'button',
+              class: 'seg' + (getLang() === l ? ' active' : ''),
+              onclick: () => {
+                setLang(l);
+                state.lang = l;
+                document.documentElement.lang = l;
+                rebuild();
+              },
+            },
+            l.toUpperCase()
+          )
+        )
+      )
+    )
+  );
+}
+
+/* --------------------------------------------------------------- scenes -- */
+
+function buildSceneTabs() {
+  clear(sceneTabsEl);
+  sceneTabsEl.append(
+    segmented(
+      [
+        { value: 'droplet', labelKey: 'sceneDroplet' },
+        { value: 'drops', labelKey: 'sceneDrops' },
+        { value: 'sky', labelKey: 'sceneSky' },
+      ],
+      () => state.scene,
+      (v) => set({ scene: v })
+    )
+  );
+}
+
+function buildGraphTabs() {
+  clear(graphTabsEl);
+  graphTabsEl.append(
+    segmented(
+      [
+        { value: 'exit', labelKey: 'graphExitAngle' },
+        { value: 'dist', labelKey: 'graphDistribution' },
+      ],
+      () => state.graph,
+      (v) => set({ graph: v })
+    ),
+    el('span', { class: 'graph-title' },
+      state.graph === 'exit' ? t('graphExitAngleTitle') : t('graphDistributionTitle')),
+    state.graph === 'exit'
+      ? select(
+          'angleConvention',
+          [
+            { value: 'antisolar', labelKey: 'angleAntisolar' },
+            { value: 'scattering', labelKey: 'angleScattering' },
+            { value: 'deviation', labelKey: 'angleDeviation' },
+          ],
+          () => state.angleMode,
+          (v) => set({ angleMode: v })
+        )
+      : el(
+          'div',
+          { class: 'inline-ctl' },
+          slider({
+            labelKey: 'rayCount',
+            min: 0, max: 5, step: 0.05,
+            get: () => Math.log10(Math.max(1, state.distRays)),
+            format: (v) => fmtCount(Math.round(Math.pow(10, v))),
+            onInput: (v) => set({ distRays: Math.round(Math.pow(10, v)) }),
+          }),
+          toggle('accumulate', () => state.distAccumulate, (v) => set({ distAccumulate: v }))
+        ),
+    el('span', { class: 'graph-hint' }, t('graphHint'))
+  );
+}
+
+function fmtCount(c) {
+  if (c >= 1000000) return `${num(c / 1000000, 1)}M`;
+  if (c >= 1000) return `${num(c / 1000, c >= 10000 ? 0 : 1)}k`;
+  return String(c);
+}
+
+/* ------------------------------------------------------------- controls -- */
+
+const HEIGHT_STOPS = [1.7, 5, 10, 50, 100, 300, 1000, 3000, 10000];
+
+function buildControls() {
+  clear(controlsEl);
+  const idx = indexModel();
+
+  /* --- light --- */
+  const colorOptions = [
+    { value: 'white', labelKey: 'white' },
+    ...O.NAMED_COLORS.map((c) => ({
+      value: c.lambda,
+      labelKey: c.id,
+      color: O.rgbCss(c.lambda),
+    })),
+  ];
+
+  const lightGroup = group(
+    'light',
+    el('div', { class: 'ctl' },
+      el('span', { class: 'ctl-label' }, t('wavelength')),
+      segmented(colorOptions, () => state.wavelength, (v) =>
+        set({ wavelength: v === 'white' ? 'white' : Number(v), selectedRay: null }), { wrap: true })),
+    slider({
+      labelKey: 'dispersion', min: 0, max: 1, step: 0.01,
+      get: () => state.dispersion,
+      format: (v) => `${num(v * 100, 0)} %`,
+      onInput: (v) => set({ dispersion: v }),
+      hintKey: 'dispersionHint',
+    })
+  );
+
+  /* --- droplet & optics --- */
+  const opticsGroup = group(
+    'droplet',
+    slider({
+      labelKey: 'impactParameter', min: -0.999, max: 0.999, step: 0.001,
+      get: () => state.impact,
+      format: (v) => num(v, 3),
+      onInput: (v) => set({ impact: v }),
+    }),
+    el('div', { class: 'ctl' },
+      el('span', { class: 'ctl-label' }, t('reflections')),
+      segmented(
+        [0, 1, 2, 3, 4].map((k) => ({ value: k, label: String(k) })),
+        () => state.reflections,
+        (v) => set({ reflections: Number(v), selectedRay: null })
+      )),
+    slider({
+      labelKey: 'dropletRadius', min: 0.05, max: 5, step: 0.05,
+      get: () => state.dropletRadiusMm,
+      format: (v) => `${num(v, 2)} mm`,
+      onInput: (v) => set({ dropletRadiusMm: v }),
+    }),
+    el('small', { class: 'ctl-hint block' }, t('dropletSizeNote')),
+    select('indexModel',
+      [{ value: 'table', labelKey: 'indexTable' }, { value: 'cauchy', labelKey: 'indexCauchy' }],
+      () => state.indexMode, (v) => set({ indexMode: v })),
+    slider({
+      labelKey: 'indexScale', min: 0.85, max: 1.15, step: 0.001,
+      get: () => state.indexScale,
+      format: (v) => `×${num(v, 3)} → n=${num(idx(650) * 1, 4)}`,
+      onInput: (v) => set({ indexScale: v }),
+    })
+  );
+
+  /* --- rays --- */
+  const raysGroup = group(
+    'rays',
+    toggle('showNonRainbow', () => state.showNonRainbow, (v) => set({ showNonRainbow: v }), { strong: true }),
+    el('div', { class: 'ctl' },
+      el('span', { class: 'ctl-label' }, t('showFamilies')),
+      el('div', { class: 'stack' },
+        toggle('family0', () => state.families[0], (v) => set({ families: { 0: v } })),
+        toggle('family1', () => state.families[1], (v) => set({ families: { 1: v } })),
+        toggle('family2', () => state.families[2], (v) => set({ families: { 2: v } })),
+        toggle('family3', () => state.families[3], (v) => set({ families: { 3: v } })))),
+    slider({
+      labelKey: 'fanCount', min: 0, max: 60, step: 1,
+      get: () => state.fanCount,
+      format: (v) => (v === 0 ? '1' : String(v)),
+      onInput: (v) => set({ fanCount: Math.round(v) }),
+    })
+  );
+
+  /* --- sun & observer --- */
+  const skyGroup = group(
+    'sun',
+    slider({
+      labelKey: 'sunElevation', min: 0, max: 90, step: 0.5,
+      get: () => state.sunElevation,
+      format: (v) => deg(v, 1),
+      onInput: (v) => set({ sunElevation: v }),
+    }),
+    slider({
+      labelKey: 'sunAzimuth', min: 0, max: 360, step: 1,
+      get: () => state.sunAzimuth,
+      format: (v) => deg(v, 0),
+      onInput: (v) => set({ sunAzimuth: v }),
+    }),
+    slider({
+      labelKey: 'observerHeight', min: 0, max: HEIGHT_STOPS.length - 1, step: 0.01,
+      get: () => heightToSlider(state.observerHeight),
+      format: (v) => `${num(sliderToHeight(v), sliderToHeight(v) < 10 ? 1 : 0)} ${t('metres')}`,
+      onInput: (v) => set({ observerHeight: sliderToHeight(v) }),
+    }),
+    el('small', { class: 'ctl-hint block' }, t('explObserverHeight')),
+    el('div', { class: 'ctl' },
+      el('span', { class: 'ctl-label' }, t('viewMode')),
+      segmented(
+        [{ value: 'orbit', labelKey: 'viewOrbit' }, { value: 'eye', labelKey: 'viewEye' }],
+        () => state.view,
+        (v) => set({ view: v, scene: 'sky' })
+      )),
+    slider({
+      labelKey: 'lookAzimuth', min: -180, max: 180, step: 1,
+      get: () => state.eyeAzimuth,
+      format: (v) => deg(v, 0),
+      onInput: (v) => set({ eyeAzimuth: v }),
+    }),
+    slider({
+      labelKey: 'lookElevation', min: -60, max: 85, step: 1,
+      get: () => state.eyeElevation,
+      format: (v) => deg(v, 0),
+      onInput: (v) => set({ eyeElevation: v }),
+    }),
+    slider({
+      labelKey: 'fieldOfView', min: 25, max: 120, step: 1,
+      get: () => state.fov,
+      format: (v) => deg(v, 0),
+      onInput: (v) => set({ fov: v }),
+    }),
+    toggle('rainBelow', () => state.show.rainBelow, (v) => set({ show: { rainBelow: v } })),
+    el('small', { class: 'ctl-hint block' }, t('fullCircleNote'))
+  );
+
+  /* --- droplets scene --- */
+  const dropsGroup = group(
+    'sceneDrops',
+    slider({
+      labelKey: 'dropCount', min: 0, max: 4, step: 0.01,
+      get: () => Math.log10(Math.max(1, state.dropCount)),
+      format: (v) => fmtCount(Math.round(Math.pow(10, v))),
+      onInput: (v) => set({ dropCount: Math.round(Math.pow(10, v)) }),
+    }),
+    toggle('animateDrops', () => state.dropsAnimate, (v) => set({ dropsAnimate: v }))
+  );
+
+  /* --- visualisation --- */
+  const showToggle = (key, labelKey) =>
+    toggle(labelKey, () => state.show[key], (v) => set({ show: { [key]: v } }));
+
+  const visGroup = group(
+    'visualization',
+    el('div', { class: 'grid2' },
+      showToggle('primary', 'showPrimary'),
+      showToggle('secondary', 'showSecondary'),
+      showToggle('higher', 'showHigherOrder'),
+      showToggle('cone', 'showCone'),
+      showToggle('antisolar', 'showAntisolar'),
+      showToggle('horizon', 'showHorizon'),
+      showToggle('ground', 'showGround'),
+      showToggle('droplets', 'showDroplets'),
+      showToggle('normals', 'showNormals'),
+      showToggle('angles', 'showAngles'),
+      showToggle('labels', 'showLabels'),
+      showToggle('wavelengthLabels', 'showWavelengthLabels'),
+      showToggle('alexander', 'showAlexander'),
+      showToggle('sky', 'showSky')),
+    toggle('showRenderedBow', () => state.show.renderedBow, (v) => set({ show: { renderedBow: v } }), { strong: true }),
+    el('small', { class: 'ctl-hint block' }, t('warningNoRender'))
+  );
+
+  controlsEl.append(lightGroup, opticsGroup, raysGroup, skyGroup, dropsGroup, visGroup,
+    el('button', {
+      class: 'btn wide', type: 'button',
+      onclick: () => { resetState(); rebuild(); },
+    }, t('reset')));
+
+  syncers = [...collectSyncers(controlsEl), ...collectSyncers(graphTabsEl)];
+}
+
+function heightToSlider(h) {
+  let best = 0;
+  for (let i = 0; i < HEIGHT_STOPS.length; i++) {
+    if (HEIGHT_STOPS[i] <= h) best = i;
+  }
+  const lo = HEIGHT_STOPS[best];
+  const hi = HEIGHT_STOPS[Math.min(best + 1, HEIGHT_STOPS.length - 1)];
+  if (hi === lo) return best;
+  return best + (Math.log10(h / lo) / Math.log10(hi / lo));
+}
+
+function sliderToHeight(v) {
+  const i = Math.max(0, Math.min(HEIGHT_STOPS.length - 1, Math.floor(v)));
+  const f = v - i;
+  const lo = HEIGHT_STOPS[i];
+  const hi = HEIGHT_STOPS[Math.min(i + 1, HEIGHT_STOPS.length - 1)];
+  return hi === lo ? lo : lo * Math.pow(hi / lo, f);
+}
+
+function resetState() {
+  set({
+    wavelength: 'white', dispersion: 1, impact: 0.861, reflections: 1,
+    dropletRadiusMm: 1, indexMode: 'table', indexScale: 1,
+    showNonRainbow: false, fanCount: 0, families: { 0: false, 1: true, 2: false, 3: false },
+    angleMode: 'antisolar', distRays: 60, distAccumulate: false,
+    dropCount: 1, dropsAnimate: false,
+    sunElevation: 15, sunAzimuth: 180, observerHeight: 1.7,
+    view: 'orbit', camYaw: -35, camPitch: 14, camDist: 3.1,
+    eyeAzimuth: 0, eyeElevation: 12, fov: 75, selectedRay: null,
+    show: {
+      normals: false, angles: true, labels: true, wavelengthLabels: false,
+      droplets: true, cone: true, antisolar: true, horizon: true, ground: true,
+      renderedBow: false, alexander: true, primary: true, secondary: false,
+      higher: false, sky: true, rainBelow: false,
+    },
+  });
+  graph.reset();
+  views.drops.reset();
+  views.sky.reset();
+}
+
+/* ------------------------------------------------------------- rendering -- */
+
+let syncers = [];
+
+function rebuild() {
+  buildHeader();
+  buildSceneTabs();
+  buildGraphTabs();
+  buildControls();
+  renderPanel(panelEl);
+  applyVisibility();
+}
+
+function applyVisibility() {
+  for (const [name, c] of Object.entries(sceneCanvases)) {
+    c.classList.toggle('hidden', name !== state.scene);
+  }
+  sceneDescEl.textContent = t(
+    state.scene === 'droplet' ? 'sceneDropletDesc' : state.scene === 'drops' ? 'sceneDropsDesc' : 'sceneSkyDesc'
+  );
+  document.body.dataset.scene = state.scene;
+}
+
+/**
+ * Structural key: when it changes, the affected DOM is rebuilt. Everything
+ * else is pushed into the existing controls by their own sync(), so a drag in
+ * progress is never interrupted.
+ * The readout panels depend on the live ray, so they add the ray to the key.
+ */
+function structuralKey() {
+  const base = `${state.lang}|${state.mode}|${state.panel}|${state.step}|${state.graph}|${state.scene}`;
+  const liveRay =
+    state.panel === 'ray' || (state.mode === 'tutorial' && TUTORIAL[state.step]?.showRay);
+  if (liveRay) {
+    const s = state.selectedRay;
+    return `${base}|${state.impact.toFixed(4)}|${state.reflections}|${state.wavelength}|${state.dispersion}|${s ? `${s.lambda},${s.k},${s.b.toFixed(4)}` : '-'}`;
+  }
+  if (state.panel === 'math') {
+    return `${base}|${state.reflections}|${state.dispersion}|${state.indexMode}|${state.indexScale}`;
+  }
+  if (state.mode === 'free' && state.panel === 'guide') {
+    return `${base}|${state.dispersion}|${state.indexMode}|${state.indexScale}|${state.show.renderedBow}`;
+  }
+  return base;
+}
+
+let lastKey = '';
+subscribe(() => {
+  const key = structuralKey();
+  if (key !== lastKey) {
+    const structural = key.split('|').slice(0, 6).join('|') !== lastKey.split('|').slice(0, 6).join('|');
+    lastKey = key;
+    if (structural) {
+      buildGraphTabs();
+      applyVisibility();
+    }
+    renderPanel(panelEl);
+    syncers = [...collectSyncers(controlsEl), ...collectSyncers(graphTabsEl)];
+  }
+  for (const s of syncers) s();
+});
+
+function renderOnce() {
+  const view = views[state.scene];
+  if (view) {
+    view.tick();
+    view.draw();
+  }
+  graph.tick();
+  graph.draw();
+}
+
+function loop() {
+  renderOnce();
+  requestAnimationFrame(loop);
+}
+
+/* --------------------------------------------------------------- startup -- */
+
+function start() {
+  setLang(navigator.language && navigator.language.startsWith('en') ? 'en' : 'cs');
+  state.lang = getLang();
+  document.documentElement.lang = state.lang;
+  applyStep(0);
+  rebuild();
+  lastKey = structuralKey();
+  window.addEventListener('resize', () => set({}));
+  requestAnimationFrame(loop);
+}
+
+start();
+
+// exposed for quick console poking / debugging
+window.RainbowLab = { state, set, O, TUTORIAL, renderOnce, rebuild, applyStep, views, graph };
+</script>
+</body>
+</html>
