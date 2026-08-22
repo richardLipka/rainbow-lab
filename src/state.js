@@ -119,14 +119,29 @@ export function subscribe(fn) {
   return () => listeners.delete(fn);
 }
 
+/**
+ * Coalesce a burst of set() calls into one DOM sync per frame, aligned to
+ * requestAnimationFrame in the normal case. rAF is also backed by a short
+ * timer: if rAF is ever starved for longer than a user would tolerate (a
+ * throttled/backgrounded tab, or an embedding context that skips painting
+ * altogether), the `queued` guard below would otherwise latch permanently
+ * true and silently stop every future state change from reaching the DOM,
+ * since nothing else ever resets it. Whichever fires first wins; `fired`
+ * stops the other from double-flushing.
+ */
 let queued = false;
 export function notify() {
   if (queued) return;
   queued = true;
-  requestAnimationFrame(() => {
+  let fired = false;
+  const flush = () => {
+    if (fired) return;
+    fired = true;
     queued = false;
     for (const fn of listeners) fn(state);
-  });
+  };
+  requestAnimationFrame(flush);
+  setTimeout(flush, 32);
 }
 
 /** Shallow-merge a patch into the state and notify. Nested `show` is merged. */

@@ -358,7 +358,7 @@ function buildControls() {
       onclick: () => { resetState(); rebuild(); },
     }, t('reset')));
 
-  syncers = [...collectSyncers(controlsEl), ...collectSyncers(graphTabsEl)];
+  collectAllSyncers();
 }
 
 function heightToSlider(h) {
@@ -406,6 +406,21 @@ function resetState() {
 
 let syncers = [];
 
+/**
+ * Every live control lives in one of these four containers. Re-collecting
+ * after any of them is rebuilt keeps `syncers` complete -- the scene tabs
+ * were missing from this list before, which is why their active highlight
+ * used to freeze after the very first switch away from Tutorial mode.
+ */
+function collectAllSyncers() {
+  syncers = [
+    ...collectSyncers(sceneTabsEl),
+    ...collectSyncers(controlsEl),
+    ...collectSyncers(graphTabsEl),
+    ...collectSyncers(panelEl),
+  ];
+}
+
 function rebuild() {
   buildHeader();
   buildSceneTabs();
@@ -413,8 +428,17 @@ function rebuild() {
   buildControls();
   renderPanel(panelEl);
   applyVisibility();
+  collectAllSyncers();
+  trackedGraph = state.graph;
+  trackedPanelKey = panelKey();
 }
 
+/**
+ * Which canvas is shown. Deliberately unconditional and run on every store
+ * notification -- it is three cheap classList/textContent writes, so there is
+ * no reason to gate it behind a "did something structural change?" check,
+ * and every previous attempt at such a check has hidden a real bug behind it.
+ */
 function applyVisibility() {
   for (const [name, c] of Object.entries(sceneCanvases)) {
     c.classList.toggle('hidden', name !== state.scene);
@@ -425,42 +449,43 @@ function applyVisibility() {
   document.body.dataset.scene = state.scene;
 }
 
-/**
- * Structural key: when it changes, the affected DOM is rebuilt. Everything
- * else is pushed into the existing controls by their own sync(), so a drag in
- * progress is never interrupted.
- * The readout panels depend on the live ray, so they add the ray to the key.
- */
-function structuralKey() {
-  const base = `${state.lang}|${state.mode}|${state.panel}|${state.step}|${state.graph}|${state.scene}`;
-  const liveRay =
-    state.panel === 'ray' || (state.mode === 'tutorial' && TUTORIAL[state.step]?.showRay);
-  if (liveRay) {
-    const s = state.selectedRay;
-    return `${base}|${state.impact.toFixed(4)}|${state.reflections}|${state.wavelength}|${state.dispersion}|${s ? `${s.lambda},${s.k},${s.b.toFixed(4)}` : '-'}`;
-  }
-  if (state.panel === 'math') {
-    return `${base}|${state.reflections}|${state.dispersion}|${state.indexMode}|${state.indexScale}`;
-  }
-  if (state.mode === 'free' && state.panel === 'guide') {
-    return `${base}|${state.dispersion}|${state.indexMode}|${state.indexScale}|${state.show.renderedBow}`;
-  }
-  return base;
+/** Everything renderPanel()'s output depends on, as one comparable string. */
+function panelKey() {
+  const liveRay = state.panel === 'ray' || (state.mode === 'tutorial' && TUTORIAL[state.step]?.showRay);
+  const rayPart = liveRay
+    ? (() => {
+        const s = state.selectedRay;
+        return `${state.impact.toFixed(4)}|${state.reflections}|${state.wavelength}|${state.dispersion}|${s ? `${s.lambda},${s.k},${s.b.toFixed(4)}` : '-'}`;
+      })()
+    : '';
+  const mathPart =
+    state.panel === 'math' ? `${state.reflections}|${state.dispersion}|${state.indexMode}|${state.indexScale}` : '';
+  const guidePart =
+    state.mode === 'free' && state.panel === 'guide'
+      ? `${state.dispersion}|${state.indexMode}|${state.indexScale}|${state.show.renderedBow}`
+      : '';
+  return `${state.panel}|${state.step}|${rayPart}|${mathPart}|${guidePart}`;
 }
 
-let lastKey = '';
+let trackedGraph = state.graph;
+let trackedPanelKey = panelKey();
+
 subscribe(() => {
-  const key = structuralKey();
-  if (key !== lastKey) {
-    const structural = key.split('|').slice(0, 6).join('|') !== lastKey.split('|').slice(0, 6).join('|');
-    lastKey = key;
-    if (structural) {
-      buildGraphTabs();
-      applyVisibility();
-    }
-    renderPanel(panelEl);
-    syncers = [...collectSyncers(controlsEl), ...collectSyncers(graphTabsEl)];
+  applyVisibility();
+
+  if (state.graph !== trackedGraph) {
+    trackedGraph = state.graph;
+    buildGraphTabs();
+    collectAllSyncers();
   }
+
+  const pk = panelKey();
+  if (pk !== trackedPanelKey) {
+    trackedPanelKey = pk;
+    renderPanel(panelEl);
+    collectAllSyncers();
+  }
+
   for (const s of syncers) s();
 });
 
@@ -487,7 +512,6 @@ function start() {
   document.documentElement.lang = state.lang;
   applyStep(0);
   rebuild();
-  lastKey = structuralKey();
   window.addEventListener('resize', () => set({}));
   requestAnimationFrame(loop);
 }
@@ -495,4 +519,4 @@ function start() {
 start();
 
 // exposed for quick console poking / debugging
-window.RainbowLab = { state, set, O, TUTORIAL, renderOnce, rebuild, applyStep, views, graph };
+window.RainbowLab = { state, set, O, TUTORIAL, renderOnce, rebuild, applyStep, views, graph, applyVisibility };
