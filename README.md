@@ -9,6 +9,11 @@ Nothing in the visualisation is a hard-coded arc. Every angle drawn on screen
 comes out of `src/optics.js`, and the unit tests check those angles against
 independent derivations.
 
+Working on the code? See [`CLAUDE.md`](CLAUDE.md) for the angle conventions,
+the reactive-update pipeline, and a list of real bugs already found and
+fixed here — worth reading before touching any angle-related code, so they
+don't get reintroduced.
+
 ---
 
 ## Running it
@@ -65,7 +70,7 @@ app.js         assembly + render loop
 | `src/state.js` | Application state + subscription. |
 | `src/ui.js` | `el()`, controls, canvas fitting, drawing primitives. |
 | `src/rays.js` | Builds the current ray set; display colour policy. |
-| `src/dropletView.js` | Mode A — cross-section of one droplet. |
+| `src/dropletView.js` | Mode A — cross-section of one droplet, plus the observer eye(s). |
 | `src/graphView.js` | Exit-angle plot and angular-distribution plot. |
 | `src/dropsView.js` | Mode B — one droplet to ten thousand. |
 | `src/skyView.js` | Mode C — 3-D cone, horizon, observer's eye view. |
@@ -160,10 +165,42 @@ which is what the "rain below the observer" toggle represents.
 
 ---
 
+## The observer, in the single-droplet view
+
+A droplet diagram with rays but no observer leaves the central question
+unanswered: rays go *somewhere*, but which ones reach an eye? The single-
+droplet view answers this directly.
+
+For every active reflection order that has an extremum (`k ≥ 1`), an eye
+icon is placed exactly along the direction that order's canonical rainbow
+ray exits — found by tracing a ray at `O.rainbowGeometry`'s own impact
+parameter, the same tested code path as every other ray on screen, not a
+hand-derived angle. One eye per active order, because a real observer sees
+the primary and secondary bows *simultaneously*, at different angular radii
+— exactly what the sky view already draws as two concentric circles.
+Drawing only one shared eye when comparing two families would leave a
+reaching secondary ray glowing next to an eye it doesn't actually point at.
+
+Every ray's prominence — opacity, width, arrowhead size, and a brass glow
+along its exit segment — is driven by its own `classification`
+(`primary`/`secondary`/`higherOrder` vs. `nonCaustic`/`noReflection`), the
+identical test the ray-info panel and the unit tests use. A fan ray that
+happens to land near the extremum is emphasised exactly like the main ray
+would be; an off-caustic main ray is dimmed exactly like an ordinary
+scattered fan ray. For `k = 0` there is no extremum at all, so the eye is
+still shown (captioned accordingly) but nothing ever emphasises — which is
+itself the correct lesson, not a missing feature.
+
+The exit-point angle readout shows `Θ = … → φ = …` rather than just `φ`,
+because the arc it draws (from the forward/antisolar reference to the
+actual outgoing ray) geometrically sweeps Θ, the scattering angle — showing
+that arc's size next to a `φ` number alone would silently mismatch.
+
 ## Interaction map
 
 - **Single droplet** — drag vertically in the canvas, or use the impact
   parameter slider, to move the incoming ray. Click any ray to classify it.
+  Watch the eye: it lights up brass exactly when the current ray reaches it.
 - **Exit-angle graph** — click anywhere to set the impact parameter; the marker
   in the droplet follows, and vice versa.
 - **Ray distribution** — raise the ray count and watch the caustic peak build

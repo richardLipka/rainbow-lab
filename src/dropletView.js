@@ -37,25 +37,33 @@ export function createDropletView(canvas) {
     drawDroplet(ctx);
     drawSun(ctx, w, h);
 
-    const observer = computeObserver();
+    const observers = computeObservers();
 
     const rays = buildRays();
     // fans first, main rays on top, so a prominent ray never gets buried
     const order = { fan: 0, demo0: 1, demoNC: 1, main: 2 };
     rays.sort((a, b) => order[a.role] - order[b.role]);
-    const anyReaching = rays.some((r) => REACHES_OBSERVER.has(r.classification));
-    for (const ray of rays) drawRay(ctx, ray, observer);
+    const reachingKs = new Set(
+      rays.filter((r) => REACHES_OBSERVER.has(r.classification)).map((r) => r.k)
+    );
+    for (const ray of rays) drawRay(ctx, ray);
 
     const main = rays.filter((r) => r.role === 'main');
     if (main.length) {
-      const ref = main[main.length - 1];
+      // When several families are compared at once, the detailed breakdown
+      // (angle arcs, R-segment labels, Theta/phi readout) has to pick ONE
+      // ray to attach to. Prefer whichever matches the "Vnitřní odrazy"
+      // solo-select control -- the one control the user is actually
+      // steering -- rather than an arbitrary last-built ray, so the detail
+      // view never silently jumps to a family the user didn't ask about.
+      const ref = main.find((r) => r.k === state.reflections) ?? main[main.length - 1];
       if (state.show.angles) drawAngles(ctx, ref);
       if (state.show.labels) drawSegmentLabels(ctx, ref);
       if (state.show.angles && ref.path.dirOut) drawExitAngle(ctx, ref);
       if (state.show.normals) for (const r of main) drawNormals(ctx, r);
     }
     drawImpactHandle(ctx);
-    drawObserver(ctx, observer, anyReaching);
+    for (const observer of observers) drawObserver(ctx, observer, reachingKs.has(observer.kRef));
     drawLegend(ctx, w, h, rays);
     if (state.show.labels) {
       label(ctx, t('observerReachHint'), 12, h - 14, {
@@ -65,34 +73,42 @@ export function createDropletView(canvas) {
   }
 
   /**
-   * Where a real observer would need to stand to see the CURRENT reflection
-   * family's rainbow, and in which direction they are looking.
+   * Where a real observer would need to stand to see each ACTIVE reflection
+   * family's rainbow, and in which direction they'd be looking -- one entry
+   * per family, not one overall. A real observer sees the primary and
+   * secondary bows at once, at different angular radii (exactly what the sky
+   * view draws as two concentric circles); drawing only a single shared eye
+   * here would leave a secondary ray glowing as "reaching" while visibly
+   * missing the one eye on screen, which is actively misleading whenever more
+   * than one family is compared at a time.
    *
    * A real observer is effectively at infinity, so every droplet sends its
    * concentrated light in the same fixed direction -- the antisolar angle phi
-   * for the active order/wavelength. We get that direction by tracing the
+   * for a given order/wavelength. We get that direction by tracing the
    * actual canonical ray at the analytic extremum (O.rainbowGeometry's own
    * impact parameter), reusing the exact same tested ray tracer as every
    * other ray on screen, rather than re-deriving the angle by hand.
-   * For k=0 there is no extremum -- no reflection ever produces a
-   * concentrated direction -- so the observer is shown, but nothing on
-   * screen will ever visibly reach them, which is itself the point.
+   * k=0 has no extremum -- no reflection ever produces a concentrated
+   * direction -- so it never gets an eye; if it is the only active family, a
+   * single inactive placeholder eye is still shown, captioned accordingly.
    */
-  function computeObserver() {
+  function computeObservers() {
     const idx = indexModel();
-    const orders = activeOrders();
-    let kRef = [1, 2, 3].find((k) => orders.includes(k));
-    if (kRef === undefined) kRef = state.reflections >= 1 ? state.reflections : undefined;
     const nRef = idx(650); // red, the same reference wavelength used elsewhere
-    const geo = kRef !== undefined ? O.rainbowGeometry(nRef, kRef) : null;
-    if (!geo) {
-      return { dir: O.vec(-1, 0, 0), valid: false, kRef: kRef ?? 0, phiDeg: null };
+    const orders = activeOrders().filter((k) => k >= 1);
+    const observers = [];
+    for (const kRef of orders) {
+      const geo = O.rainbowGeometry(nRef, kRef);
+      if (!geo) continue;
+      const canonical = traceOne(650, nRef, kRef, geo.impactParameter);
+      if (!canonical.path.dirOut) continue;
+      observers.push({ dir: canonical.path.dirOut, valid: true, kRef, phiDeg: geo.antisolarDeg });
     }
-    const canonical = traceOne(650, nRef, kRef, geo.impactParameter);
-    if (!canonical.path.dirOut) {
-      return { dir: O.vec(-1, 0, 0), valid: false, kRef, phiDeg: geo.antisolarDeg };
+    if (!observers.length) {
+      const kRef = state.reflections >= 1 ? state.reflections : 0;
+      observers.push({ dir: O.vec(-1, 0, 0), valid: false, kRef, phiDeg: null });
     }
-    return { dir: canonical.path.dirOut, valid: true, kRef, phiDeg: geo.antisolarDeg };
+    return observers;
   }
 
   function drawBackground(ctx, w, h) {
@@ -111,8 +127,12 @@ export function createDropletView(canvas) {
       [4, 6]
     );
     if (state.show.labels) {
-      label(ctx, t('antisolarPoint'), 14, layout.cy - 13, {
-        color: '#8fa4c8', bg: false, font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
+      // The antisolar direction IS the incoming beam's direction of travel
+      // (away from the Sun, continuing forward) -- so its label belongs on
+      // the far side of the droplet from the Sun icon, not next to it.
+      label(ctx, t('antisolarPoint'), w - 14, layout.cy - 13, {
+        align: 'right', color: '#8fa4c8', bg: false,
+        font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
       });
     }
   }
@@ -181,7 +201,7 @@ export function createDropletView(canvas) {
     return { alpha: reaches ? 1 : 0.38, width: reaches ? 2.3 : 1.4, reaches };
   }
 
-  function drawRay(ctx, ray, observer) {
+  function drawRay(ctx, ray) {
     const p = ray.path;
     if (!p.hit && !p.miss) return;
     const { alpha: a, width: baseWidth, reaches } = rayStyle(ray);
@@ -356,17 +376,30 @@ export function createDropletView(canvas) {
     }
   }
 
+  /**
+   * Marks the angle this specific arc geometrically sweeps: the reference
+   * line points forward (+x, continuing the incident beam undeviated) and
+   * the arc closes onto the actual outgoing ray, so the angle between them is
+   * Theta -- the scattering angle from the ORIGINAL direction of travel, per
+   * optics.js's own convention -- not phi. (phi = 180 deg - Theta is measured
+   * from the antisolar direction instead, i.e. from the reverse of this same
+   * reference line, which would require the arc to sweep back through the
+   * droplet body to draw honestly.) Showing Theta here and deriving phi as
+   * text keeps the arc's size and its label in agreement, and ties directly
+   * into the two conventions the Mathematics panel documents.
+   */
   function drawExitAngle(ctx, ray) {
     const p = ray.path;
     const exitSeg = p.segments[p.segments.length - 1];
     const origin = project(exitSeg.a);
-    // reference direction = away from the Sun (the antisolar direction), i.e. +x
     const refEnd = { x: origin.x + 78, y: origin.y };
     strokePath(ctx, [origin, refEnd], 'rgba(120,140,180,0.5)', 1, [3, 4]);
     const d = { x: exitSeg.b.x - exitSeg.a.x, y: -(exitSeg.b.y - exitSeg.a.y) };
     const outAng = Math.atan2(d.y, d.x);
-    const phi = p.antisolar * O.DEG;
-    angleArc(ctx, origin.x, origin.y, 46, 0, outAng, 'rgba(111,211,164,0.95)', `φ=${deg(phi, 1)}`);
+    const thetaDeg = p.scattering * O.DEG;
+    const phiDeg = p.antisolar * O.DEG;
+    angleArc(ctx, origin.x, origin.y, 46, 0, outAng, 'rgba(111,211,164,0.95)',
+      `Θ=${deg(thetaDeg, 1)} → φ=${deg(phiDeg, 1)}`);
   }
 
   function drawImpactHandle(ctx) {
