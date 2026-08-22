@@ -138,6 +138,8 @@ export const translations = {
     sunLabel: 'Slunce',
     observerLabel: 'Pozorovatel',
     antisolarLabelLong: 'antisolární bod — bod přesně proti Slunci',
+    observerNoConcentration: 'bez odrazu neexistuje soustředěný směr',
+    observerReachHint: 'Zvýrazněné paprsky dopadají do oka pozorovatele — ostatní míří jinam.',
 
     /* ---- ray info panel ---- */
     rayInfo: 'Údaje o paprsku',
@@ -438,6 +440,8 @@ export const translations = {
     sunLabel: 'Sun',
     observerLabel: 'Observer',
     antisolarLabelLong: 'antisolar point — the point directly opposite the Sun',
+    observerNoConcentration: 'no concentrated direction without a reflection',
+    observerReachHint: "Highlighted rays reach the observer's eye — the rest head elsewhere.",
 
     /* ---- ray info panel ---- */
     rayInfo: 'Ray data',

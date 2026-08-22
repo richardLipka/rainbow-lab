@@ -1540,6 +1540,8 @@ const translations = {
     sunLabel: 'Slunce',
     observerLabel: 'Pozorovatel',
     antisolarLabelLong: 'antisolární bod — bod přesně proti Slunci',
+    observerNoConcentration: 'bez odrazu neexistuje soustředěný směr',
+    observerReachHint: 'Zvýrazněné paprsky dopadají do oka pozorovatele — ostatní míří jinam.',
 
     /* ---- ray info panel ---- */
     rayInfo: 'Údaje o paprsku',
@@ -1840,6 +1842,8 @@ const translations = {
     sunLabel: 'Sun',
     observerLabel: 'Observer',
     antisolarLabelLong: 'antisolar point — the point directly opposite the Sun',
+    observerNoConcentration: 'no concentrated direction without a reflection',
+    observerReachHint: "Highlighted rays reach the observer's eye — the rest head elsewhere.",
 
     /* ---- ray info panel ---- */
     rayInfo: 'Ray data',
@@ -2619,6 +2623,11 @@ function colorIdFor(lambda) {
 
 
 
+/** Rays classified into one of these families are the ones a real observer
+ * would actually see as a bright rainbow -- everything else is scattered
+ * light going somewhere else entirely. */
+const REACHES_OBSERVER = new Set([O.RayClass.PRIMARY, O.RayClass.SECONDARY, O.RayClass.HIGHER_ORDER]);
+
 const SEG_LABELS = ['R0', 'R1', 'R2', 'R3', 'R4', 'R5'];
 
 function createDropletView(canvas) {
@@ -2640,11 +2649,14 @@ function createDropletView(canvas) {
     drawDroplet(ctx);
     drawSun(ctx, w, h);
 
+    const observer = computeObserver();
+
     const rays = buildRays();
-    // fans first, main rays on top
+    // fans first, main rays on top, so a prominent ray never gets buried
     const order = { fan: 0, demo0: 1, demoNC: 1, main: 2 };
     rays.sort((a, b) => order[a.role] - order[b.role]);
-    for (const ray of rays) drawRay(ctx, ray);
+    const anyReaching = rays.some((r) => REACHES_OBSERVER.has(r.classification));
+    for (const ray of rays) drawRay(ctx, ray, observer);
 
     const main = rays.filter((r) => r.role === 'main');
     if (main.length) {
@@ -2655,7 +2667,44 @@ function createDropletView(canvas) {
       if (state.show.normals) for (const r of main) drawNormals(ctx, r);
     }
     drawImpactHandle(ctx);
+    drawObserver(ctx, observer, anyReaching);
     drawLegend(ctx, w, h, rays);
+    if (state.show.labels) {
+      label(ctx, t('observerReachHint'), 12, h - 14, {
+        color: '#6f86ab', font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
+      });
+    }
+  }
+
+  /**
+   * Where a real observer would need to stand to see the CURRENT reflection
+   * family's rainbow, and in which direction they are looking.
+   *
+   * A real observer is effectively at infinity, so every droplet sends its
+   * concentrated light in the same fixed direction -- the antisolar angle phi
+   * for the active order/wavelength. We get that direction by tracing the
+   * actual canonical ray at the analytic extremum (O.rainbowGeometry's own
+   * impact parameter), reusing the exact same tested ray tracer as every
+   * other ray on screen, rather than re-deriving the angle by hand.
+   * For k=0 there is no extremum -- no reflection ever produces a
+   * concentrated direction -- so the observer is shown, but nothing on
+   * screen will ever visibly reach them, which is itself the point.
+   */
+  function computeObserver() {
+    const idx = indexModel();
+    const orders = activeOrders();
+    let kRef = [1, 2, 3].find((k) => orders.includes(k));
+    if (kRef === undefined) kRef = state.reflections >= 1 ? state.reflections : undefined;
+    const nRef = idx(650); // red, the same reference wavelength used elsewhere
+    const geo = kRef !== undefined ? O.rainbowGeometry(nRef, kRef) : null;
+    if (!geo) {
+      return { dir: O.vec(-1, 0, 0), valid: false, kRef: kRef ?? 0, phiDeg: null };
+    }
+    const canonical = traceOne(650, nRef, kRef, geo.impactParameter);
+    if (!canonical.path.dirOut) {
+      return { dir: O.vec(-1, 0, 0), valid: false, kRef, phiDeg: geo.antisolarDeg };
+    }
+    return { dir: canonical.path.dirOut, valid: true, kRef, phiDeg: geo.antisolarDeg };
   }
 
   function drawBackground(ctx, w, h) {
@@ -2731,16 +2780,23 @@ function createDropletView(canvas) {
     }
   }
 
-  function rayAlpha(ray) {
-    if (ray.role === 'fan') return 0.24;
-    if (ray.role === 'demo0' || ray.role === 'demoNC') return 0.75;
-    return 1;
+  /**
+   * Prominence is driven by whether the ray actually reaches the observer
+   * (its own classification, exactly the same test used in the ray-info
+   * panel), not by which role built it. A demo ray or a fan ray that happens
+   * to land on the caustic is emphasised exactly like the main ray would be;
+   * an off-caustic main ray is dimmed exactly like a non-rainbow fan ray.
+   */
+  function rayStyle(ray) {
+    const reaches = REACHES_OBSERVER.has(ray.classification);
+    if (ray.role === 'fan') return { alpha: reaches ? 0.95 : 0.13, width: reaches ? 2.1 : 0.9, reaches };
+    return { alpha: reaches ? 1 : 0.38, width: reaches ? 2.3 : 1.4, reaches };
   }
 
-  function drawRay(ctx, ray) {
+  function drawRay(ctx, ray, observer) {
     const p = ray.path;
     if (!p.hit && !p.miss) return;
-    const a = rayAlpha(ray);
+    const { alpha: a, width: baseWidth, reaches } = rayStyle(ray);
     const selected =
       state.selectedRay &&
       state.selectedRay.k === ray.k &&
@@ -2750,10 +2806,18 @@ function createDropletView(canvas) {
     const base = colorFor(ray.lambda, a);
     const dashed = ray.role === 'demo0' || ray.role === 'demoNC';
 
+    // A glow under the exit segment for any ray that actually reaches the
+    // observer -- the visual cue that ties "this ray" to "that eye", not
+    // just a brighter version of the same colour.
+    if (reaches && p.segments.length) {
+      const exitSeg = p.segments[p.segments.length - 1];
+      strokePath(ctx, [project(exitSeg.a), project(exitSeg.b)], 'rgba(224,168,63,0.35)', baseWidth + 5);
+    }
+
     for (const seg of p.segments) {
       const A = project(seg.a);
       const B = project(seg.b);
-      let width = ray.role === 'fan' ? 1 : 1.9;
+      let width = baseWidth;
       if (selected) width += 1.6;
       let style = base;
       if (seg.medium === 'water') {
@@ -2768,7 +2832,7 @@ function createDropletView(canvas) {
 
     if (p.dirOut && p.segments.length) {
       const last = p.segments[p.segments.length - 1];
-      arrowHead(ctx, project(last.a), project(last.b), base, ray.role === 'fan' ? 4 : 7);
+      arrowHead(ctx, project(last.a), project(last.b), base, reaches ? 8 : ray.role === 'fan' ? 4 : 6);
     }
 
     if (ray.role !== 'fan') {
@@ -2788,6 +2852,77 @@ function createDropletView(canvas) {
       label(ctx, txt.length > 62 ? txt.slice(0, 60) + '…' : txt,
         Math.min(q.x, layout.w - 12), q.y + (ray.k === 0 ? 16 : -16), {
         align: 'right', color: '#c3b6ff', font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
+      });
+    }
+  }
+
+  /**
+   * The observer, drawn as an eye facing back toward the droplet, sitting
+   * exactly along the direction the current family's canonical rainbow ray
+   * exits along (see computeObserver). Its screen position is derived from
+   * that world-space direction but clamped to stay comfortably inside the
+   * canvas regardless of aspect ratio, since the true distance to an
+   * observer is effectively infinite and has no meaningful scale here.
+   */
+  function drawObserver(ctx, observer, active) {
+    const { cx, cy, s, w, h } = layout;
+    const screenDir = { x: observer.dir.x, y: -observer.dir.y }; // world -> screen y-flip
+    const len = Math.hypot(screenDir.x, screenDir.y) || 1;
+    const ux = screenDir.x / len;
+    const uy = screenDir.y / len;
+
+    const margin = 52;
+    let radius = s * 3.3;
+    const limits = [];
+    if (ux > 1e-6) limits.push((w - margin - cx) / ux);
+    if (ux < -1e-6) limits.push((margin - cx) / ux);
+    if (uy > 1e-6) limits.push((h - margin - cy) / uy);
+    if (uy < -1e-6) limits.push((margin - cy) / uy);
+    for (const lim of limits) if (lim > 0) radius = Math.min(radius, lim);
+
+    const x = cx + ux * radius;
+    const y = cy + uy * radius;
+    const faceAngle = Math.atan2(cy - y, cx - x); // eye looks back at the droplet
+
+    ctx.save();
+    if (active) {
+      const g = ctx.createRadialGradient(x, y, 2, x, y, 30);
+      g.addColorStop(0, 'rgba(224,168,63,0.38)');
+      g.addColorStop(1, 'rgba(224,168,63,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, 30, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // line of sight, faint, from the observer toward the droplet
+    strokePath(ctx, [{ x, y }, { x: cx, y: cy }],
+      active ? 'rgba(224,168,63,0.3)' : 'rgba(147,163,189,0.16)', 1, [2, 4]);
+
+    ctx.translate(x, y);
+    ctx.rotate(faceAngle);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 15, 8, 0, 0, Math.PI * 2);
+    ctx.fillStyle = active ? 'rgba(224,168,63,0.14)' : 'rgba(147,163,189,0.08)';
+    ctx.fill();
+    ctx.strokeStyle = active ? '#e0a83f' : 'rgba(147,163,189,0.7)';
+    ctx.lineWidth = active ? 1.9 : 1.2;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, active ? 4.4 : 3.2, 0, Math.PI * 2);
+    ctx.fillStyle = active ? '#e0a83f' : '#93a3bd';
+    ctx.fill();
+    ctx.restore();
+
+    if (state.show.labels) {
+      const belowLine2 = observer.valid
+        ? `φ ≈ ${deg(observer.phiDeg, 1)}${observer.kRef ? ` · k=${observer.kRef}` : ''}`
+        : t('observerNoConcentration');
+      label(ctx, t('observerLabel'), x, y + 20, {
+        align: 'center', color: active ? '#e0a83f' : '#93a3bd',
+      });
+      label(ctx, belowLine2, x, y + 36, {
+        align: 'center', color: '#6f86ab', font: '10px "IBM Plex Mono", ui-monospace, monospace',
       });
     }
   }
