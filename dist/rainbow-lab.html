@@ -2164,17 +2164,27 @@ function indexModel() {
   });
 }
 
-/** Which reflection orders should be traced right now. */
+/**
+ * Which reflection orders should be traced right now.
+ *
+ * One rule, used identically in both modes -- this used to branch on
+ * state.mode and read a DIFFERENT control in each branch (state.reflections
+ * in tutorial mode, state.families in free mode), which meant whichever
+ * control the current mode ignored looked broken: it updated its own state
+ * and its checkbox/highlight, but never touched the scene. families[3]
+ * stands for "3 or more"; the exact bounce count traced for it follows
+ * state.reflections when the user picked something >= 3, so a solo pick of
+ * "4" via the segmented control still traces exactly 4 bounces.
+ */
 function activeOrders() {
-  if (state.mode === 'tutorial') {
-    const orders = [state.reflections];
-    if (state.showNonRainbow && !orders.includes(0)) orders.push(0);
-    return orders.sort();
-  }
   const out = [];
-  for (const k of [0, 1, 2, 3]) if (state.families[k]) out.push(k);
+  if (state.families[0]) out.push(0);
+  if (state.families[1]) out.push(1);
+  if (state.families[2]) out.push(2);
+  if (state.families[3]) out.push(Math.max(3, state.reflections));
+  if (state.showNonRainbow && !out.includes(0)) out.push(0);
   if (!out.length) out.push(state.reflections);
-  return out;
+  return [...new Set(out)].sort((a, b) => a - b);
 }
 
 function subscribe(fn) {
@@ -4647,7 +4657,17 @@ function buildControls() {
       segmented(
         [0, 1, 2, 3, 4].map((k) => ({ value: k, label: String(k) })),
         () => state.reflections,
-        (v) => set({ reflections: Number(v), selectedRay: null })
+        (v) => {
+          // Solo-select: picking a value here shows exactly that one family,
+          // clearing any others left on from the checkboxes below so this
+          // control always visibly drives the scene by itself.
+          const k = Number(v);
+          set({
+            reflections: k,
+            families: { 0: k === 0, 1: k === 1, 2: k === 2, 3: k >= 3 },
+            selectedRay: null,
+          });
+        }
       )),
     slider({
       labelKey: 'dropletRadius', min: 0.05, max: 5, step: 0.05,

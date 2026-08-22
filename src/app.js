@@ -215,7 +215,17 @@ function buildControls() {
       segmented(
         [0, 1, 2, 3, 4].map((k) => ({ value: k, label: String(k) })),
         () => state.reflections,
-        (v) => set({ reflections: Number(v), selectedRay: null })
+        (v) => {
+          // Solo-select: picking a value here shows exactly that one family,
+          // clearing any others left on from the checkboxes below so this
+          // control always visibly drives the scene by itself.
+          const k = Number(v);
+          set({
+            reflections: k,
+            families: { 0: k === 0, 1: k === 1, 2: k === 2, 3: k >= 3 },
+            selectedRay: null,
+          });
+        }
       )),
     slider({
       labelKey: 'dropletRadius', min: 0.05, max: 5, step: 0.05,
