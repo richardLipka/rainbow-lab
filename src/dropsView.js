@@ -14,6 +14,7 @@ import { fitCanvas, strokePath, label } from './ui.js';
 import { colorFor } from './rays.js';
 
 const MAX_DRAWN_RAYS = 34;
+const MAX_DRAWN_GREY_RAYS = 16;
 
 export function createDropsView(canvas) {
   let drops = [];
@@ -89,9 +90,13 @@ export function createDropsView(canvas) {
     const sun = { x: -anti.x, y: -anti.y };
     const bs = bands();
 
-    // antisolar axis
-    strokePath(ctx, [P({ x: 0, y: 0 }), P({ x: anti.x * 1.35, y: anti.y * 1.35 })],
-      'rgba(150,170,210,0.35)', 1, [5, 5]);
+    // The sun-antisolar axis: sunlight is parallel at this distance, so this
+    // ONE line, running the full width of the scene through the observer, is
+    // literally the direction every ray of incoming light travels along. It
+    // also makes the Sun's position explicit rather than leaving it floating
+    // near the observer with no visible connection to anything.
+    strokePath(ctx, [P({ x: sun.x * 1.4, y: sun.y * 1.4 }), P({ x: anti.x * 1.4, y: anti.y * 1.4 })],
+      'rgba(255,225,160,0.28)', 1, [5, 5]);
     if (state.show.labels) {
       const e = P({ x: anti.x * 1.2, y: anti.y * 1.2 });
       label(ctx, t('antisolarPoint'), e.x, e.y - 12, { align: 'center', color: '#9fb4d8' });
@@ -129,6 +134,7 @@ export function createDropsView(canvas) {
     // is what makes ten thousand of them slow.
     let contributing = 0;
     let drawnRays = 0;
+    let drawnGreyRays = 0;
     const dotR = state.dropCount > 3000 ? 0.7 : state.dropCount > 600 ? 1.1 : state.dropCount > 60 ? 1.8 : 3;
     const greyPath = new Path2D();
     let greyCount = 0;
@@ -152,13 +158,34 @@ export function createDropsView(canvas) {
           // incoming sunlight
           const back = { x: d.x - sun.x * 0.22, y: d.y - sun.y * 0.22 };
           strokePath(ctx, [P(back), q], 'rgba(255,246,214,0.5)', 1);
-          // the ray that actually reaches the eye
-          strokePath(ctx, [q, P({ x: 0, y: 0 })], colorFor(hitc.lambda, 0.6), 1);
+          // the ray that actually reaches the eye -- dashed for the
+          // secondary bow (k=2), solid for the primary (k=1), the same
+          // convention used everywhere else in the app for the two orders
+          strokePath(ctx, [q, P({ x: 0, y: 0 })], colorFor(hitc.lambda, 0.6), 1,
+            hitc.k === 2 ? [4, 3] : null);
         }
       } else if (state.show.droplets) {
         greyPath.moveTo(q.x + dotR, q.y);
         greyPath.arc(q.x, q.y, dotR, 0, Math.PI * 2);
         greyCount++;
+        // A sample of the grey droplets get the same treatment as the
+        // coloured ones: sunlight really does reach every droplet, and every
+        // droplet really does scatter it onward -- it is only the DIRECTION
+        // that fails to line up with this particular observer's eye. Drawn
+        // faint and undeviated (most scattered light is not concentrated
+        // into any caustic at all -- the k=0 lesson from the single-droplet
+        // view), so it reads as "goes on, unremarkably" rather than
+        // implying a second hidden rainbow direction that isn't modelled
+        // here.
+        if (drawnGreyRays < MAX_DRAWN_GREY_RAYS && len > 0.12) {
+          drawnGreyRays++;
+          const back = { x: d.x - sun.x * 0.22, y: d.y - sun.y * 0.22 };
+          strokePath(ctx, [P(back), q], 'rgba(255,246,214,0.16)', 1);
+          // continues onward, undeviated -- same direction light was already
+          // travelling in (away from the Sun, i.e. -sun)
+          const onward = { x: d.x - sun.x * 0.16, y: d.y - sun.y * 0.16 };
+          strokePath(ctx, [q, P(onward)], 'rgba(150,175,215,0.3)', 1);
+        }
       }
     }
     if (greyCount) {
@@ -181,27 +208,72 @@ export function createDropsView(canvas) {
     ctx.restore();
     if (state.show.labels) label(ctx, t('observerLabel'), o.x, o.y + 22, { align: 'center', color: '#e8eefc' });
 
-    // sun, behind the observer
-    const sp = P({ x: sun.x * 0.55, y: sun.y * 0.55 });
-    const sg = ctx.createRadialGradient(sp.x, sp.y, 2, sp.x, sp.y, 22);
+    // Sun icon, at a small FIXED pixel distance from the observer in the
+    // correct direction -- not scaled by world units. The observer sits
+    // close to the left edge (ox is only ~10% of the width, to leave room
+    // for droplet depth on the antisolar side), so at low sun elevations the
+    // true sun direction points almost straight off the left edge: there is
+    // close to zero margin on that side by construction of the layout, so
+    // no world-space radius reliably keeps the icon on-canvas. The dashed
+    // axis line above is drawn unclamped (harmless off-canvas) and carries
+    // the true far-away direction; the icon only needs to sit clearly,
+    // legibly, and in the right direction close to the observer, the same
+    // way the single-droplet view's own Sun icon is a fixed screen element
+    // rather than a geometrically "correct" distance.
+    const sunScreenDir = { x: sun.x, y: -sun.y };
+    const sunMargin = 14;
+    let sunDist = 70;
+    if (sunScreenDir.x < -1e-6) sunDist = Math.min(sunDist, (ox - sunMargin) / -sunScreenDir.x);
+    if (sunScreenDir.x > 1e-6) sunDist = Math.min(sunDist, (w - ox - sunMargin) / sunScreenDir.x);
+    if (sunScreenDir.y < -1e-6) sunDist = Math.min(sunDist, (oy - sunMargin) / -sunScreenDir.y);
+    if (sunScreenDir.y > 1e-6) sunDist = Math.min(sunDist, (h - oy - sunMargin) / sunScreenDir.y);
+    sunDist = Math.max(24, sunDist);
+    const sp = { x: ox + sunScreenDir.x * sunDist, y: oy + sunScreenDir.y * sunDist };
+    const sg = ctx.createRadialGradient(sp.x, sp.y, 2, sp.x, sp.y, 26);
     sg.addColorStop(0, 'rgba(255,238,180,0.9)');
     sg.addColorStop(1, 'rgba(255,210,90,0)');
     ctx.fillStyle = sg;
     ctx.beginPath();
-    ctx.arc(sp.x, sp.y, 22, 0, Math.PI * 2);
+    ctx.arc(sp.x, sp.y, 26, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#ffe9a8';
     ctx.beginPath();
-    ctx.arc(sp.x, sp.y, 5, 0, Math.PI * 2);
+    ctx.arc(sp.x, sp.y, 6, 0, Math.PI * 2);
     ctx.fill();
-    if (state.show.labels) label(ctx, t('sunLabel'), sp.x, sp.y - 26, { align: 'center', color: '#ffe9a8' });
+    if (state.show.labels) {
+      // Left-aligned, not centred: the icon sits close to the left edge at
+      // most sun elevations (see the clamp above), and a centred label would
+      // clip against that edge.
+      label(ctx, `${t('sunLabel')} · ${num(state.sunElevation, 0)}°`, Math.max(sp.x - 4, 4), sp.y - 28, {
+        align: 'left', color: '#ffe9a8',
+      });
+    }
 
     // readout
     label(ctx, `${t('dropCount')}: ${fmt(drops.length)}`, 12, 16, { color: '#cfe0ff' });
     label(ctx, `${t('dropsContributing')}: ${fmt(contributing)}`, 12, 36, { color: '#6fd3a4' });
+
+    // legend: what green vs grey actually means, spelled out next to a
+    // sample swatch rather than left for the hint text alone to carry
     if (state.show.labels) {
-      const hint = t('dropsHint');
-      label(ctx, hint, 12, h - 14, { color: '#8ea3c6', font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif' });
+      const swatch = (x, y, color) => {
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+      };
+      swatch(16, 58, '#6fd3a4');
+      label(ctx, t('dropsLegendReaches'), 26, 58, {
+        align: 'left', color: '#9fd8bd', bg: false, font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
+      });
+      swatch(16, 74, 'rgba(150,175,215,0.7)');
+      label(ctx, t('dropsLegendMisses'), 26, 74, {
+        align: 'left', color: '#8ea3c6', bg: false, font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
+      });
+
+      const smallFont = '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif';
+      label(ctx, t('dropsHint'), 12, h - 30, { color: '#8ea3c6', font: smallFont });
+      label(ctx, t('dropsSunHint'), 12, h - 14, { color: '#e0a83f', font: smallFont });
     }
   }
 

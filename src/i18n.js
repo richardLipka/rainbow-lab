@@ -287,6 +287,10 @@ export const translations = {
     dropCount: 'Počet kapek',
     dropsHint:
       'Zelené kapky posílají světlo k pozorovateli, šedé ne. Rozhoduje jen úhel, ne vzdálenost.',
+    dropsSunHint:
+      'Posuňte výšku Slunce — rozsvítí se jiné kapky. Duha není předmět na jednom místě, je to jen úhel; jiný pozorovatel by měl svou vlastní.',
+    dropsLegendReaches: 'dosáhne oka pozorovatele',
+    dropsLegendMisses: 'kapka je osvětlená, ale míjí — jiný úhel',
     dropsContributing: 'Kapek přispívajících pozorovateli',
     animateDrops: 'Animovat přibývání',
 
@@ -593,6 +597,10 @@ export const translations = {
     dropCount: 'Number of droplets',
     dropsHint:
       'Green droplets send light to the observer, grey ones do not. Only the angle matters, not the distance.',
+    dropsSunHint:
+      "Drag the Sun's height — different droplets light up. A rainbow isn't an object at one place, only an angle; another observer would have their own.",
+    dropsLegendReaches: 'reaches the observer’s eye',
+    dropsLegendMisses: 'lit too, but misses — wrong angle',
     dropsContributing: 'Droplets reaching the observer',
     animateDrops: 'Animate accumulation',
 
