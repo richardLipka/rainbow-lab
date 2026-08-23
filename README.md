@@ -196,6 +196,16 @@ because the arc it draws (from the forward/antisolar reference to the
 actual outgoing ray) geometrically sweeps Θ, the scattering angle — showing
 that arc's size next to a `φ` number alone would silently mismatch.
 
+At the default zoom the eye sits close enough that six wavelengths' worth of
+dispersion is barely a few pixels wide — visually indistinguishable from one
+ray. The **zoom-out slider** pulls the (dampened, `1/√zoom`) droplet down in
+size while pushing the observer proportionally farther away and lengthening
+the drawn rays to match, so the same angular dispersion becomes an
+increasingly wide, clearly rainbow-coloured band by the time it reaches the
+eye. The ratio of that band's width to the droplet's own size grows roughly
+linearly with the zoom setting (measured: ~0.1 at 1×, ~0.8 at 9×) — turn on
+white light and full dispersion, then zoom out, to watch it happen.
+
 ## Interaction map
 
 - **Single droplet** — drag vertically in the canvas, or use the impact

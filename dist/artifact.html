@@ -1475,6 +1475,8 @@ const translations = {
     /* ---- controls: droplet & optics ---- */
     droplet: 'Kapka',
     dropletRadius: 'Poloměr kapky',
+    dropletZoom: 'Oddálení pohledu',
+    dropletZoomHint: 'Oddalte pohled a sledujte, jak se barvy paprsku rozestupují na cestě k oku pozorovatele.',
     impactParameter: 'Parametr dopadu b/R',
     reflections: 'Vnitřní odrazy',
     refractiveIndex: 'Index lomu',
@@ -1777,6 +1779,8 @@ const translations = {
     /* ---- controls: droplet & optics ---- */
     droplet: 'Droplet',
     dropletRadius: 'Droplet radius',
+    dropletZoom: 'Zoom out',
+    dropletZoomHint: 'Zoom out to watch the ray colours spread apart on their way to the eye.',
     impactParameter: 'Impact parameter b/R',
     reflections: 'Internal reflections',
     refractiveIndex: 'Refractive index',
@@ -2094,6 +2098,12 @@ const state = {
   dropletRadiusMm: 1.0,
   indexMode: 'table',
   indexScale: 1,
+
+  /* how far (in droplet radii) the observer is drawn from the droplet in the
+     single-droplet scene -- 1 matches the original close-up framing; turning
+     this up draws the droplet smaller and the rays longer, so a dispersed
+     fan of colour becomes visible on its way to the eye. */
+  dropletZoom: 1,
 
   /* rays */
   showNonRainbow: false,
@@ -2493,16 +2503,22 @@ function angleArc(ctx, cx, cy, r, a0, a1, color, text) {
 /** A demonstrably off-caustic impact parameter for the "ordinary ray" case. */
 const NON_CAUSTIC_B = 0.35;
 
-/** Trace one ray with the canonical geometry: beam along +x, droplet at origin. */
-function traceOne(lambda, n, k, b, radius = 1) {
+/**
+ * Trace one ray with the canonical geometry: beam along +x, droplet at
+ * origin. `rayLength` (droplet radii) sets how far the incident and exit
+ * segments are drawn on each side -- 6 by default, matching the original
+ * close-up framing; buildRays() scales it up with state.dropletZoom so a
+ * zoomed-out view has correspondingly longer rays to draw a visible fan.
+ */
+function traceOne(lambda, n, k, b, radius = 1, rayLength = 6 * radius) {
   const path = O.traceRay({
-    origin: O.vec(-6 * radius, b * radius, 0),
+    origin: O.vec(-rayLength, b * radius, 0),
     dir: O.vec(1, 0, 0),
     center: O.vec(0, 0, 0),
     radius,
     n,
     reflections: k,
-    exitLength: 6 * radius,
+    exitLength: rayLength,
   });
   return {
     lambda,
@@ -2527,12 +2543,13 @@ function buildRays() {
   const idx = indexModel();
   const lambdas = activeLambdas();
   const orders = activeOrders();
+  const rayLength = 6 * Math.max(1, state.dropletZoom);
   const out = [];
 
   for (const k of orders) {
     for (const lambda of lambdas) {
       const n = idx(lambda);
-      const r = traceOne(lambda, n, k, state.impact);
+      const r = traceOne(lambda, n, k, state.impact, 1, rayLength);
       r.role = 'main';
       out.push(r);
 
@@ -2540,7 +2557,7 @@ function buildRays() {
         for (let i = 0; i < state.fanCount; i++) {
           const b = (i + 0.5) / state.fanCount;
           if (Math.abs(b - state.impact) < 1e-6) continue;
-          const f = traceOne(lambda, n, k, b);
+          const f = traceOne(lambda, n, k, b, 1, rayLength);
           f.role = 'fan';
           out.push(f);
         }
@@ -2552,12 +2569,12 @@ function buildRays() {
     const lambda = lambdas.includes(650) ? 650 : lambdas[0];
     const n = idx(lambda);
     if (!orders.includes(0)) {
-      const r0 = traceOne(lambda, n, 0, state.impact);
+      const r0 = traceOne(lambda, n, 0, state.impact, 1, rayLength);
       r0.role = 'demo0';
       r0.noteKey = 'explNoReflection';
       out.push(r0);
     }
-    const rn = traceOne(lambda, n, 1, NON_CAUSTIC_B);
+    const rn = traceOne(lambda, n, 1, NON_CAUSTIC_B, 1, rayLength);
     rn.role = 'demoNC';
     rn.noteKey = 'explNonCaustic';
     out.push(rn);
@@ -2634,8 +2651,14 @@ function createDropletView(canvas) {
     const { ctx, w, h } = fitCanvas(canvas);
     ctx.clearRect(0, 0, w, h);
 
-    const s = Math.min(w * 0.19, h * 0.34);
-    layout = { cx: w * 0.47, cy: h * 0.5, s, w, h };
+    // Zooming out draws the droplet smaller (dampened by sqrt so it stays
+    // legible even at high zoom) while the observer moves proportionally
+    // farther away (see drawObserver) -- together this is what lets a
+    // dispersed fan of colour become visible on the way to the eye instead
+    // of being lost in a droplet that fills most of the frame.
+    const zoom = Math.max(1, state.dropletZoom);
+    const s = Math.min(w * 0.19, h * 0.34) / Math.sqrt(zoom);
+    layout = { cx: w * 0.47, cy: h * 0.5, s, w, h, zoom };
 
     drawBackground(ctx, w, h);
     drawDroplet(ctx);
@@ -2871,20 +2894,23 @@ function createDropletView(canvas) {
   /**
    * The observer, drawn as an eye facing back toward the droplet, sitting
    * exactly along the direction the current family's canonical rainbow ray
-   * exits along (see computeObserver). Its screen position is derived from
-   * that world-space direction but clamped to stay comfortably inside the
-   * canvas regardless of aspect ratio, since the true distance to an
-   * observer is effectively infinite and has no meaningful scale here.
+   * exits along (see computeObserver). Its world-space distance grows with
+   * state.dropletZoom (see draw()), so zooming out pushes it farther away
+   * in step with the droplet shrinking -- not just a fixed offset -- and
+   * the diverging exit rays get correspondingly longer to reach it (see
+   * buildRays()). It is still clamped to stay comfortably inside the canvas
+   * regardless of aspect ratio, since the true distance to an observer is
+   * effectively infinite and has no true scale to draw at.
    */
   function drawObserver(ctx, observer, active) {
-    const { cx, cy, s, w, h } = layout;
+    const { cx, cy, s, w, h, zoom } = layout;
     const screenDir = { x: observer.dir.x, y: -observer.dir.y }; // world -> screen y-flip
     const len = Math.hypot(screenDir.x, screenDir.y) || 1;
     const ux = screenDir.x / len;
     const uy = screenDir.y / len;
 
     const margin = 52;
-    let radius = s * 3.3;
+    let radius = s * 3.3 * Math.sqrt(zoom);
     const limits = [];
     if (ux > 1e-6) limits.push((w - margin - cx) / ux);
     if (ux < -1e-6) limits.push((margin - cx) / ux);
@@ -4851,6 +4877,13 @@ function buildControls() {
       onInput: (v) => set({ dropletRadiusMm: v }),
     }),
     el('small', { class: 'ctl-hint block' }, t('dropletSizeNote')),
+    slider({
+      labelKey: 'dropletZoom', min: 1, max: 9, step: 0.1,
+      get: () => state.dropletZoom,
+      format: (v) => `${num(v, 1)}×`,
+      onInput: (v) => set({ dropletZoom: v }),
+      hintKey: 'dropletZoomHint',
+    }),
     select('indexModel',
       [{ value: 'table', labelKey: 'indexTable' }, { value: 'cauchy', labelKey: 'indexCauchy' }],
       () => state.indexMode, (v) => set({ indexMode: v })),
@@ -5000,7 +5033,7 @@ function sliderToHeight(v) {
 function resetState() {
   set({
     wavelength: 'white', dispersion: 1, impact: 0.861, reflections: 1,
-    dropletRadiusMm: 1, indexMode: 'table', indexScale: 1,
+    dropletRadiusMm: 1, dropletZoom: 1, indexMode: 'table', indexScale: 1,
     showNonRainbow: false, fanCount: 0, families: { 0: false, 1: true, 2: false, 3: false },
     angleMode: 'antisolar', distRays: 60, distAccumulate: false,
     dropCount: 1, dropsAnimate: false,

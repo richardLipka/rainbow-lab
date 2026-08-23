@@ -81,6 +81,8 @@ export const translations = {
     /* ---- controls: droplet & optics ---- */
     droplet: 'Kapka',
     dropletRadius: 'Poloměr kapky',
+    dropletZoom: 'Oddálení pohledu',
+    dropletZoomHint: 'Oddalte pohled a sledujte, jak se barvy paprsku rozestupují na cestě k oku pozorovatele.',
     impactParameter: 'Parametr dopadu b/R',
     reflections: 'Vnitřní odrazy',
     refractiveIndex: 'Index lomu',
@@ -383,6 +385,8 @@ export const translations = {
     /* ---- controls: droplet & optics ---- */
     droplet: 'Droplet',
     dropletRadius: 'Droplet radius',
+    dropletZoom: 'Zoom out',
+    dropletZoomHint: 'Zoom out to watch the ray colours spread apart on their way to the eye.',
     impactParameter: 'Impact parameter b/R',
     reflections: 'Internal reflections',
     refractiveIndex: 'Refractive index',

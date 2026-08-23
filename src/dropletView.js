@@ -30,8 +30,14 @@ export function createDropletView(canvas) {
     const { ctx, w, h } = fitCanvas(canvas);
     ctx.clearRect(0, 0, w, h);
 
-    const s = Math.min(w * 0.19, h * 0.34);
-    layout = { cx: w * 0.47, cy: h * 0.5, s, w, h };
+    // Zooming out draws the droplet smaller (dampened by sqrt so it stays
+    // legible even at high zoom) while the observer moves proportionally
+    // farther away (see drawObserver) -- together this is what lets a
+    // dispersed fan of colour become visible on the way to the eye instead
+    // of being lost in a droplet that fills most of the frame.
+    const zoom = Math.max(1, state.dropletZoom);
+    const s = Math.min(w * 0.19, h * 0.34) / Math.sqrt(zoom);
+    layout = { cx: w * 0.47, cy: h * 0.5, s, w, h, zoom };
 
     drawBackground(ctx, w, h);
     drawDroplet(ctx);
@@ -267,20 +273,23 @@ export function createDropletView(canvas) {
   /**
    * The observer, drawn as an eye facing back toward the droplet, sitting
    * exactly along the direction the current family's canonical rainbow ray
-   * exits along (see computeObserver). Its screen position is derived from
-   * that world-space direction but clamped to stay comfortably inside the
-   * canvas regardless of aspect ratio, since the true distance to an
-   * observer is effectively infinite and has no meaningful scale here.
+   * exits along (see computeObserver). Its world-space distance grows with
+   * state.dropletZoom (see draw()), so zooming out pushes it farther away
+   * in step with the droplet shrinking -- not just a fixed offset -- and
+   * the diverging exit rays get correspondingly longer to reach it (see
+   * buildRays()). It is still clamped to stay comfortably inside the canvas
+   * regardless of aspect ratio, since the true distance to an observer is
+   * effectively infinite and has no true scale to draw at.
    */
   function drawObserver(ctx, observer, active) {
-    const { cx, cy, s, w, h } = layout;
+    const { cx, cy, s, w, h, zoom } = layout;
     const screenDir = { x: observer.dir.x, y: -observer.dir.y }; // world -> screen y-flip
     const len = Math.hypot(screenDir.x, screenDir.y) || 1;
     const ux = screenDir.x / len;
     const uy = screenDir.y / len;
 
     const margin = 52;
-    let radius = s * 3.3;
+    let radius = s * 3.3 * Math.sqrt(zoom);
     const limits = [];
     if (ux > 1e-6) limits.push((w - margin - cx) / ux);
     if (ux < -1e-6) limits.push((margin - cx) / ux);

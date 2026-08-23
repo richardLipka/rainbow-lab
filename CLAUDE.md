@@ -110,6 +110,19 @@ direction from `phi`/`theta` trig by hand — the two are easy to get
 subtly wrong (see below), and tracing reuses code already covered by the
 unit tests.
 
+`state.dropletZoom` (default 1) controls how far away the observer is drawn,
+in droplet radii. `draw()` derives the droplet's pixel scale as
+`baseS / sqrt(zoom)` (dampened so it stays legible even at high zoom) and
+`buildRays()` scales the drawn ray length as `6 * zoom`, while
+`drawObserver()`'s eye distance scales as `3.3 * sqrt(zoom)` on that same
+shrinking pixel scale. The combination is what makes the effect work: at
+zoom 1 the six wavelengths' worth of dispersion is a few pixels, invisible;
+by zoom 9 the ratio of ray-fan spread to droplet size has grown roughly
+8×, because the fan spread shrinks slower than the droplet does as the
+scale contracts. If you touch any of these three formulas, touch the other
+two the same way, or the fan-to-droplet ratio stops growing with zoom and
+the control stops doing what it's for.
+
 ## Lessons from bugs found in this codebase (don't reintroduce these)
 
 - **`notify()`'s debounce had no fallback.** `state.js`'s `notify()` used to
@@ -144,6 +157,22 @@ unit tests.
   different `k` changes the numbers.
 
 ## How to verify changes
+
+**Check `location.href` before trusting any browser test result.** This
+project has both a live dev page (`index.html`, source files) and a static
+built snapshot (`dist/rainbow-lab.html`) that a prior verification pass may
+have navigated to and left the tab sitting on. `location.reload()` reloads
+*whatever URL the tab currently has* — if that's the dist snapshot, you will
+reload a frozen-in-time build and every test against it silently exercises
+old code, often with no errors at all (setting a state field the loaded
+code doesn't yet read just adds a harmless extra property). This already
+produced one fully-chased false bug report in this project — a "reset
+button doesn't reset the new field" investigation that consumed several
+tool calls before the real cause turned out to be the tab sitting on a
+stale `dist/` build from an earlier session. Confirm `location.href` points
+at `index.html` (or explicitly navigate there) before drawing any
+conclusion from a failing browser check, especially after a `dist/` build
+was verified earlier in the same session.
 
 `optics.js` changes: run the unit tests. They check ray-sphere intersection,
 Snell's law (scalar and vector forms agree), Fresnel limits, the analytic

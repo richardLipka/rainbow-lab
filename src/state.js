@@ -26,6 +26,12 @@ export const state = {
   indexMode: 'table',
   indexScale: 1,
 
+  /* how far (in droplet radii) the observer is drawn from the droplet in the
+     single-droplet scene -- 1 matches the original close-up framing; turning
+     this up draws the droplet smaller and the rays longer, so a dispersed
+     fan of colour becomes visible on its way to the eye. */
+  dropletZoom: 1,
+
   /* rays */
   showNonRainbow: false,
   families: { 0: false, 1: true, 2: false, 3: false },

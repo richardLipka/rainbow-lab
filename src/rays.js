@@ -10,16 +10,22 @@ import { state, activeLambdas, activeOrders, indexModel } from './state.js';
 /** A demonstrably off-caustic impact parameter for the "ordinary ray" case. */
 export const NON_CAUSTIC_B = 0.35;
 
-/** Trace one ray with the canonical geometry: beam along +x, droplet at origin. */
-export function traceOne(lambda, n, k, b, radius = 1) {
+/**
+ * Trace one ray with the canonical geometry: beam along +x, droplet at
+ * origin. `rayLength` (droplet radii) sets how far the incident and exit
+ * segments are drawn on each side -- 6 by default, matching the original
+ * close-up framing; buildRays() scales it up with state.dropletZoom so a
+ * zoomed-out view has correspondingly longer rays to draw a visible fan.
+ */
+export function traceOne(lambda, n, k, b, radius = 1, rayLength = 6 * radius) {
   const path = O.traceRay({
-    origin: O.vec(-6 * radius, b * radius, 0),
+    origin: O.vec(-rayLength, b * radius, 0),
     dir: O.vec(1, 0, 0),
     center: O.vec(0, 0, 0),
     radius,
     n,
     reflections: k,
-    exitLength: 6 * radius,
+    exitLength: rayLength,
   });
   return {
     lambda,
@@ -44,12 +50,13 @@ export function buildRays() {
   const idx = indexModel();
   const lambdas = activeLambdas();
   const orders = activeOrders();
+  const rayLength = 6 * Math.max(1, state.dropletZoom);
   const out = [];
 
   for (const k of orders) {
     for (const lambda of lambdas) {
       const n = idx(lambda);
-      const r = traceOne(lambda, n, k, state.impact);
+      const r = traceOne(lambda, n, k, state.impact, 1, rayLength);
       r.role = 'main';
       out.push(r);
 
@@ -57,7 +64,7 @@ export function buildRays() {
         for (let i = 0; i < state.fanCount; i++) {
           const b = (i + 0.5) / state.fanCount;
           if (Math.abs(b - state.impact) < 1e-6) continue;
-          const f = traceOne(lambda, n, k, b);
+          const f = traceOne(lambda, n, k, b, 1, rayLength);
           f.role = 'fan';
           out.push(f);
         }
@@ -69,12 +76,12 @@ export function buildRays() {
     const lambda = lambdas.includes(650) ? 650 : lambdas[0];
     const n = idx(lambda);
     if (!orders.includes(0)) {
-      const r0 = traceOne(lambda, n, 0, state.impact);
+      const r0 = traceOne(lambda, n, 0, state.impact, 1, rayLength);
       r0.role = 'demo0';
       r0.noteKey = 'explNoReflection';
       out.push(r0);
     }
-    const rn = traceOne(lambda, n, 1, NON_CAUSTIC_B);
+    const rn = traceOne(lambda, n, 1, NON_CAUSTIC_B, 1, rayLength);
     rn.role = 'demoNC';
     rn.noteKey = 'explNonCaustic';
     out.push(rn);

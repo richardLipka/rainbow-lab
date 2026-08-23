@@ -234,6 +234,13 @@ function buildControls() {
       onInput: (v) => set({ dropletRadiusMm: v }),
     }),
     el('small', { class: 'ctl-hint block' }, t('dropletSizeNote')),
+    slider({
+      labelKey: 'dropletZoom', min: 1, max: 9, step: 0.1,
+      get: () => state.dropletZoom,
+      format: (v) => `${num(v, 1)}×`,
+      onInput: (v) => set({ dropletZoom: v }),
+      hintKey: 'dropletZoomHint',
+    }),
     select('indexModel',
       [{ value: 'table', labelKey: 'indexTable' }, { value: 'cauchy', labelKey: 'indexCauchy' }],
       () => state.indexMode, (v) => set({ indexMode: v })),
@@ -383,7 +390,7 @@ function sliderToHeight(v) {
 function resetState() {
   set({
     wavelength: 'white', dispersion: 1, impact: 0.861, reflections: 1,
-    dropletRadiusMm: 1, indexMode: 'table', indexScale: 1,
+    dropletRadiusMm: 1, dropletZoom: 1, indexMode: 'table', indexScale: 1,
     showNonRainbow: false, fanCount: 0, families: { 0: false, 1: true, 2: false, 3: false },
     angleMode: 'antisolar', distRays: 60, distAccumulate: false,
     dropCount: 1, dropsAnimate: false,
