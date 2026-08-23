@@ -46,9 +46,18 @@ export function createDropletView(canvas) {
     const observers = computeObservers();
 
     const rays = buildRays();
-    // fans first, main rays on top, so a prominent ray never gets buried
+    // Rays that reach the observer are drawn LAST, above everything else.
+    // Sorting by role alone used to bury them: a contributing fan ray would
+    // be painted before a dim, non-contributing main ray and then covered by
+    // it, so the very rays the scene is trying to emphasise ended up
+    // underneath the ones it is trying to play down. Role only breaks ties
+    // within each group.
     const order = { fan: 0, demo0: 1, demoNC: 1, main: 2 };
-    rays.sort((a, b) => order[a.role] - order[b.role]);
+    rays.sort((a, b) => {
+      const ra = REACHES_OBSERVER.has(a.classification) ? 1 : 0;
+      const rb = REACHES_OBSERVER.has(b.classification) ? 1 : 0;
+      return ra !== rb ? ra - rb : order[a.role] - order[b.role];
+    });
     const reachingKs = new Set(
       rays.filter((r) => REACHES_OBSERVER.has(r.classification)).map((r) => r.k)
     );
@@ -203,21 +212,28 @@ export function createDropletView(canvas) {
    */
   function rayStyle(ray) {
     const reaches = REACHES_OBSERVER.has(ray.classification);
-    if (ray.role === 'fan') return { alpha: reaches ? 0.95 : 0.13, width: reaches ? 2.1 : 0.9, reaches };
-    return { alpha: reaches ? 1 : 0.38, width: reaches ? 2.3 : 1.4, reaches };
+    // greyMix is the primary cue (see colorFor): a ray that misses the
+    // observer loses most of its hue, so with a whole fan on screen the few
+    // that matter stand out by colour and not merely by being a little less
+    // faint. Alpha is kept high enough that the missing rays stay clearly
+    // present -- they are the pedagogical point, not clutter to hide.
+    if (ray.role === 'fan') {
+      return { alpha: reaches ? 0.95 : 0.4, width: reaches ? 2.2 : 0.9, greyMix: reaches ? 0 : 0.82, reaches };
+    }
+    return { alpha: reaches ? 1 : 0.62, width: reaches ? 2.4 : 1.3, greyMix: reaches ? 0 : 0.72, reaches };
   }
 
   function drawRay(ctx, ray) {
     const p = ray.path;
     if (!p.hit && !p.miss) return;
-    const { alpha: a, width: baseWidth, reaches } = rayStyle(ray);
+    const { alpha: a, width: baseWidth, greyMix, reaches } = rayStyle(ray);
     const selected =
       state.selectedRay &&
       state.selectedRay.k === ray.k &&
       Math.abs(state.selectedRay.b - ray.b) < 1e-9 &&
       state.selectedRay.lambda === ray.lambda;
 
-    const base = colorFor(ray.lambda, a);
+    const base = colorFor(ray.lambda, a, greyMix);
     const dashed = ray.role === 'demo0' || ray.role === 'demoNC';
 
     // A glow under the exit segment for any ray that actually reaches the
@@ -235,11 +251,13 @@ export function createDropletView(canvas) {
       if (selected) width += 1.6;
       let style = base;
       if (seg.medium === 'water') {
-        style = colorFor(ray.lambda, Math.min(1, a * 0.95));
+        style = colorFor(ray.lambda, Math.min(1, a * 0.95), greyMix);
         width += 0.2;
       }
       if (seg.kind === 'incident' && ray.role !== 'fan') {
-        style = state.wavelength === 'white' ? `rgba(255,246,214,${a})` : base;
+        // incoming sunlight is white before the droplet splits it, but a
+        // ray that will miss the observer still reads as greyed out
+        style = reaches && state.wavelength === 'white' ? `rgba(255,246,214,${a})` : base;
       }
       strokePath(ctx, [A, B], style, width, dashed && seg.kind !== 'internal' ? [5, 4] : null);
     }
@@ -250,11 +268,15 @@ export function createDropletView(canvas) {
     }
 
     if (ray.role !== 'fan') {
+      // The refraction/reflection dots follow the ray's own emphasis --
+      // full-strength markers on a greyed-out ray would pull the eye back
+      // to exactly the ray the scene is trying to play down.
       for (const v of p.vertices) {
         const q = project(v.point);
-        ctx.fillStyle = v.type === 'reflection' ? '#ffd166' : '#8be0ff';
+        const dot = v.type === 'reflection' ? '255,209,102' : '139,224,255';
+        ctx.fillStyle = reaches ? `rgb(${dot})` : `rgba(${dot},0.45)`;
         ctx.beginPath();
-        ctx.arc(q.x, q.y, selected ? 3.6 : 2.6, 0, Math.PI * 2);
+        ctx.arc(q.x, q.y, selected ? 3.6 : reaches ? 2.6 : 2, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -434,19 +456,71 @@ export function createDropletView(canvas) {
   }
 
   function drawLegend(ctx, w, h, rays) {
-    if (!state.show.wavelengthLabels) return;
-    const main = rays.filter((r) => r.role === 'main');
-    const seen = new Set();
     let y = 18;
-    for (const r of main) {
-      if (seen.has(r.lambda)) continue;
-      seen.add(r.lambda);
-      const txt = `${r.lambda} ${t('nm')} · n=${num(r.n, 4)} · φ=${
-        r.path.antisolar === null ? '—' : deg(r.path.antisolar * O.DEG, 2)
-      }`;
-      label(ctx, txt, w - 12, y, { align: 'right', color: colorFor(r.lambda) });
-      y += 18;
+    if (state.show.wavelengthLabels) {
+      const main = rays.filter((r) => r.role === 'main');
+      const seen = new Set();
+      for (const r of main) {
+        if (seen.has(r.lambda)) continue;
+        seen.add(r.lambda);
+        const txt = `${r.lambda} ${t('nm')} · n=${num(r.n, 4)} · φ=${
+          r.path.antisolar === null ? '—' : deg(r.path.antisolar * O.DEG, 2)
+        }`;
+        label(ctx, txt, w - 12, y, { align: 'right', color: colorFor(r.lambda) });
+        y += 18;
+      }
+      y += 6;
     }
+    drawRayTally(ctx, w, y, rays);
+  }
+
+  /**
+   * How many of the rays on screen actually reach the observer, with a
+   * swatch for each of the two states. Only worth showing once there is
+   * more than one ray to compare -- with a single ray the observer eye
+   * lighting up already says the same thing. Placed top-right, under the
+   * wavelength legend, because the top-left is where the Sun icon and its
+   * label travel as the impact parameter is dragged.
+   */
+  function drawRayTally(ctx, w, y0, rays) {
+    if (!state.show.labels) return;
+    const traced = rays.filter((r) => r.path.hit && !r.path.tangent);
+    if (traced.length < 2) return;
+    const reaching = traced.filter((r) => REACHES_OBSERVER.has(r.classification)).length;
+
+    let y = y0;
+    label(ctx, `${t('rayTally')}: ${reaching} / ${traced.length}`, w - 12, y, {
+      align: 'right', color: reaching ? '#e0a83f' : '#93a3bd',
+    });
+    y += 18;
+
+    const font = '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif';
+    const lambdas = state.wavelength === 'white'
+      ? O.NAMED_COLORS.map((c) => c.lambda)
+      : [state.wavelength];
+
+    /** greyMix null => draw the swatch as the actual spectrum in play, so
+     *  under white light the "reaches" key is a miniature rainbow rather
+     *  than a single red line that misrepresents what is on screen. */
+    const swatchRow = (text, greyMix, alpha) => {
+      label(ctx, text, w - 12, y, { align: 'right', bg: false, color: '#8ea3c6', font });
+      // measure with the same font label() draws in, not whatever the
+      // context happened to be left set to
+      ctx.save();
+      ctx.font = font;
+      const textW = ctx.measureText(text).width;
+      ctx.restore();
+      const x1 = w - 18 - textW;
+      const x0 = x1 - 16;
+      const seg = (x1 - x0) / lambdas.length;
+      lambdas.forEach((lam, i) => {
+        strokePath(ctx, [{ x: x0 + i * seg, y }, { x: x0 + (i + 1) * seg + 0.6, y }],
+          colorFor(lam, alpha, greyMix), 2.4);
+      });
+      y += 15;
+    };
+    swatchRow(t('rayLegendReaches'), 0, 1);
+    swatchRow(t('rayLegendMisses'), 0.82, 0.55);
   }
 
   /* ---------------------------------------------------------- interaction */

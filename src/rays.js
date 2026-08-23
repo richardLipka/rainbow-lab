@@ -107,7 +107,7 @@ export function distanceFromExtremum(ray) {
  * which is the honest visual statement that the colours of a rainbow exist
  * only because n depends on wavelength.
  */
-export function colorFor(lambda, alpha = 1) {
+export function colorFor(lambda, alpha = 1, greyMix = 0) {
   const c = O.wavelengthToRGB(lambda);
   let { r, g, b } = c;
   if (state.wavelength === 'white') {
@@ -115,6 +115,16 @@ export function colorFor(lambda, alpha = 1) {
     r = Math.round(r * m + 255 * (1 - m));
     g = Math.round(g * m + 255 * (1 - m));
     b = Math.round(b * m + 255 * (1 - m));
+  }
+  // Blend towards the neutral chrome grey. Used for rays that do not reach
+  // the observer, so "this one misses" reads from hue -- the same grey the
+  // many-droplets view uses for droplets that miss -- rather than from a
+  // difference in opacity alone, which disappears at thin line widths.
+  if (greyMix > 0) {
+    const k = Math.min(1, greyMix);
+    r = Math.round(r * (1 - k) + 0x93 * k);
+    g = Math.round(g * (1 - k) + 0xa3 * k);
+    b = Math.round(b * (1 - k) + 0xbd * k);
   }
   return alpha >= 1 ? `rgb(${r},${g},${b})` : `rgba(${r},${g},${b},${alpha})`;
 }

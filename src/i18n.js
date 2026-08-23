@@ -142,6 +142,9 @@ export const translations = {
     antisolarLabelLong: 'antisolární bod — bod přesně proti Slunci',
     observerNoConcentration: 'bez odrazu neexistuje soustředěný směr',
     observerReachHint: 'Zvýrazněné paprsky dopadají do oka pozorovatele — ostatní míří jinam.',
+    rayTally: 'Paprsků do oka',
+    rayLegendReaches: 'tvoří duhu',
+    rayLegendMisses: 'míří mimo pozorovatele',
 
     /* ---- ray info panel ---- */
     rayInfo: 'Údaje o paprsku',
@@ -450,6 +453,9 @@ export const translations = {
     antisolarLabelLong: 'antisolar point — the point directly opposite the Sun',
     observerNoConcentration: 'no concentrated direction without a reflection',
     observerReachHint: "Highlighted rays reach the observer's eye — the rest head elsewhere.",
+    rayTally: 'Rays reaching the eye',
+    rayLegendReaches: 'forms the rainbow',
+    rayLegendMisses: 'misses the observer',
 
     /* ---- ray info panel ---- */
     rayInfo: 'Ray data',

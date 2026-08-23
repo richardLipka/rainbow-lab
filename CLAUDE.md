@@ -93,6 +93,25 @@ UI element that needs to decide "is this ray special" (glow, emphasis,
 which one gets the detail overlay) should read `ray.classification` rather
 than re-deriving the same test from `role` or from ad-hoc angle comparisons.
 
+Two rules follow from that, both easy to break by accident:
+
+- **Rays that reach the observer must be drawn LAST.** `dropletView.js`
+  sorts on `reaches` first and only uses `role` to break ties. Sorting by
+  role alone (as it once did) buries the emphasis: a contributing fan ray
+  gets painted before a dim, non-contributing *main* ray and is then
+  covered by it, so the rays the scene is trying to highlight end up
+  underneath the ones it is trying to play down.
+- **Emphasis is carried by hue, not just opacity.** `colorFor()` takes a
+  `greyMix` that blends towards the neutral chrome grey; a ray that misses
+  the observer is drawn heavily desaturated. This matches the
+  many-droplets view, where grey already means "this droplet's light does
+  not reach *this* observer", so the two scenes teach the same colour
+  convention. Opacity alone is not enough — at the thin line widths a
+  60-ray fan needs, a low-alpha ray and a mid-alpha ray look identical.
+  Non-reaching rays are still kept clearly visible: they are the
+  pedagogical point ("most rays do *not* make a rainbow"), not clutter to
+  hide.
+
 ## The observer, and why it's per-family
 
 `dropletView.js`'s `computeObservers()` returns **one entry per active

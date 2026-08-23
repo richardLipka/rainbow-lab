@@ -1536,6 +1536,9 @@ const translations = {
     antisolarLabelLong: 'antisolární bod — bod přesně proti Slunci',
     observerNoConcentration: 'bez odrazu neexistuje soustředěný směr',
     observerReachHint: 'Zvýrazněné paprsky dopadají do oka pozorovatele — ostatní míří jinam.',
+    rayTally: 'Paprsků do oka',
+    rayLegendReaches: 'tvoří duhu',
+    rayLegendMisses: 'míří mimo pozorovatele',
 
     /* ---- ray info panel ---- */
     rayInfo: 'Údaje o paprsku',
@@ -1681,6 +1684,10 @@ const translations = {
     dropCount: 'Počet kapek',
     dropsHint:
       'Zelené kapky posílají světlo k pozorovateli, šedé ne. Rozhoduje jen úhel, ne vzdálenost.',
+    dropsSunHint:
+      'Posuňte výšku Slunce — rozsvítí se jiné kapky. Duha není předmět na jednom místě, je to jen úhel; jiný pozorovatel by měl svou vlastní.',
+    dropsLegendReaches: 'dosáhne oka pozorovatele',
+    dropsLegendMisses: 'kapka je osvětlená, ale míjí — jiný úhel',
     dropsContributing: 'Kapek přispívajících pozorovateli',
     animateDrops: 'Animovat přibývání',
 
@@ -1840,6 +1847,9 @@ const translations = {
     antisolarLabelLong: 'antisolar point — the point directly opposite the Sun',
     observerNoConcentration: 'no concentrated direction without a reflection',
     observerReachHint: "Highlighted rays reach the observer's eye — the rest head elsewhere.",
+    rayTally: 'Rays reaching the eye',
+    rayLegendReaches: 'forms the rainbow',
+    rayLegendMisses: 'misses the observer',
 
     /* ---- ray info panel ---- */
     rayInfo: 'Ray data',
@@ -1987,6 +1997,10 @@ const translations = {
     dropCount: 'Number of droplets',
     dropsHint:
       'Green droplets send light to the observer, grey ones do not. Only the angle matters, not the distance.',
+    dropsSunHint:
+      "Drag the Sun's height — different droplets light up. A rainbow isn't an object at one place, only an angle; another observer would have their own.",
+    dropsLegendReaches: 'reaches the observer’s eye',
+    dropsLegendMisses: 'lit too, but misses — wrong angle',
     dropsContributing: 'Droplets reaching the observer',
     animateDrops: 'Animate accumulation',
 
@@ -2600,7 +2614,7 @@ function distanceFromExtremum(ray) {
  * which is the honest visual statement that the colours of a rainbow exist
  * only because n depends on wavelength.
  */
-function colorFor(lambda, alpha = 1) {
+function colorFor(lambda, alpha = 1, greyMix = 0) {
   const c = O.wavelengthToRGB(lambda);
   let { r, g, b } = c;
   if (state.wavelength === 'white') {
@@ -2608,6 +2622,16 @@ function colorFor(lambda, alpha = 1) {
     r = Math.round(r * m + 255 * (1 - m));
     g = Math.round(g * m + 255 * (1 - m));
     b = Math.round(b * m + 255 * (1 - m));
+  }
+  // Blend towards the neutral chrome grey. Used for rays that do not reach
+  // the observer, so "this one misses" reads from hue -- the same grey the
+  // many-droplets view uses for droplets that miss -- rather than from a
+  // difference in opacity alone, which disappears at thin line widths.
+  if (greyMix > 0) {
+    const k = Math.min(1, greyMix);
+    r = Math.round(r * (1 - k) + 0x93 * k);
+    g = Math.round(g * (1 - k) + 0xa3 * k);
+    b = Math.round(b * (1 - k) + 0xbd * k);
   }
   return alpha >= 1 ? `rgb(${r},${g},${b})` : `rgba(${r},${g},${b},${alpha})`;
 }
@@ -2667,9 +2691,18 @@ function createDropletView(canvas) {
     const observers = computeObservers();
 
     const rays = buildRays();
-    // fans first, main rays on top, so a prominent ray never gets buried
+    // Rays that reach the observer are drawn LAST, above everything else.
+    // Sorting by role alone used to bury them: a contributing fan ray would
+    // be painted before a dim, non-contributing main ray and then covered by
+    // it, so the very rays the scene is trying to emphasise ended up
+    // underneath the ones it is trying to play down. Role only breaks ties
+    // within each group.
     const order = { fan: 0, demo0: 1, demoNC: 1, main: 2 };
-    rays.sort((a, b) => order[a.role] - order[b.role]);
+    rays.sort((a, b) => {
+      const ra = REACHES_OBSERVER.has(a.classification) ? 1 : 0;
+      const rb = REACHES_OBSERVER.has(b.classification) ? 1 : 0;
+      return ra !== rb ? ra - rb : order[a.role] - order[b.role];
+    });
     const reachingKs = new Set(
       rays.filter((r) => REACHES_OBSERVER.has(r.classification)).map((r) => r.k)
     );
@@ -2824,21 +2857,28 @@ function createDropletView(canvas) {
    */
   function rayStyle(ray) {
     const reaches = REACHES_OBSERVER.has(ray.classification);
-    if (ray.role === 'fan') return { alpha: reaches ? 0.95 : 0.13, width: reaches ? 2.1 : 0.9, reaches };
-    return { alpha: reaches ? 1 : 0.38, width: reaches ? 2.3 : 1.4, reaches };
+    // greyMix is the primary cue (see colorFor): a ray that misses the
+    // observer loses most of its hue, so with a whole fan on screen the few
+    // that matter stand out by colour and not merely by being a little less
+    // faint. Alpha is kept high enough that the missing rays stay clearly
+    // present -- they are the pedagogical point, not clutter to hide.
+    if (ray.role === 'fan') {
+      return { alpha: reaches ? 0.95 : 0.4, width: reaches ? 2.2 : 0.9, greyMix: reaches ? 0 : 0.82, reaches };
+    }
+    return { alpha: reaches ? 1 : 0.62, width: reaches ? 2.4 : 1.3, greyMix: reaches ? 0 : 0.72, reaches };
   }
 
   function drawRay(ctx, ray) {
     const p = ray.path;
     if (!p.hit && !p.miss) return;
-    const { alpha: a, width: baseWidth, reaches } = rayStyle(ray);
+    const { alpha: a, width: baseWidth, greyMix, reaches } = rayStyle(ray);
     const selected =
       state.selectedRay &&
       state.selectedRay.k === ray.k &&
       Math.abs(state.selectedRay.b - ray.b) < 1e-9 &&
       state.selectedRay.lambda === ray.lambda;
 
-    const base = colorFor(ray.lambda, a);
+    const base = colorFor(ray.lambda, a, greyMix);
     const dashed = ray.role === 'demo0' || ray.role === 'demoNC';
 
     // A glow under the exit segment for any ray that actually reaches the
@@ -2856,11 +2896,13 @@ function createDropletView(canvas) {
       if (selected) width += 1.6;
       let style = base;
       if (seg.medium === 'water') {
-        style = colorFor(ray.lambda, Math.min(1, a * 0.95));
+        style = colorFor(ray.lambda, Math.min(1, a * 0.95), greyMix);
         width += 0.2;
       }
       if (seg.kind === 'incident' && ray.role !== 'fan') {
-        style = state.wavelength === 'white' ? `rgba(255,246,214,${a})` : base;
+        // incoming sunlight is white before the droplet splits it, but a
+        // ray that will miss the observer still reads as greyed out
+        style = reaches && state.wavelength === 'white' ? `rgba(255,246,214,${a})` : base;
       }
       strokePath(ctx, [A, B], style, width, dashed && seg.kind !== 'internal' ? [5, 4] : null);
     }
@@ -2871,11 +2913,15 @@ function createDropletView(canvas) {
     }
 
     if (ray.role !== 'fan') {
+      // The refraction/reflection dots follow the ray's own emphasis --
+      // full-strength markers on a greyed-out ray would pull the eye back
+      // to exactly the ray the scene is trying to play down.
       for (const v of p.vertices) {
         const q = project(v.point);
-        ctx.fillStyle = v.type === 'reflection' ? '#ffd166' : '#8be0ff';
+        const dot = v.type === 'reflection' ? '255,209,102' : '139,224,255';
+        ctx.fillStyle = reaches ? `rgb(${dot})` : `rgba(${dot},0.45)`;
         ctx.beginPath();
-        ctx.arc(q.x, q.y, selected ? 3.6 : 2.6, 0, Math.PI * 2);
+        ctx.arc(q.x, q.y, selected ? 3.6 : reaches ? 2.6 : 2, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -3055,19 +3101,71 @@ function createDropletView(canvas) {
   }
 
   function drawLegend(ctx, w, h, rays) {
-    if (!state.show.wavelengthLabels) return;
-    const main = rays.filter((r) => r.role === 'main');
-    const seen = new Set();
     let y = 18;
-    for (const r of main) {
-      if (seen.has(r.lambda)) continue;
-      seen.add(r.lambda);
-      const txt = `${r.lambda} ${t('nm')} · n=${num(r.n, 4)} · φ=${
-        r.path.antisolar === null ? '—' : deg(r.path.antisolar * O.DEG, 2)
-      }`;
-      label(ctx, txt, w - 12, y, { align: 'right', color: colorFor(r.lambda) });
-      y += 18;
+    if (state.show.wavelengthLabels) {
+      const main = rays.filter((r) => r.role === 'main');
+      const seen = new Set();
+      for (const r of main) {
+        if (seen.has(r.lambda)) continue;
+        seen.add(r.lambda);
+        const txt = `${r.lambda} ${t('nm')} · n=${num(r.n, 4)} · φ=${
+          r.path.antisolar === null ? '—' : deg(r.path.antisolar * O.DEG, 2)
+        }`;
+        label(ctx, txt, w - 12, y, { align: 'right', color: colorFor(r.lambda) });
+        y += 18;
+      }
+      y += 6;
     }
+    drawRayTally(ctx, w, y, rays);
+  }
+
+  /**
+   * How many of the rays on screen actually reach the observer, with a
+   * swatch for each of the two states. Only worth showing once there is
+   * more than one ray to compare -- with a single ray the observer eye
+   * lighting up already says the same thing. Placed top-right, under the
+   * wavelength legend, because the top-left is where the Sun icon and its
+   * label travel as the impact parameter is dragged.
+   */
+  function drawRayTally(ctx, w, y0, rays) {
+    if (!state.show.labels) return;
+    const traced = rays.filter((r) => r.path.hit && !r.path.tangent);
+    if (traced.length < 2) return;
+    const reaching = traced.filter((r) => REACHES_OBSERVER.has(r.classification)).length;
+
+    let y = y0;
+    label(ctx, `${t('rayTally')}: ${reaching} / ${traced.length}`, w - 12, y, {
+      align: 'right', color: reaching ? '#e0a83f' : '#93a3bd',
+    });
+    y += 18;
+
+    const font = '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif';
+    const lambdas = state.wavelength === 'white'
+      ? O.NAMED_COLORS.map((c) => c.lambda)
+      : [state.wavelength];
+
+    /** greyMix null => draw the swatch as the actual spectrum in play, so
+     *  under white light the "reaches" key is a miniature rainbow rather
+     *  than a single red line that misrepresents what is on screen. */
+    const swatchRow = (text, greyMix, alpha) => {
+      label(ctx, text, w - 12, y, { align: 'right', bg: false, color: '#8ea3c6', font });
+      // measure with the same font label() draws in, not whatever the
+      // context happened to be left set to
+      ctx.save();
+      ctx.font = font;
+      const textW = ctx.measureText(text).width;
+      ctx.restore();
+      const x1 = w - 18 - textW;
+      const x0 = x1 - 16;
+      const seg = (x1 - x0) / lambdas.length;
+      lambdas.forEach((lam, i) => {
+        strokePath(ctx, [{ x: x0 + i * seg, y }, { x: x0 + (i + 1) * seg + 0.6, y }],
+          colorFor(lam, alpha, greyMix), 2.4);
+      });
+      y += 15;
+    };
+    swatchRow(t('rayLegendReaches'), 0, 1);
+    swatchRow(t('rayLegendMisses'), 0.82, 0.55);
   }
 
   /* ---------------------------------------------------------- interaction */
@@ -3545,6 +3643,7 @@ function createGraphView(canvas) {
 
 
 const MAX_DRAWN_RAYS = 34;
+const MAX_DRAWN_GREY_RAYS = 16;
 
 function createDropsView(canvas) {
   let drops = [];
@@ -3620,9 +3719,13 @@ function createDropsView(canvas) {
     const sun = { x: -anti.x, y: -anti.y };
     const bs = bands();
 
-    // antisolar axis
-    strokePath(ctx, [P({ x: 0, y: 0 }), P({ x: anti.x * 1.35, y: anti.y * 1.35 })],
-      'rgba(150,170,210,0.35)', 1, [5, 5]);
+    // The sun-antisolar axis: sunlight is parallel at this distance, so this
+    // ONE line, running the full width of the scene through the observer, is
+    // literally the direction every ray of incoming light travels along. It
+    // also makes the Sun's position explicit rather than leaving it floating
+    // near the observer with no visible connection to anything.
+    strokePath(ctx, [P({ x: sun.x * 1.4, y: sun.y * 1.4 }), P({ x: anti.x * 1.4, y: anti.y * 1.4 })],
+      'rgba(255,225,160,0.28)', 1, [5, 5]);
     if (state.show.labels) {
       const e = P({ x: anti.x * 1.2, y: anti.y * 1.2 });
       label(ctx, t('antisolarPoint'), e.x, e.y - 12, { align: 'center', color: '#9fb4d8' });
@@ -3660,6 +3763,7 @@ function createDropsView(canvas) {
     // is what makes ten thousand of them slow.
     let contributing = 0;
     let drawnRays = 0;
+    let drawnGreyRays = 0;
     const dotR = state.dropCount > 3000 ? 0.7 : state.dropCount > 600 ? 1.1 : state.dropCount > 60 ? 1.8 : 3;
     const greyPath = new Path2D();
     let greyCount = 0;
@@ -3683,13 +3787,34 @@ function createDropsView(canvas) {
           // incoming sunlight
           const back = { x: d.x - sun.x * 0.22, y: d.y - sun.y * 0.22 };
           strokePath(ctx, [P(back), q], 'rgba(255,246,214,0.5)', 1);
-          // the ray that actually reaches the eye
-          strokePath(ctx, [q, P({ x: 0, y: 0 })], colorFor(hitc.lambda, 0.6), 1);
+          // the ray that actually reaches the eye -- dashed for the
+          // secondary bow (k=2), solid for the primary (k=1), the same
+          // convention used everywhere else in the app for the two orders
+          strokePath(ctx, [q, P({ x: 0, y: 0 })], colorFor(hitc.lambda, 0.6), 1,
+            hitc.k === 2 ? [4, 3] : null);
         }
       } else if (state.show.droplets) {
         greyPath.moveTo(q.x + dotR, q.y);
         greyPath.arc(q.x, q.y, dotR, 0, Math.PI * 2);
         greyCount++;
+        // A sample of the grey droplets get the same treatment as the
+        // coloured ones: sunlight really does reach every droplet, and every
+        // droplet really does scatter it onward -- it is only the DIRECTION
+        // that fails to line up with this particular observer's eye. Drawn
+        // faint and undeviated (most scattered light is not concentrated
+        // into any caustic at all -- the k=0 lesson from the single-droplet
+        // view), so it reads as "goes on, unremarkably" rather than
+        // implying a second hidden rainbow direction that isn't modelled
+        // here.
+        if (drawnGreyRays < MAX_DRAWN_GREY_RAYS && len > 0.12) {
+          drawnGreyRays++;
+          const back = { x: d.x - sun.x * 0.22, y: d.y - sun.y * 0.22 };
+          strokePath(ctx, [P(back), q], 'rgba(255,246,214,0.16)', 1);
+          // continues onward, undeviated -- same direction light was already
+          // travelling in (away from the Sun, i.e. -sun)
+          const onward = { x: d.x - sun.x * 0.16, y: d.y - sun.y * 0.16 };
+          strokePath(ctx, [q, P(onward)], 'rgba(150,175,215,0.3)', 1);
+        }
       }
     }
     if (greyCount) {
@@ -3712,27 +3837,72 @@ function createDropsView(canvas) {
     ctx.restore();
     if (state.show.labels) label(ctx, t('observerLabel'), o.x, o.y + 22, { align: 'center', color: '#e8eefc' });
 
-    // sun, behind the observer
-    const sp = P({ x: sun.x * 0.55, y: sun.y * 0.55 });
-    const sg = ctx.createRadialGradient(sp.x, sp.y, 2, sp.x, sp.y, 22);
+    // Sun icon, at a small FIXED pixel distance from the observer in the
+    // correct direction -- not scaled by world units. The observer sits
+    // close to the left edge (ox is only ~10% of the width, to leave room
+    // for droplet depth on the antisolar side), so at low sun elevations the
+    // true sun direction points almost straight off the left edge: there is
+    // close to zero margin on that side by construction of the layout, so
+    // no world-space radius reliably keeps the icon on-canvas. The dashed
+    // axis line above is drawn unclamped (harmless off-canvas) and carries
+    // the true far-away direction; the icon only needs to sit clearly,
+    // legibly, and in the right direction close to the observer, the same
+    // way the single-droplet view's own Sun icon is a fixed screen element
+    // rather than a geometrically "correct" distance.
+    const sunScreenDir = { x: sun.x, y: -sun.y };
+    const sunMargin = 14;
+    let sunDist = 70;
+    if (sunScreenDir.x < -1e-6) sunDist = Math.min(sunDist, (ox - sunMargin) / -sunScreenDir.x);
+    if (sunScreenDir.x > 1e-6) sunDist = Math.min(sunDist, (w - ox - sunMargin) / sunScreenDir.x);
+    if (sunScreenDir.y < -1e-6) sunDist = Math.min(sunDist, (oy - sunMargin) / -sunScreenDir.y);
+    if (sunScreenDir.y > 1e-6) sunDist = Math.min(sunDist, (h - oy - sunMargin) / sunScreenDir.y);
+    sunDist = Math.max(24, sunDist);
+    const sp = { x: ox + sunScreenDir.x * sunDist, y: oy + sunScreenDir.y * sunDist };
+    const sg = ctx.createRadialGradient(sp.x, sp.y, 2, sp.x, sp.y, 26);
     sg.addColorStop(0, 'rgba(255,238,180,0.9)');
     sg.addColorStop(1, 'rgba(255,210,90,0)');
     ctx.fillStyle = sg;
     ctx.beginPath();
-    ctx.arc(sp.x, sp.y, 22, 0, Math.PI * 2);
+    ctx.arc(sp.x, sp.y, 26, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#ffe9a8';
     ctx.beginPath();
-    ctx.arc(sp.x, sp.y, 5, 0, Math.PI * 2);
+    ctx.arc(sp.x, sp.y, 6, 0, Math.PI * 2);
     ctx.fill();
-    if (state.show.labels) label(ctx, t('sunLabel'), sp.x, sp.y - 26, { align: 'center', color: '#ffe9a8' });
+    if (state.show.labels) {
+      // Left-aligned, not centred: the icon sits close to the left edge at
+      // most sun elevations (see the clamp above), and a centred label would
+      // clip against that edge.
+      label(ctx, `${t('sunLabel')} · ${num(state.sunElevation, 0)}°`, Math.max(sp.x - 4, 4), sp.y - 28, {
+        align: 'left', color: '#ffe9a8',
+      });
+    }
 
     // readout
     label(ctx, `${t('dropCount')}: ${fmt(drops.length)}`, 12, 16, { color: '#cfe0ff' });
     label(ctx, `${t('dropsContributing')}: ${fmt(contributing)}`, 12, 36, { color: '#6fd3a4' });
+
+    // legend: what green vs grey actually means, spelled out next to a
+    // sample swatch rather than left for the hint text alone to carry
     if (state.show.labels) {
-      const hint = t('dropsHint');
-      label(ctx, hint, 12, h - 14, { color: '#8ea3c6', font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif' });
+      const swatch = (x, y, color) => {
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+      };
+      swatch(16, 58, '#6fd3a4');
+      label(ctx, t('dropsLegendReaches'), 26, 58, {
+        align: 'left', color: '#9fd8bd', bg: false, font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
+      });
+      swatch(16, 74, 'rgba(150,175,215,0.7)');
+      label(ctx, t('dropsLegendMisses'), 26, 74, {
+        align: 'left', color: '#8ea3c6', bg: false, font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
+      });
+
+      const smallFont = '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif';
+      label(ctx, t('dropsHint'), 12, h - 30, { color: '#8ea3c6', font: smallFont });
+      label(ctx, t('dropsSunHint'), 12, h - 14, { color: '#e0a83f', font: smallFont });
     }
   }
 

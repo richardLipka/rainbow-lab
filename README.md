@@ -181,8 +181,8 @@ the primary and secondary bows *simultaneously*, at different angular radii
 Drawing only one shared eye when comparing two families would leave a
 reaching secondary ray glowing next to an eye it doesn't actually point at.
 
-Every ray's prominence — opacity, width, arrowhead size, and a brass glow
-along its exit segment — is driven by its own `classification`
+Every ray's prominence — **hue**, opacity, width, arrowhead size, and a
+brass glow along its exit segment — is driven by its own `classification`
 (`primary`/`secondary`/`higherOrder` vs. `nonCaustic`/`noReflection`), the
 identical test the ray-info panel and the unit tests use. A fan ray that
 happens to land near the extremum is emphasised exactly like the main ray
@@ -190,6 +190,18 @@ would be; an off-caustic main ray is dimmed exactly like an ordinary
 scattered fan ray. For `k = 0` there is no extremum at all, so the eye is
 still shown (captioned accordingly) but nothing ever emphasises — which is
 itself the correct lesson, not a missing feature.
+
+With a whole fan on screen, hue does the heavy lifting: rays that miss the
+observer are drawn heavily desaturated towards grey — the same "grey means
+it does not reach *this* observer" convention the many-droplets view uses —
+because at the thin line widths a 60-ray fan needs, a difference in opacity
+alone is invisible. They stay clearly present rather than being hidden:
+that *most* rays do not make a rainbow is the whole point. Contributing
+rays are also drawn last, on top, so they are never buried under the ones
+being played down. A tally in the top-right corner counts them (`5 / 26`,
+`23 / 126` …) with a two-row key, and under white light that key's
+"forms the rainbow" swatch is itself a miniature spectrum rather than a
+single red line.
 
 The exit-point angle readout shows `Θ = … → φ = …` rather than just `φ`,
 because the arc it draws (from the forward/antisolar reference to the
