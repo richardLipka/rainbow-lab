@@ -703,22 +703,47 @@ export function orthonormalBasis(axis) {
 }
 
 /**
+ * One direction on the rainbow circle: the unit vector at angle phiDeg from
+ * `antisolar`, rolled rollDeg around it. roll 0 is the `u` axis of
+ * orthonormalBasis(), so a roll is only meaningful relative to the same
+ * antisolar direction it was measured against.
+ */
+export function bowDirection(antisolar, phiDeg, rollDeg) {
+  const a = vnorm(antisolar);
+  const { u, v } = orthonormalBasis(a);
+  const ph = phiDeg * RAD;
+  const t = rollDeg * RAD;
+  const ring = vadd(vmul(u, Math.cos(t)), vmul(v, Math.sin(t)));
+  return vadd(vmul(a, Math.cos(ph)), vmul(ring, Math.sin(ph)));
+}
+
+/**
  * Directions making the angle phiDeg with the antisolar direction -- i.e. the
  * rainbow circle. Returns unit vectors.
  */
 export function rainbowCircle(antisolar, phiDeg, steps = 256) {
-  const a = vnorm(antisolar);
-  const { u, v } = orthonormalBasis(a);
-  const ph = phiDeg * RAD;
-  const ca = Math.cos(ph);
-  const sa = Math.sin(ph);
   const pts = [];
-  for (let i = 0; i <= steps; i++) {
-    const t = (i / steps) * 2 * Math.PI;
-    const ring = vadd(vmul(u, Math.cos(t)), vmul(v, Math.sin(t)));
-    pts.push(vadd(vmul(a, ca), vmul(ring, sa)));
-  }
+  for (let i = 0; i <= steps; i++) pts.push(bowDirection(antisolar, phiDeg, (i / steps) * 360));
   return pts;
+}
+
+/**
+ * The unit direction at angleDeg from `axis`, lying in the plane that `axis`
+ * and `towards` span, on `towards`'s side of the axis.
+ *
+ * This is what turns a scattering angle into an actual outgoing ray: a
+ * droplet sends order k out on a cone of half-angle Theta_k around the
+ * incoming sunlight, and the element of that cone which lies in the plane
+ * containing the observer is the only one that can be compared with the line
+ * of sight. Degenerate input (`towards` parallel to `axis`) falls back to an
+ * arbitrary but stable perpendicular, so the caller never gets NaN.
+ */
+export function directionAtAngle(axis, towards, angleDeg) {
+  const a = vnorm(axis);
+  const perp = vsub(towards, vmul(a, vdot(towards, a)));
+  const p = vlen(perp) < 1e-9 ? orthonormalBasis(a).u : vnorm(perp);
+  const th = angleDeg * RAD;
+  return vadd(vmul(a, Math.cos(th)), vmul(p, Math.sin(th)));
 }
 
 export const EARTH_RADIUS_M = 6371000;

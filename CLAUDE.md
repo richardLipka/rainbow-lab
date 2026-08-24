@@ -17,7 +17,7 @@ almost certainly how a bug gets in (see "Lessons from bugs found" below).
 
 ```bash
 node server.mjs        # dev server on :5178 (or next free port)
-node --test test/optics.test.mjs   # 42 unit tests over the engine
+node --test test/optics.test.mjs   # 45 unit tests over the engine
 node build.mjs          # writes dist/rainbow-lab.html and dist/artifact.html
 ```
 
@@ -63,7 +63,7 @@ app.js         assembly + render loop
 | `src/skyView.js` | Mode C — 3-D cone/circle/horizon, orbit and eye camera. |
 | `src/panels.js` | Tutorial script, ray readout, mathematics panel, questions. |
 | `src/app.js` | Shell, controls, the reactive update pipeline (see below), render loop. |
-| `test/optics.test.mjs` | 42 tests over the engine — ray-sphere, Snell, extremum vs. numeric search, classification, sky geometry. |
+| `test/optics.test.mjs` | 45 tests over the engine — ray-sphere, Snell, extremum vs. numeric search, classification, sky geometry. |
 
 ## Angle conventions — read this before changing any angle-related code
 
@@ -310,6 +310,71 @@ the observer mode, or the tutorial position changes. Adding a new condition
 to a `when` predicate means adding its state to `controlsKey()`, or the
 column will not rebuild when it changes.
 
+## Tracing one beam in the 3-D sky
+
+Clicking a bow in the sky scene stores `state.skyPick = {k, lambda, roll}` —
+a reflection order, a wavelength, and an angle **around the antisolar axis**,
+never a direction. Storing the direction would strand the pick in empty sky
+the moment the Sun moved; storing the roll means `resolvePick()` rebuilds it
+from the current engine numbers every frame, so the marked droplet slides
+along its own bow as the Sun rises.
+
+The trace itself is three engine calls and no hand-placed geometry:
+
+- `bowDirection(anti, phi, roll)` — where the droplet is.
+- `directionAtAngle(anti, toEye, geo.scatteringDeg)` — where order k's light
+  leaves it. Order k concentrates onto a **cone** of half-angle Θ_k about the
+  incoming sunlight; the element of that cone lying in the plane through the
+  observer is the only one that can be compared with the line of sight, and
+  that is what this returns.
+- For the picked order the two coincide exactly, which is why that ray ends
+  in the eye. Unit-tested to 1e-12 for k = 1, 2, 3 at four rolls each, along
+  with the corollary that any *other* order misses by precisely the angular
+  gap between the two bows.
+
+That is the whole point of drawing the other orders: they come from the
+**same droplet** and leave in the wrong directions. It is why a droplet
+contributes to exactly one bow for a given observer, and why the secondary
+bow you see is made of entirely different droplets from the primary — a
+claim the scene previously could only make in a caption.
+
+Both `bowDirection()` and `directionAtAngle()` live in `optics.js` and are
+covered by the tests; `rainbowCircle()` was rewritten to call the former, so
+there is one definition of "a direction on the bow" rather than two.
+
+Three details worth keeping:
+
+- **φ is arced at the eye, Θ at the droplet**, the same split the
+  many-droplets inspector uses. `arc3()` sweeps them by walking the *angle*
+  through the same generator that produced the direction, so an arc is
+  literally the locus of the angle it is labelled with.
+- **A click is only a pick when the pointer barely moved** (`travelled < 5`).
+  Dragging is the primary gesture in this scene; without the threshold every
+  orbit would end by re-selecting whatever the cursor landed on.
+- **The trace is cut at the horizon along with its circle.** Raising the Sun
+  can carry a picked point below the ground, and a beam still drawn to a
+  droplet whose circle has just vanished contradicts the very thing that
+  vanishing is teaching. The pick survives, so lowering the Sun brings it
+  back, and the readout says why the beam is missing.
+
+Hit-testing is brute force: every drawn bow line sampled at 1° rolls,
+projected, nearest within `PICK_PX`. A few thousand projections once per
+click is nothing, and it means the test uses exactly the projection the
+reader was looking at rather than an inverse that would have to be kept in
+step with the camera by hand. `bowLines()` is shared by the drawing and the
+test, so only a line actually on screen can be picked — wavelength included.
+
+## Zooming the single droplet with the wheel
+
+`ZOOM_RANGE` is exported from `dropletView.js` for the same reason
+`OBS_RANGE` is exported from `dropsView.js`: the slider in the control column
+and the wheel gesture must not be able to disagree about the ends of the
+range. The wheel scales `state.dropletZoom` by `1.35 ** (deltaY / 120)`,
+clamped — proportional to the raw `deltaY` rather than its sign, so a
+trackpad gets ~3 % per event and a notched mouse gets a useful step, and
+capped at ±120 because some devices report a whole page of `deltaY` per
+notch. Scroll direction matches the sky view's: down pulls back.
+
 ## The plots are closed by default, and each step says whether it needs them
 
 `state.graphOpen` gates the whole `graph-wrap` section. It starts **false**:
@@ -500,7 +565,8 @@ was verified earlier in the same session.
 Snell's law (scalar and vector forms agree), Fresnel limits, the analytic
 extremum against an independent numeric (golden-section) search, the
 headline 42°/51° values, classification for every ray family, sky/horizon
-geometry, and more — 42 tests, all should stay green.
+geometry, the bow-direction and scattering-angle constructors, and more —
+45 tests, all should stay green.
 
 View/rendering changes: there is no visual regression suite, so verify by
 driving the actual app:

@@ -374,6 +374,22 @@ export const translations = {
 
     /* ---- sky scene ---- */
     skyHint: 'Táhněte myší = otáčení, kolečko = přiblížení.',
+
+    /* ---- 3-D sky: tracing one beam ---- */
+    skyClickHint: 'Klepněte na duhu — uvidíte, kudy k vám letí jeden paprsek.',
+    skyClearHint: 'Klepnutím mimo duhu výběr zrušíte.',
+    skyPickInfo: 'Vybraný paprsek',
+    skyPickOrder: 'Vnitřních odrazů k',
+    skyPickElevation: 'Výška nad obzorem',
+    skyPickRoll: 'Poloha na kružnici',
+    skyPickNote:
+      'Kapka v tomto směru dostává sluneční světlo jako všechny ostatní. Řád k = {k} z ní vychází přesně pod úhlem, na kterém stojíte, a doletí do oka. Ostatní řády opouštějí tutéž kapku jinam — proto v jednom směru vidíte vždy jen jeden řád a vedlejší duhu vám tvoří úplně jiné kapky.',
+    skyPickOthers: 'Kam z téže kapky míří ostatní řády',
+    skyPickMiss: 'míjí oko o {delta}',
+    skyPickReaches: 'trefí oko',
+    skyPickClear: 'Zrušit výběr',
+    skyPickBelowHorizon:
+      'Tento směr je pod obzorem, takže tam žádný déšť nevidíte a paprsek se nekreslí. Snižte Slunce nebo zapněte déšť pod úrovní očí.',
     coneAngle: 'Úhel kužele',
     visibleAbove: 'Nad horizontem',
     horizonDip: 'Pokles horizontu',
@@ -762,6 +778,22 @@ export const translations = {
 
     /* ---- sky scene ---- */
     skyHint: 'Drag to rotate, scroll to zoom.',
+
+    /* ---- 3-D sky: tracing one beam ---- */
+    skyClickHint: 'Click the bow to trace one beam back to where it comes from.',
+    skyClearHint: 'Click empty sky to clear the selection.',
+    skyPickInfo: 'Traced beam',
+    skyPickOrder: 'Internal reflections k',
+    skyPickElevation: 'Elevation above the horizon',
+    skyPickRoll: 'Position around the circle',
+    skyPickNote:
+      'The droplet in this direction receives sunlight like every other one. Order k = {k} leaves it at exactly the angle you are standing at, so that light reaches your eye. The other orders leave the same droplet in other directions — which is why you only ever see one order in a given direction, and why the secondary bow is made of entirely different droplets.',
+    skyPickOthers: 'Where the other orders leave the same droplet',
+    skyPickMiss: 'misses your eye by {delta}',
+    skyPickReaches: 'reaches your eye',
+    skyPickClear: 'Clear selection',
+    skyPickBelowHorizon:
+      'This direction is below the horizon, so there is no rain to see there and the beam is not drawn. Lower the Sun, or turn on rain below eye level.',
     coneAngle: 'Cone angle',
     visibleAbove: 'Above the horizon',
     horizonDip: 'Horizon dip',

@@ -7,7 +7,7 @@ import { t, setLang, getLang, num, deg, LANGS } from './i18n.js';
 import { state, set, subscribe, indexModel } from './state.js';
 import { el, clear, group, slider, toggle, segmented, select, collectSyncers, setRenderScale } from './ui.js';
 import { FAV_LOGO } from './assets.js';
-import { createDropletView } from './dropletView.js';
+import { createDropletView, ZOOM_RANGE } from './dropletView.js';
 import { createGraphView } from './graphView.js';
 import { createDropsView, OBS_RANGE } from './dropsView.js';
 import { createSkyView } from './skyView.js';
@@ -389,7 +389,7 @@ const HEIGHT_STOPS = [1.7, 5, 10, 50, 100, 300, 1000, 3000, 10000];
 const ALL = ['droplet', 'drops', 'sky'];
 
 /** Zoom-out range for the single-droplet scene, driven on a log slider. */
-const ZOOM_MAX = 40;
+const ZOOM_MAX = ZOOM_RANGE[1];
 const ZOOM_MAX_LOG = Math.log10(ZOOM_MAX);
 
 /**
@@ -444,12 +444,16 @@ const VIS_TOGGLES = [
   { scenes: ['drops', 'sky'], key: 'ground', labelKey: 'showGround' },
   { scenes: ['drops'], key: 'droplets', labelKey: 'showDroplets' },
   { scenes: ['droplet'], key: 'normals', labelKey: 'showNormals' },
-  // The many-droplets scene reads show.angles only for the phi/Theta arcs of
-  // an inspected droplet, so it is offered there only once one is picked --
-  // a toggle with nothing to toggle teaches that the scene is decorative.
+  // The many-droplets and sky scenes read show.angles only for the
+  // phi/Theta arcs of something the reader has clicked on, so it is offered
+  // there only once they have -- a toggle with nothing to toggle teaches
+  // that the scene is decorative.
   {
-    scenes: ['droplet', 'drops'], key: 'angles', labelKey: 'showAngles',
-    when: () => state.scene !== 'drops' || !!state.selectedDrop,
+    scenes: ['droplet', 'drops', 'sky'], key: 'angles', labelKey: 'showAngles',
+    when: () =>
+      state.scene === 'droplet' ||
+      (state.scene === 'drops' && !!state.selectedDrop) ||
+      (state.scene === 'sky' && !!state.skyPick),
   },
   { scenes: ALL, key: 'labels', labelKey: 'showLabels' },
   { scenes: ['droplet', 'sky'], key: 'wavelengthLabels', labelKey: 'showWavelengthLabels' },
@@ -748,7 +752,8 @@ function resetState() {
     dropCount: 1, dropsAnimate: false,
     sunElevation: 15, sunAzimuth: 180, observerHeight: 1.7,
     view: 'orbit', camYaw: -35, camPitch: 14, camDist: 3.1,
-    eyeAzimuth: 0, eyeElevation: 12, fov: 75, selectedRay: null, selectedDrop: null,
+    eyeAzimuth: 0, eyeElevation: 12, fov: 75,
+    selectedRay: null, selectedDrop: null, skyPick: null,
     show: {
       normals: false, angles: true, labels: true, wavelengthLabels: false,
       droplets: true, cone: true, antisolar: true, horizon: true, ground: true,
@@ -802,7 +807,10 @@ function rebuild() {
  * switching scenes left the previous scene's controls sitting there.
  */
 function controlsKey() {
-  return `${state.scene}|${state.view}|${state.observerMode}|${state.mode}|${state.step}|${state.selectedDrop ? 1 : 0}`;
+  return [
+    state.scene, state.view, state.observerMode, state.mode, state.step,
+    state.selectedDrop ? 1 : 0, state.skyPick ? 1 : 0,
+  ].join('|');
 }
 
 /**
@@ -842,11 +850,20 @@ function panelKey() {
           return `${d ? `${d.x.toFixed(4)},${d.y.toFixed(4)}` : '-'}|${state.sunElevation}|${state.dropsObserverX}|${state.dropsObserverY}|${state.dispersion}|${state.indexMode}|${state.indexScale}`;
         })()
       : '';
+  // The sky readout is about a clicked point on a bow, so it moves with the
+  // pick, the Sun and the index model -- everything skyPickNodes() reads.
+  const skyPart =
+    state.scene === 'sky' && state.panel === 'ray'
+      ? (() => {
+          const k = state.skyPick;
+          return `${k ? `${k.k},${k.lambda},${k.roll.toFixed(2)}` : '-'}|${state.sunElevation}|${state.sunAzimuth}|${state.dispersion}|${state.indexMode}|${state.indexScale}`;
+        })()
+      : '';
   const guidePart =
     state.mode === 'free' && state.panel === 'guide'
       ? `${state.dispersion}|${state.indexMode}|${state.indexScale}|${state.show.renderedBow}`
       : '';
-  return `${state.panel}|${state.scene}|${state.step}|${rayPart}|${mathPart}|${dropPart}|${guidePart}`;
+  return `${state.panel}|${state.scene}|${state.step}|${rayPart}|${mathPart}|${dropPart}|${skyPart}|${guidePart}`;
 }
 
 /** Everything the shape of the graph section depends on. */

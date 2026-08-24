@@ -106,6 +106,13 @@ export const state = {
   /* selection */
   selectedRay: null,
 
+  /* The point on a bow the reader has clicked in the 3-D sky, as
+     {k, lambda, roll}: a reflection order, a wavelength, and an angle around
+     the antisolar axis. Held as a roll rather than a direction so the pick
+     stays ON the bow when the Sun moves or the index model changes -- the
+     direction is recomputed from the engine every frame. */
+  skyPick: null,
+
   /* The droplet the reader has clicked on in the many-droplets scene, as
      world coordinates ({x, y}), or null. Held as a position rather than an
      index because the droplet field is regenerated whenever the count or the

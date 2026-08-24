@@ -83,7 +83,7 @@ app.js         assembly + render loop
 | `src/panels.js` | Tutorial, ray readout, mathematics, questions. |
 | `src/app.js` | Shell, controls, render loop. |
 | `src/assets.js` | Generated — logos inlined as data: URIs. |
-| `test/optics.test.mjs` | 42 tests over the engine. |
+| `test/optics.test.mjs` | 45 tests over the engine. |
 
 The control column is filtered per scene: every control declares which
 scenes read its state, and groups left empty are dropped. Tutorial steps
@@ -319,7 +319,8 @@ The control column shows only what the current scene actually reads, so a
 control that is on screen always does something when you move it.
 
 - **Single droplet** — drag vertically in the canvas, or use the impact
-  parameter slider, to move the incoming ray. Click any ray to classify it.
+  parameter slider, to move the incoming ray. Scroll to pull the view back
+  from the droplet. Click any ray to classify it.
   Watch the eye: it lights up brass exactly when the current ray reaches it.
   Drag the eye itself to stand somewhere else and hunt for the angle where
   the rays pile up.
@@ -333,7 +334,25 @@ control that is on screen always does something when you move it.
   green or grey — to see every ray it sends out and every angle involved;
   click empty sky to let it go.
 - **Sky 3-D** — drag to orbit, scroll to zoom. Switch to the observer's eye to
-  see the circle cut by the horizon.
+  see the circle cut by the horizon. Click anywhere on a bow to trace that
+  beam back to the droplet it came from.
+
+## Tracing one beam through the sky
+
+Click any point on a bow in the 3-D scene and that beam is traced: the
+sunlight arriving at a droplet in that direction, the ray that carries it
+back to your eye, and — from the *same droplet* — where the other reflection
+orders go instead. They miss, by exactly the angular gap between the bows,
+and they carry on past you into the sky behind.
+
+That is the point. A droplet contributes to exactly one bow for a given
+observer, because order k concentrates its light onto a cone of half-angle
+Θ_k about the incoming sunlight and only one of those cones has an element
+ending at your eye. So the secondary bow you see is not the same rain as the
+primary — it is made of entirely different droplets. The readout lists φ, Θ
+and the miss angle for each order, and the trace stays on its bow when you
+move the Sun, because what is stored is the position *around the circle*, not
+a direction in space.
 
 ## The plots at the bottom
 

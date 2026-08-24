@@ -6,7 +6,7 @@ import * as O from './optics.js';
 import { state, set, indexModel, activeLambdas } from './state.js';
 import { t, deg, num, CLASS_KEY, CLASS_EXPLAIN } from './i18n.js';
 import { el, row, segmented } from './ui.js';
-import { traceOne, distanceFromExtremum, dropReport, colorIdFor } from './rays.js';
+import { traceOne, distanceFromExtremum, dropReport, colorIdFor, DROP_ORDERS } from './rays.js';
 
 /* ==========================================================================
  * Tutorial
@@ -399,14 +399,87 @@ function dropInfoNodes() {
   ].filter(Boolean);
 }
 
+/* ==========================================================================
+ * Traced-beam readout (3-D sky)
+ * ======================================================================== */
+
 /**
- * The many-droplets scene steers no single ray, so its readout is about the
- * droplet the reader clicked instead.
+ * The numbers behind one clicked point on a bow.
+ *
+ * The angular offsets are not looked up anywhere: each one is the angle
+ * between the direction that order actually leaves the droplet in and the
+ * direction of the observer, both built by the engine.
+ */
+function skyPickNodes() {
+  const pick = state.skyPick;
+  const idx = indexModel();
+  const anti = O.antisolarDirection(state.sunElevation, state.sunAzimuth);
+  const geo = O.rainbowGeometry(idx(pick.lambda), pick.k);
+  if (!geo) return [el('h2', {}, t('skyPickInfo')), el('p', { class: 'hint' }, t('skyClickHint'))];
+
+  const dir = O.bowDirection(anti, geo.antisolarDeg, pick.roll);
+  const toEye = O.vneg(dir);
+  const elevation = Math.asin(O.clamp(dir.y, -1, 1)) * O.DEG;
+
+  const rows = DROP_ORDERS.map((k) => {
+    const g = O.rainbowGeometry(idx(pick.lambda), k);
+    if (!g) return null;
+    const out = O.directionAtAngle(anti, toEye, g.scatteringDeg);
+    return { k, g, miss: O.vangle(out, toEye) * O.DEG };
+  }).filter(Boolean);
+
+  return [
+    el('h2', {}, t('skyPickInfo')),
+    el('div', { class: 'panel-block' },
+      row('infoWavelength', `${pick.lambda} ${t('nm')}`, { color: O.rgbCss(pick.lambda) }),
+      row('skyPickOrder', String(pick.k)),
+      row('infoExitAngle', deg(geo.antisolarDeg, 2)),
+      row('infoScattering', deg(geo.scatteringDeg, 2)),
+      row('infoIncidence', deg(geo.thetaIDeg, 2)),
+      row('skyPickElevation', deg(elevation, 2)),
+      row('skyPickRoll', deg(pick.roll, 0))
+    ),
+
+    el('h3', {}, t('skyPickOthers')),
+    el('table', { class: 'math-table' },
+      el('thead', {}, el('tr', {},
+        el('th', {}, 'k'), el('th', {}, 'φ'), el('th', {}, 'Θ'), el('th', {}, 'Δ'))),
+      el('tbody', {},
+        rows.map((r) => el('tr', { class: r.k === pick.k ? 'hit' : null },
+          el('td', {}, String(r.k)),
+          el('td', {}, num(r.g.antisolarDeg, 2)),
+          el('td', {}, num(r.g.scatteringDeg, 2)),
+          el('td', {}, r.k === pick.k ? t('skyPickReaches') : t('skyPickMiss', { delta: deg(r.miss, 2) }))))))
+    ,
+    el('p', { class: 'note' }, t('skyPickNote', { k: pick.k })),
+    // Same test the scene uses to cut the bow at the horizon, so the panel
+    // says why the beam stopped being drawn instead of leaving it a mystery.
+    !state.show.rainBelow &&
+    (state.show.horizon || state.show.ground) &&
+    elevation < -O.horizonDipDeg(state.observerHeight)
+      ? el('p', { class: 'note warn' }, t('skyPickBelowHorizon'))
+      : null,
+    el('button', {
+      class: 'btn wide', type: 'button',
+      onclick: () => set({ skyPick: null, panel: 'guide' }),
+    }, t('skyPickClear')),
+  ].filter(Boolean);
+}
+
+/**
+ * Two of the three scenes steer no single ray, so in those the readout is
+ * about whatever the reader clicked on instead.
  */
 function renderRayInfo() {
-  if (state.scene !== 'drops') return rayInfoNodes();
-  if (state.selectedDrop) return dropInfoNodes();
-  return [el('h2', {}, t('dropInfo')), el('p', { class: 'hint' }, t('dropsClickHint'))];
+  if (state.scene === 'drops') {
+    if (state.selectedDrop) return dropInfoNodes();
+    return [el('h2', {}, t('dropInfo')), el('p', { class: 'hint' }, t('dropsClickHint'))];
+  }
+  if (state.scene === 'sky') {
+    if (state.skyPick) return skyPickNodes();
+    return [el('h2', {}, t('skyPickInfo')), el('p', { class: 'hint' }, t('skyClickHint'))];
+  }
+  return rayInfoNodes();
 }
 
 /* ==========================================================================

@@ -499,3 +499,63 @@ test('with dispersion off, all colours land at the same angle', () => {
   const b = O.rainbowGeometry(flat(420), 1).antisolarDeg;
   close(a, b, 1e-12, 'no dispersion, no colours');
 });
+
+test('bowDirection agrees with rainbowCircle and sits exactly on the cone', () => {
+  const anti = O.antisolarDirection(15, 180);
+  const phi = O.rainbowGeometry(O.makeIndexModel()(650), 1).antisolarDeg;
+
+  // every sample of the circle is reproduced by the single-direction form
+  const circle = O.rainbowCircle(anti, phi, 36);
+  for (let i = 0; i <= 36; i++) {
+    const d = O.bowDirection(anti, phi, (i / 36) * 360);
+    close(d.x, circle[i].x, 1e-12, 'x');
+    close(d.y, circle[i].y, 1e-12, 'y');
+    close(d.z, circle[i].z, 1e-12, 'z');
+  }
+  // and every one of them really is phi away from the antisolar point
+  for (const roll of [0, 37, 90, 211.5, 359]) {
+    const d = O.bowDirection(anti, phi, roll);
+    close(O.vlen(d), 1, 1e-12, 'unit');
+    close(O.vangle(d, anti) * O.DEG, phi, 1e-10, `roll ${roll}`);
+  }
+});
+
+test('directionAtAngle turns a scattering angle back into the line of sight', () => {
+  const anti = O.antisolarDirection(22, 180);
+  const idx = O.makeIndexModel();
+
+  for (const k of [1, 2, 3]) {
+    const geo = O.rainbowGeometry(idx(650), k);
+    // a droplet seen on the bow of order k, anywhere around the circle
+    for (const roll of [0, 73, 180, 298]) {
+      const d = O.bowDirection(anti, geo.antisolarDeg, roll);
+      const toEye = O.vneg(d); // droplet -> observer
+
+      // The ray that order k actually sends into that plane must BE the ray
+      // to the eye: Theta = 180 - phi, measured from the incoming sunlight.
+      const exit = O.directionAtAngle(anti, toEye, geo.scatteringDeg);
+      close(exit.x, toEye.x, 1e-12, `k=${k} roll=${roll} x`);
+      close(exit.y, toEye.y, 1e-12, `k=${k} roll=${roll} y`);
+      close(exit.z, toEye.z, 1e-12, `k=${k} roll=${roll} z`);
+
+      // and any other order leaves at exactly the angular gap between the bows
+      for (const other of [1, 2, 3].filter((o) => o !== k)) {
+        const g2 = O.rainbowGeometry(idx(650), other);
+        const miss = O.directionAtAngle(anti, toEye, g2.scatteringDeg);
+        close(
+          O.vangle(miss, toEye) * O.DEG,
+          Math.abs(g2.antisolarDeg - geo.antisolarDeg),
+          1e-10,
+          `k=${k} vs k=${other}`
+        );
+      }
+    }
+  }
+});
+
+test('directionAtAngle survives a line of sight along the axis', () => {
+  const anti = O.vec(0, 0, 1);
+  const d = O.directionAtAngle(anti, anti, 42);
+  close(O.vlen(d), 1, 1e-12, 'unit');
+  close(O.vangle(d, anti) * O.DEG, 42, 1e-10, 'still 42 deg off the axis');
+});

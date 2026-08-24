@@ -18,6 +18,13 @@ const REACHES_OBSERVER = new Set([O.RayClass.PRIMARY, O.RayClass.SECONDARY, O.Ra
 
 const SEG_LABELS = ['R0', 'R1', 'R2', 'R3', 'R4', 'R5'];
 
+/**
+ * How far the view may be pulled back from the droplet, in droplet radii.
+ * Exported so the slider in the control column and the wheel gesture here
+ * cannot disagree about the ends of the range.
+ */
+export const ZOOM_RANGE = [1, 40];
+
 export function createDropletView(canvas) {
   let layout = null;
   let hover = null;
@@ -745,6 +752,20 @@ export function createDropletView(canvas) {
   const stop = () => { dragging = false; eyeDrag = false; };
   canvas.addEventListener('pointerup', stop);
   canvas.addEventListener('pointercancel', stop);
+
+  // Wheel = pull back from the droplet, the same direction the sky view's
+  // wheel moves its camera. Scaled by the raw deltaY rather than its sign so
+  // a trackpad gets fine control and a notched mouse gets a useful step;
+  // capped because some devices report a whole page of deltaY per notch.
+  canvas.addEventListener(
+    'wheel',
+    (e) => {
+      e.preventDefault();
+      const step = O.clamp(e.deltaY, -120, 120) / 120;
+      set({ dropletZoom: O.clamp(state.dropletZoom * Math.pow(1.35, step), ...ZOOM_RANGE) });
+    },
+    { passive: false }
+  );
 
   function selectNearest(e) {
     const rect = canvas.getBoundingClientRect();
