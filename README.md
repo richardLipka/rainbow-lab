@@ -335,6 +335,27 @@ control that is on screen always does something when you move it.
 - **Sky 3-D** — drag to orbit, scroll to zoom. Switch to the observer's eye to
   see the circle cut by the horizon.
 
+## The plots at the bottom
+
+Two plots sit under the scene, **closed by default** — the scene is the way
+in, and axes labelled `b/R` mean nothing until you have watched a ray go
+through a droplet. Open them from the bar at the bottom of the page, and the
+tutorial opens them itself at the three steps that talk about them. Each
+carries a paragraph saying what it shows and how it relates to the bow:
+
+- **Exit angle vs. impact parameter** — each incoming ray is labelled by
+  where it hits the droplet (0 = dead centre, 1 = grazing the edge), and the
+  curve gives the direction it leaves in. Near its turning point the curve is
+  almost flat, so a whole band of impact parameters exits at nearly the same
+  angle. That pile-up is the rainbow, and the angle it happens at is the
+  bow's angular radius. One curve per wavelength, each turning over slightly
+  differently — which is where the colours come from.
+- **Ray distribution** — rays fired at random across the droplet's whole
+  face, counted by the direction they leave in. This is brightness against
+  angle, the same thing an eye measures sweeping across the sky, so the spike
+  *is* the bow. Raise the ray count and it sharpens out of the noise on its
+  own.
+
 Both the scene and the graph have a **Save PNG** button that writes the
 figure at triple resolution with a credit line baked in, so a figure pasted
 into a slide keeps its provenance. PNG rather than SVG on purpose: the whole

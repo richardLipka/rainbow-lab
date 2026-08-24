@@ -13,6 +13,12 @@ export const state = {
   step: 0,
   scene: 'droplet', // 'droplet' | 'drops' | 'sky'
   graph: 'exit', // 'exit' | 'dist'
+
+  /* Whether the plots at the bottom of the page are open. Closed by default:
+     they are the evidence behind the scenes above, not the way in, and a
+     reader who meets them before the droplet has no idea what the axes mean.
+     Tutorial steps that actually talk about a plot open it themselves. */
+  graphOpen: false,
   panel: 'guide', // 'guide' | 'ray' | 'math' | 'quiz'
 
   /* light */

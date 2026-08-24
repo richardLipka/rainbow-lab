@@ -48,6 +48,14 @@ export const translations = {
     angleScattering: 'Θ — rozptylový úhel',
     angleDeviation: 'D — celková odchylka',
     graphHint: 'Klikněte do grafu a vyberte paprsek. Táhněte paprsek v kapce a bod se posune.',
+    graphShow: 'Zobrazit grafy',
+    graphHide: 'Skrýt grafy',
+    graphCollapsedHint:
+      'Výstupní úhel a rozdělení paprsků — čísla, ze kterých duhový úhel vychází.',
+    graphExitExplain:
+      'Každý přicházející paprsek je popsán tím, kam do kapky dopadne: b/R = 0 je přesný střed, b/R = 1 okraj. Křivka udává směr, kterým paprsek vyjde ven. V okolí svého extrému je téměř vodorovná, takže celý pás parametrů dopadu odchází skoro stejným směrem — právě tam se paprsky hromadí a ten úhel je úhlový poloměr duhy. Každá vlnová délka má svou křivku a každá se obrací u trochu jiného úhlu; odtud jsou barvy.',
+    graphDistExplain:
+      'Paprsky se vystřelují náhodně po celé ploše kapky a počítá se, kterým směrem odejdou. Do většiny směrů jich jde podobně málo; do jednoho ne. U úhlu, kde se křivka výstupního úhlu obrací, počet prudce vyskočí — a protože tenhle graf je jas v závislosti na úhlu, tedy přesně to, co měří oko přejíždějící po obloze, ten vrchol je duha a leží u úhlu, pod kterým ji uvidíte. Zvyšte počet paprsků a vyloupne se ze šumu sám.',
     extremumLabel: 'extrém → duha',
     rayCount: 'Počet paprsků',
     accumulate: 'Přidávat paprsky',
@@ -261,7 +269,7 @@ export const translations = {
       'Ve třech rozměrech tvoří všechny takové směry kužel kolem antisolárního bodu. Průnik kužele s oblohou je kružnice. Zapněte horizont a dolní část zmizí.',
     s11title: 'Odkud jsou barvy?',
     s11body:
-      'Index lomu vody závisí na vlnové délce. Posuňte disperzi z 0 % na 100 % a sledujte, jak se jediný úhel rozpadne na pás barev.',
+      'Index lomu vody závisí na vlnové délce. Posuňte disperzi z 0 % na 100 % a sledujte, jak se jediný úhel rozpadne na pás barev — a s ním i graf dole, na jednu křivku pro každou vlnovou délku.',
     s12title: 'Může být duh víc?',
     s12body:
       'Nastavte dva vnitřní odrazy. Vznikne slabší duha s větším poloměrem a obráceným pořadím barev. Mezi nimi zůstane Alexandrův temný pás.',
@@ -426,6 +434,14 @@ export const translations = {
     angleScattering: 'Θ — scattering angle',
     angleDeviation: 'D — total deviation',
     graphHint: 'Click the graph to pick a ray. Drag the ray in the droplet and the marker follows.',
+    graphShow: 'Show graphs',
+    graphHide: 'Hide graphs',
+    graphCollapsedHint:
+      'Exit angle and ray distribution — the numbers the rainbow angle comes out of.',
+    graphExitExplain:
+      'Every incoming ray is labelled by where it hits the droplet: b/R = 0 is dead centre, b/R = 1 grazes the edge. The curve gives the direction that ray leaves in. Near its turning point the curve is almost flat, so a whole band of impact parameters exits at nearly the same angle — that pile-up is the rainbow, and the angle it happens at is the bow’s angular radius. Each wavelength has its own curve, each turning over at a slightly different angle; that is where the colours come from.',
+    graphDistExplain:
+      'Rays are fired at random across the whole face of the droplet and counted by the direction they leave in. Most directions get a similar modest share; one does not. At the angle where the exit-angle curve turns over the count spikes — and since this plot is brightness against angle, exactly what an eye measures sweeping across the sky, that spike is the bow, sitting at the angle you have to look at. Raise the ray count and it sharpens out of the noise on its own.',
     extremumLabel: 'extremum → rainbow',
     rayCount: 'Number of rays',
     accumulate: 'Accumulate rays',
@@ -641,7 +657,7 @@ export const translations = {
       'In three dimensions all those directions form a cone around the antisolar point. The cone meets the sky in a circle. Switch the horizon on and the lower part disappears.',
     s11title: 'Where do the colors come from?',
     s11body:
-      "Water's refractive index depends on wavelength. Move dispersion from 0 % to 100 % and watch a single angle split into a band of colours.",
+      "Water's refractive index depends on wavelength. Move dispersion from 0 % to 100 % and watch a single angle split into a band of colours — and the graph below splits with it, one curve per wavelength.",
     s12title: 'Can there be another rainbow?',
     s12body:
       "Set two internal reflections. A fainter bow appears with a larger radius and reversed colour order, with Alexander's dark band between them.",

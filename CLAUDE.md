@@ -310,6 +310,42 @@ the observer mode, or the tutorial position changes. Adding a new condition
 to a `when` predicate means adding its state to `controlsKey()`, or the
 column will not rebuild when it changes.
 
+## The plots are closed by default, and each step says whether it needs them
+
+`state.graphOpen` gates the whole `graph-wrap` section. It starts **false**:
+the plots are the evidence behind the scenes above, not the way in, and a
+reader who meets `b/R` on an axis before they have met the droplet has been
+handed a coordinate system for nothing. Closing them also gives the scene
+canvas roughly twice the height (362 → 734 px at 1440×950), which is the
+view that actually teaches.
+
+Two things about `buildGraphTabs()` are load-bearing:
+
+- **While closed, the tabs are emptied, not hidden.** `rayCount` and
+  `accumulate` live in that row, and step 7 focuses `rayCount`. If the row
+  were merely `display: none` the control would still be in the DOM,
+  `applyFocus()` would find it, and "this step asks you to turn a knob that
+  is not on screen" would go from a console warning to a silent dead end.
+  Verified: closing the plots while on step 7 prints
+  `tutorial step 7 (droplet): controls not on screen: rayCount`.
+- **`applyFocus()` is called from the graph block of the `subscribe()`
+  handler as well as from `buildControls()`.** Toggling the plots shut does
+  not change `controlsKey()`, so the column is not rebuilt and the check
+  would otherwise never run for exactly the case it exists to catch.
+
+`renderOnce()` skips `graph.tick()`/`graph.draw()` entirely while closed —
+the canvas is `display: none`, so `fitCanvas()` would measure 0×0 and every
+plotted coordinate would be meaningless. It also guards on
+`clientWidth > 0`, because `set({graphOpen: true})` returns before the
+class is taken off the section.
+
+Every `TUTORIAL` step sets `graphOpen` explicitly rather than inheriting it.
+True only at steps 5 ("watch the graph below"), 7 (focuses `rayCount`) and
+11 (dispersion splits one curve into six); false everywhere else. When a step
+opens a plot, the paragraph under the tabs (`graphExitExplain` /
+`graphDistExplain`) says what the axes are and how the shape relates to the
+bow, so a reader who arrives there mid-tutorial is not left to infer it.
+
 ### Tutorial steps declare which controls they need
 
 Each `TUTORIAL` entry carries `focus: [...]` — control ids, which are just
@@ -426,6 +462,17 @@ sits second in `build.mjs`'s `ORDER`.
   — "no reflection, so no concentrated direction" — lost its first several
   characters. Only visible in an exported figure, which is a good argument
   for exporting one while checking layout work.
+- **A check that reads the DOM has to run after everything that rebuilds
+  it, not next to the thing that triggered it.** `applyFocus()` was called
+  from the graph branch of the `subscribe()` handler, because closing the
+  plots can remove a focused control. But a tutorial step change moves the
+  graph key *and* the controls key, and the graph branch runs first — so the
+  check ran against the outgoing step's column and warned about four
+  perfectly good controls that were about to be built one statement later.
+  Confirmed by the regression sweep, which went from silent to seven
+  warnings with the app behaving correctly throughout. The fix is an
+  `else if`: run the check only when the column was not rebuilt, since
+  `buildControls()` already runs it.
 - **`setPointerCapture()` throws for a pointer id the element cannot
   claim,** and it is called before the drag state is set up, so an
   unguarded throw takes the whole gesture with it. Use `capture()` from

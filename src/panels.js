@@ -15,7 +15,11 @@ import { traceOne, distanceFromExtremum, dropReport, colorIdFor } from './rays.j
 /**
  * The guided path. Each step owns three things:
  *
- *   apply  the state it needs on screen, pushed on entry
+ *   apply  the state it needs on screen, pushed on entry. Every step sets
+ *          `graphOpen` explicitly, true only where the step actually talks
+ *          about a plot or focuses a control that lives in one -- otherwise
+ *          the plots stay shut and the reader is not handed axes they have
+ *          no reason for yet.
  *   focus  the control-column ids (translation keys, see ui.js) the step is
  *          actually asking the reader to move. app.js highlights them and
  *          warns to the console if a focused control is not present in the
@@ -31,7 +35,7 @@ export const TUTORIAL = [
     apply: {
       scene: 'droplet', graph: 'exit', reflections: 0, dispersion: 0, wavelength: 'white',
       impact: 0.6, fanCount: 0, showNonRainbow: false, angleMode: 'antisolar',
-      dropletZoom: 1, observerMode: 'auto',
+      dropletZoom: 1, observerMode: 'auto', graphOpen: false,
       show: { angles: false, normals: false, labels: true, renderedBow: false },
       families: { 0: true, 1: false, 2: false, 3: false },
     },
@@ -40,7 +44,8 @@ export const TUTORIAL = [
   {
     title: 's2title', body: 's2body',
     apply: {
-      scene: 'droplet', reflections: 0, show: { angles: true, normals: true },
+      scene: 'droplet', reflections: 0, graphOpen: false,
+      show: { angles: true, normals: true },
       families: { 0: true, 1: false, 2: false, 3: false },
     },
     focus: ['impactParameter', 'showNormals', 'showAngles'],
@@ -53,7 +58,7 @@ export const TUTORIAL = [
   {
     title: 's3title', body: 's3body',
     apply: {
-      scene: 'droplet', reflections: 1, impact: 0.7, showNonRainbow: true,
+      scene: 'droplet', reflections: 1, impact: 0.7, showNonRainbow: true, graphOpen: false,
       families: { 0: false, 1: true, 2: false, 3: false },
       show: { normals: false, angles: true },
     },
@@ -61,14 +66,20 @@ export const TUTORIAL = [
   },
   {
     title: 's4title', body: 's4body',
-    apply: { scene: 'droplet', reflections: 1, showNonRainbow: false, panel: 'guide', show: { angles: true } },
+    apply: {
+      scene: 'droplet', reflections: 1, showNonRainbow: false, panel: 'guide',
+      graphOpen: false, show: { angles: true },
+    },
     focus: ['impactParameter', 'showAngles'],
     actions: [{ labelKey: 'extremumLabel', patch: { impact: 0.861 } }],
     showRay: true,
   },
   {
     title: 's5title', body: 's5body',
-    apply: { scene: 'droplet', graph: 'exit', reflections: 1, fanCount: 9, panel: 'guide' },
+    apply: {
+      scene: 'droplet', graph: 'exit', graphOpen: true, reflections: 1, fanCount: 9,
+      panel: 'guide',
+    },
     focus: ['fanCount', 'impactParameter'],
     actions: [
       { label: '1', patch: { fanCount: 0 } },
@@ -91,7 +102,7 @@ export const TUTORIAL = [
       // quotes rather than the mean-index 41.9 that dispersion=0 produces.
       scene: 'droplet', graph: 'exit', reflections: 1, fanCount: 45, dispersion: 1,
       wavelength: 650, impact: 0.861, dropletZoom: 2.6, observerMode: 'manual', observerPhi: 30,
-      panel: 'guide', show: { angles: true, normals: false, labels: true },
+      panel: 'guide', graphOpen: false, show: { angles: true, normals: false, labels: true },
       families: { 0: false, 1: true, 2: false, 3: false },
     },
     focus: ['observerAngle', 'observerPlacement'],
@@ -111,7 +122,10 @@ export const TUTORIAL = [
   },
   {
     title: 's7title', body: 's7body',
-    apply: { scene: 'droplet', graph: 'dist', reflections: 1, fanCount: 25, distRays: 40 },
+    apply: {
+      scene: 'droplet', graph: 'dist', graphOpen: true, reflections: 1, fanCount: 25,
+      distRays: 40,
+    },
     focus: ['rayCount'],
     actions: [
       { label: '10', patch: { distRays: 10 } },
@@ -125,7 +139,7 @@ export const TUTORIAL = [
     title: 's8title', body: 's8body',
     apply: {
       scene: 'drops', graph: 'dist', dropCount: 1, dropsAnimate: true,
-      dropsObserverX: 0, dropsObserverY: 0,
+      dropsObserverX: 0, dropsObserverY: 0, graphOpen: false,
       show: { droplets: true, primary: true, secondary: false },
     },
     focus: ['dropCount', 'animateDrops'],
@@ -146,7 +160,7 @@ export const TUTORIAL = [
     title: 's9title', body: 's9body',
     apply: {
       scene: 'drops', graph: 'dist', dropCount: 1500, dropsAnimate: false,
-      dropsObserverX: 0, dropsObserverY: 0, sunElevation: 15,
+      dropsObserverX: 0, dropsObserverY: 0, sunElevation: 15, graphOpen: false,
       show: { droplets: true, primary: true, secondary: false, ground: true, labels: true },
     },
     focus: ['observerDepth', 'observerRise'],
@@ -161,7 +175,7 @@ export const TUTORIAL = [
   {
     title: 's10title', body: 's10body',
     apply: {
-      scene: 'sky', view: 'orbit', sunElevation: 15,
+      scene: 'sky', view: 'orbit', sunElevation: 15, graphOpen: false,
       show: { cone: true, horizon: false, ground: false, antisolar: true, primary: true, secondary: false, renderedBow: false },
     },
     focus: ['showCone', 'showHorizon', 'viewMode'],
@@ -175,7 +189,7 @@ export const TUTORIAL = [
     title: 's11title', body: 's11body',
     apply: {
       scene: 'droplet', graph: 'exit', wavelength: 'white', dispersion: 0, reflections: 1,
-      fanCount: 0, dropletZoom: 9, observerMode: 'auto',
+      fanCount: 0, dropletZoom: 9, observerMode: 'auto', graphOpen: true,
       show: { wavelengthLabels: true, angles: true },
       families: { 0: false, 1: true, 2: false, 3: false },
     },
@@ -191,7 +205,7 @@ export const TUTORIAL = [
     title: 's12title', body: 's12body',
     apply: {
       scene: 'sky', view: 'eye', dispersion: 1, wavelength: 'white', reflections: 2,
-      families: { 0: false, 1: true, 2: true, 3: false },
+      graphOpen: false, families: { 0: false, 1: true, 2: true, 3: false },
       show: {
         primary: true, secondary: true, alexander: true, horizon: true, ground: true,
         renderedBow: true, cone: false, wavelengthLabels: true,

@@ -176,6 +176,38 @@ html, body {
   background: var(--bg-panel);
   padding: 8px 12px 12px;
 }
+.graph-bar {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.graph-wrap:not(.collapsed) .graph-bar { margin-bottom: 10px; }
+.graph-toggle {
+  background: none;
+  border: none;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 2px 0;
+  cursor: pointer;
+}
+.graph-toggle:hover { color: var(--accent); }
+.graph-bar-hint { font-size: 11px; color: var(--fg-faint); }
+/* Emptied, not just hidden -- see buildGraphTabs(). The rule is here so the
+   section keeps its height reserved-free while closed. */
+.graph-wrap.collapsed .graph-tabs,
+.graph-wrap.collapsed .graph-explain,
+.graph-wrap.collapsed .graph-stage { display: none; }
+.graph-explain {
+  margin: 0 0 10px;
+  max-width: 108ch;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--fg-dim);
+}
 .graph-tabs {
   display: flex;
   align-items: center;
@@ -1529,6 +1561,14 @@ const translations = {
     angleScattering: 'Θ — rozptylový úhel',
     angleDeviation: 'D — celková odchylka',
     graphHint: 'Klikněte do grafu a vyberte paprsek. Táhněte paprsek v kapce a bod se posune.',
+    graphShow: 'Zobrazit grafy',
+    graphHide: 'Skrýt grafy',
+    graphCollapsedHint:
+      'Výstupní úhel a rozdělení paprsků — čísla, ze kterých duhový úhel vychází.',
+    graphExitExplain:
+      'Každý přicházející paprsek je popsán tím, kam do kapky dopadne: b/R = 0 je přesný střed, b/R = 1 okraj. Křivka udává směr, kterým paprsek vyjde ven. V okolí svého extrému je téměř vodorovná, takže celý pás parametrů dopadu odchází skoro stejným směrem — právě tam se paprsky hromadí a ten úhel je úhlový poloměr duhy. Každá vlnová délka má svou křivku a každá se obrací u trochu jiného úhlu; odtud jsou barvy.',
+    graphDistExplain:
+      'Paprsky se vystřelují náhodně po celé ploše kapky a počítá se, kterým směrem odejdou. Do většiny směrů jich jde podobně málo; do jednoho ne. U úhlu, kde se křivka výstupního úhlu obrací, počet prudce vyskočí — a protože tenhle graf je jas v závislosti na úhlu, tedy přesně to, co měří oko přejíždějící po obloze, ten vrchol je duha a leží u úhlu, pod kterým ji uvidíte. Zvyšte počet paprsků a vyloupne se ze šumu sám.',
     extremumLabel: 'extrém → duha',
     rayCount: 'Počet paprsků',
     accumulate: 'Přidávat paprsky',
@@ -1742,7 +1782,7 @@ const translations = {
       'Ve třech rozměrech tvoří všechny takové směry kužel kolem antisolárního bodu. Průnik kužele s oblohou je kružnice. Zapněte horizont a dolní část zmizí.',
     s11title: 'Odkud jsou barvy?',
     s11body:
-      'Index lomu vody závisí na vlnové délce. Posuňte disperzi z 0 % na 100 % a sledujte, jak se jediný úhel rozpadne na pás barev.',
+      'Index lomu vody závisí na vlnové délce. Posuňte disperzi z 0 % na 100 % a sledujte, jak se jediný úhel rozpadne na pás barev — a s ním i graf dole, na jednu křivku pro každou vlnovou délku.',
     s12title: 'Může být duh víc?',
     s12body:
       'Nastavte dva vnitřní odrazy. Vznikne slabší duha s větším poloměrem a obráceným pořadím barev. Mezi nimi zůstane Alexandrův temný pás.',
@@ -1907,6 +1947,14 @@ const translations = {
     angleScattering: 'Θ — scattering angle',
     angleDeviation: 'D — total deviation',
     graphHint: 'Click the graph to pick a ray. Drag the ray in the droplet and the marker follows.',
+    graphShow: 'Show graphs',
+    graphHide: 'Hide graphs',
+    graphCollapsedHint:
+      'Exit angle and ray distribution — the numbers the rainbow angle comes out of.',
+    graphExitExplain:
+      'Every incoming ray is labelled by where it hits the droplet: b/R = 0 is dead centre, b/R = 1 grazes the edge. The curve gives the direction that ray leaves in. Near its turning point the curve is almost flat, so a whole band of impact parameters exits at nearly the same angle — that pile-up is the rainbow, and the angle it happens at is the bow’s angular radius. Each wavelength has its own curve, each turning over at a slightly different angle; that is where the colours come from.',
+    graphDistExplain:
+      'Rays are fired at random across the whole face of the droplet and counted by the direction they leave in. Most directions get a similar modest share; one does not. At the angle where the exit-angle curve turns over the count spikes — and since this plot is brightness against angle, exactly what an eye measures sweeping across the sky, that spike is the bow, sitting at the angle you have to look at. Raise the ray count and it sharpens out of the noise on its own.',
     extremumLabel: 'extremum → rainbow',
     rayCount: 'Number of rays',
     accumulate: 'Accumulate rays',
@@ -2122,7 +2170,7 @@ const translations = {
       'In three dimensions all those directions form a cone around the antisolar point. The cone meets the sky in a circle. Switch the horizon on and the lower part disappears.',
     s11title: 'Where do the colors come from?',
     s11body:
-      "Water's refractive index depends on wavelength. Move dispersion from 0 % to 100 % and watch a single angle split into a band of colours.",
+      "Water's refractive index depends on wavelength. Move dispersion from 0 % to 100 % and watch a single angle split into a band of colours — and the graph below splits with it, one curve per wavelength.",
     s12title: 'Can there be another rainbow?',
     s12body:
       "Set two internal reflections. A fainter bow appears with a larger radius and reversed colour order, with Alexander's dark band between them.",
@@ -2321,6 +2369,12 @@ const state = {
   step: 0,
   scene: 'droplet', // 'droplet' | 'drops' | 'sky'
   graph: 'exit', // 'exit' | 'dist'
+
+  /* Whether the plots at the bottom of the page are open. Closed by default:
+     they are the evidence behind the scenes above, not the way in, and a
+     reader who meets them before the droplet has no idea what the axes mean.
+     Tutorial steps that actually talk about a plot open it themselves. */
+  graphOpen: false,
   panel: 'guide', // 'guide' | 'ray' | 'math' | 'quiz'
 
   /* light */
@@ -5350,7 +5404,11 @@ function createSkyView(canvas) {
 /**
  * The guided path. Each step owns three things:
  *
- *   apply  the state it needs on screen, pushed on entry
+ *   apply  the state it needs on screen, pushed on entry. Every step sets
+ *          `graphOpen` explicitly, true only where the step actually talks
+ *          about a plot or focuses a control that lives in one -- otherwise
+ *          the plots stay shut and the reader is not handed axes they have
+ *          no reason for yet.
  *   focus  the control-column ids (translation keys, see ui.js) the step is
  *          actually asking the reader to move. app.js highlights them and
  *          warns to the console if a focused control is not present in the
@@ -5366,7 +5424,7 @@ const TUTORIAL = [
     apply: {
       scene: 'droplet', graph: 'exit', reflections: 0, dispersion: 0, wavelength: 'white',
       impact: 0.6, fanCount: 0, showNonRainbow: false, angleMode: 'antisolar',
-      dropletZoom: 1, observerMode: 'auto',
+      dropletZoom: 1, observerMode: 'auto', graphOpen: false,
       show: { angles: false, normals: false, labels: true, renderedBow: false },
       families: { 0: true, 1: false, 2: false, 3: false },
     },
@@ -5375,7 +5433,8 @@ const TUTORIAL = [
   {
     title: 's2title', body: 's2body',
     apply: {
-      scene: 'droplet', reflections: 0, show: { angles: true, normals: true },
+      scene: 'droplet', reflections: 0, graphOpen: false,
+      show: { angles: true, normals: true },
       families: { 0: true, 1: false, 2: false, 3: false },
     },
     focus: ['impactParameter', 'showNormals', 'showAngles'],
@@ -5388,7 +5447,7 @@ const TUTORIAL = [
   {
     title: 's3title', body: 's3body',
     apply: {
-      scene: 'droplet', reflections: 1, impact: 0.7, showNonRainbow: true,
+      scene: 'droplet', reflections: 1, impact: 0.7, showNonRainbow: true, graphOpen: false,
       families: { 0: false, 1: true, 2: false, 3: false },
       show: { normals: false, angles: true },
     },
@@ -5396,14 +5455,20 @@ const TUTORIAL = [
   },
   {
     title: 's4title', body: 's4body',
-    apply: { scene: 'droplet', reflections: 1, showNonRainbow: false, panel: 'guide', show: { angles: true } },
+    apply: {
+      scene: 'droplet', reflections: 1, showNonRainbow: false, panel: 'guide',
+      graphOpen: false, show: { angles: true },
+    },
     focus: ['impactParameter', 'showAngles'],
     actions: [{ labelKey: 'extremumLabel', patch: { impact: 0.861 } }],
     showRay: true,
   },
   {
     title: 's5title', body: 's5body',
-    apply: { scene: 'droplet', graph: 'exit', reflections: 1, fanCount: 9, panel: 'guide' },
+    apply: {
+      scene: 'droplet', graph: 'exit', graphOpen: true, reflections: 1, fanCount: 9,
+      panel: 'guide',
+    },
     focus: ['fanCount', 'impactParameter'],
     actions: [
       { label: '1', patch: { fanCount: 0 } },
@@ -5426,7 +5491,7 @@ const TUTORIAL = [
       // quotes rather than the mean-index 41.9 that dispersion=0 produces.
       scene: 'droplet', graph: 'exit', reflections: 1, fanCount: 45, dispersion: 1,
       wavelength: 650, impact: 0.861, dropletZoom: 2.6, observerMode: 'manual', observerPhi: 30,
-      panel: 'guide', show: { angles: true, normals: false, labels: true },
+      panel: 'guide', graphOpen: false, show: { angles: true, normals: false, labels: true },
       families: { 0: false, 1: true, 2: false, 3: false },
     },
     focus: ['observerAngle', 'observerPlacement'],
@@ -5446,7 +5511,10 @@ const TUTORIAL = [
   },
   {
     title: 's7title', body: 's7body',
-    apply: { scene: 'droplet', graph: 'dist', reflections: 1, fanCount: 25, distRays: 40 },
+    apply: {
+      scene: 'droplet', graph: 'dist', graphOpen: true, reflections: 1, fanCount: 25,
+      distRays: 40,
+    },
     focus: ['rayCount'],
     actions: [
       { label: '10', patch: { distRays: 10 } },
@@ -5460,7 +5528,7 @@ const TUTORIAL = [
     title: 's8title', body: 's8body',
     apply: {
       scene: 'drops', graph: 'dist', dropCount: 1, dropsAnimate: true,
-      dropsObserverX: 0, dropsObserverY: 0,
+      dropsObserverX: 0, dropsObserverY: 0, graphOpen: false,
       show: { droplets: true, primary: true, secondary: false },
     },
     focus: ['dropCount', 'animateDrops'],
@@ -5481,7 +5549,7 @@ const TUTORIAL = [
     title: 's9title', body: 's9body',
     apply: {
       scene: 'drops', graph: 'dist', dropCount: 1500, dropsAnimate: false,
-      dropsObserverX: 0, dropsObserverY: 0, sunElevation: 15,
+      dropsObserverX: 0, dropsObserverY: 0, sunElevation: 15, graphOpen: false,
       show: { droplets: true, primary: true, secondary: false, ground: true, labels: true },
     },
     focus: ['observerDepth', 'observerRise'],
@@ -5496,7 +5564,7 @@ const TUTORIAL = [
   {
     title: 's10title', body: 's10body',
     apply: {
-      scene: 'sky', view: 'orbit', sunElevation: 15,
+      scene: 'sky', view: 'orbit', sunElevation: 15, graphOpen: false,
       show: { cone: true, horizon: false, ground: false, antisolar: true, primary: true, secondary: false, renderedBow: false },
     },
     focus: ['showCone', 'showHorizon', 'viewMode'],
@@ -5510,7 +5578,7 @@ const TUTORIAL = [
     title: 's11title', body: 's11body',
     apply: {
       scene: 'droplet', graph: 'exit', wavelength: 'white', dispersion: 0, reflections: 1,
-      fanCount: 0, dropletZoom: 9, observerMode: 'auto',
+      fanCount: 0, dropletZoom: 9, observerMode: 'auto', graphOpen: true,
       show: { wavelengthLabels: true, angles: true },
       families: { 0: false, 1: true, 2: false, 3: false },
     },
@@ -5526,7 +5594,7 @@ const TUTORIAL = [
     title: 's12title', body: 's12body',
     apply: {
       scene: 'sky', view: 'eye', dispersion: 1, wavelength: 'white', reflections: 2,
-      families: { 0: false, 1: true, 2: true, 3: false },
+      graphOpen: false, families: { 0: false, 1: true, 2: true, 3: false },
       show: {
         primary: true, secondary: true, alexander: true, horizon: true, ground: true,
         renderedBow: true, cone: false, wavelengthLabels: true,
@@ -5896,6 +5964,13 @@ const headerEl = el('header', { class: 'app-header' });
 const sceneTabsEl = el('div', { class: 'scene-tabs' });
 const sceneDescEl = el('p', { class: 'scene-desc' });
 const graphTabsEl = el('div', { class: 'graph-tabs' });
+const graphBarEl = el('div', { class: 'graph-bar' });
+const graphExplainEl = el('p', { class: 'graph-explain' });
+const graphStageEl = el('div', { class: 'graph-stage' }, graphCanvas);
+// One section, three parts: the bar is always there so the plots are
+// discoverable; the tabs and the stage only exist when they are open.
+const graphWrapEl = el('section', { class: 'graph-wrap collapsed' },
+  graphBarEl, graphTabsEl, graphExplainEl, graphStageEl);
 const footerEl = el('footer', { class: 'app-footer' });
 
 root.append(
@@ -5913,7 +5988,7 @@ root.append(
     ),
     el('aside', { class: 'col col-panel' }, panelEl)
   ),
-  el('section', { class: 'graph-wrap' }, graphTabsEl, el('div', { class: 'graph-stage' }, graphCanvas)),
+  graphWrapEl,
   footerEl
 );
 
@@ -5996,8 +6071,35 @@ function buildSceneTabs() {
   );
 }
 
+/**
+ * The plots, and the bar that opens them.
+ *
+ * When they are closed the tabs are genuinely emptied rather than merely
+ * hidden, so `applyFocus()` still reports a tutorial step that asks for a
+ * control living down here (the ray count) without opening the plots first.
+ * Hiding them with CSS would leave the control in the DOM and turn that
+ * loud failure into a silent one.
+ */
 function buildGraphTabs() {
+  clear(graphBarEl);
   clear(graphTabsEl);
+  clear(graphExplainEl);
+  const open = state.graphOpen;
+  graphWrapEl.classList.toggle('collapsed', !open);
+  graphBarEl.append(
+    el('button', {
+      class: 'graph-toggle', type: 'button', 'aria-expanded': open ? 'true' : 'false',
+      onclick: () => set({ graphOpen: !state.graphOpen }),
+    }, `${open ? '\u25be' : '\u25b8'} ${t(open ? 'graphHide' : 'graphShow')}`)
+  );
+  if (!open) {
+    // Say what is down here while it is shut; once the plots are on screen
+    // their own title and explanation take over.
+    graphBarEl.append(el('span', { class: 'graph-bar-hint' }, t('graphCollapsedHint')));
+    return;
+  }
+
+  graphExplainEl.append(t(state.graph === 'exit' ? 'graphExitExplain' : 'graphDistExplain'));
   graphTabsEl.append(
     segmented(
       [
@@ -6537,13 +6639,13 @@ function buildControls() {
 function applyFocus() {
   const step = state.mode === 'tutorial' ? TUTORIAL[state.step] : null;
   const want = (step && step.focus) || [];
-  for (const host of [controlsEl, graphTabsEl]) {
+  for (const host of [controlsEl, graphWrapEl]) {
     for (const node of host.querySelectorAll('[data-ctl]')) {
       node.classList.toggle('focus', want.includes(node.dataset.ctl));
     }
   }
   const missing = want.filter(
-    (k) => !controlsEl.querySelector(`[data-ctl="${k}"]`) && !graphTabsEl.querySelector(`[data-ctl="${k}"]`)
+    (k) => !controlsEl.querySelector(`[data-ctl="${k}"]`) && !graphWrapEl.querySelector(`[data-ctl="${k}"]`)
   );
   if (missing.length) {
     console.warn(`tutorial step ${state.step + 1} (${state.scene}): controls not on screen:`, missing);
@@ -6576,7 +6678,7 @@ function resetState() {
     observerMode: 'auto', observerPhi: 42.4,
     dropsObserverX: 0, dropsObserverY: 0,
     showNonRainbow: false, fanCount: 0, families: { 0: false, 1: true, 2: false, 3: false },
-    angleMode: 'antisolar', distRays: 60, distAccumulate: false,
+    angleMode: 'antisolar', distRays: 60, distAccumulate: false, graphOpen: false,
     dropCount: 1, dropsAnimate: false,
     sunElevation: 15, sunAzimuth: 180, observerHeight: 1.7,
     view: 'orbit', camYaw: -35, camPitch: 14, camDist: 3.1,
@@ -6607,7 +6709,7 @@ function collectAllSyncers() {
   syncers = [
     ...collectSyncers(sceneTabsEl),
     ...collectSyncers(controlsEl),
-    ...collectSyncers(graphTabsEl),
+    ...collectSyncers(graphWrapEl),
     ...collectSyncers(panelEl),
   ];
 }
@@ -6621,7 +6723,7 @@ function rebuild() {
   renderPanel(panelEl);
   applyVisibility();
   collectAllSyncers();
-  trackedGraph = state.graph;
+  trackedGraph = graphKey();
   trackedPanelKey = panelKey();
   trackedControlsKey = controlsKey();
 }
@@ -6681,23 +6783,39 @@ function panelKey() {
   return `${state.panel}|${state.scene}|${state.step}|${rayPart}|${mathPart}|${dropPart}|${guidePart}`;
 }
 
-let trackedGraph = state.graph;
+/** Everything the shape of the graph section depends on. */
+function graphKey() {
+  return `${state.graph}|${state.graphOpen}`;
+}
+
+let trackedGraph = graphKey();
 let trackedPanelKey = panelKey();
 let trackedControlsKey = controlsKey();
 
 subscribe(() => {
   applyVisibility();
 
-  if (state.graph !== trackedGraph) {
-    trackedGraph = state.graph;
+  const gk = graphKey();
+  const graphChanged = gk !== trackedGraph;
+  if (graphChanged) {
+    trackedGraph = gk;
     buildGraphTabs();
-    collectAllSyncers();
   }
 
   const ck = controlsKey();
   if (ck !== trackedControlsKey) {
     trackedControlsKey = ck;
-    buildControls(); // re-collects the syncers itself
+    buildControls(); // re-runs applyFocus() and re-collects the syncers itself
+  } else if (graphChanged) {
+    // Only when the column was NOT rebuilt. Some focused controls live in the
+    // plot bar, so opening or closing the plots can add or remove one without
+    // controlsKey() changing, and the check would otherwise never run for
+    // exactly the case it exists to catch. It has to happen after the
+    // buildControls() branch, not inside the graph branch above: a step change
+    // moves both keys, and checking first would test the OUTGOING step's
+    // column and report controls that are about to appear.
+    applyFocus();
+    collectAllSyncers();
   }
 
   const pk = panelKey();
@@ -6716,8 +6834,12 @@ function renderOnce() {
     view.tick();
     view.draw();
   }
-  graph.tick();
-  graph.draw();
+  // Skip entirely while collapsed: the canvas is display:none, so it would
+  // measure 0 x 0 and every plotted coordinate would be meaningless.
+  if (state.graphOpen && graphCanvas.clientWidth > 0) {
+    graph.tick();
+    graph.draw();
+  }
 }
 
 function loop() {

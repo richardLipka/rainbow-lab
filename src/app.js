@@ -30,6 +30,13 @@ const headerEl = el('header', { class: 'app-header' });
 const sceneTabsEl = el('div', { class: 'scene-tabs' });
 const sceneDescEl = el('p', { class: 'scene-desc' });
 const graphTabsEl = el('div', { class: 'graph-tabs' });
+const graphBarEl = el('div', { class: 'graph-bar' });
+const graphExplainEl = el('p', { class: 'graph-explain' });
+const graphStageEl = el('div', { class: 'graph-stage' }, graphCanvas);
+// One section, three parts: the bar is always there so the plots are
+// discoverable; the tabs and the stage only exist when they are open.
+const graphWrapEl = el('section', { class: 'graph-wrap collapsed' },
+  graphBarEl, graphTabsEl, graphExplainEl, graphStageEl);
 const footerEl = el('footer', { class: 'app-footer' });
 
 root.append(
@@ -47,7 +54,7 @@ root.append(
     ),
     el('aside', { class: 'col col-panel' }, panelEl)
   ),
-  el('section', { class: 'graph-wrap' }, graphTabsEl, el('div', { class: 'graph-stage' }, graphCanvas)),
+  graphWrapEl,
   footerEl
 );
 
@@ -130,8 +137,35 @@ function buildSceneTabs() {
   );
 }
 
+/**
+ * The plots, and the bar that opens them.
+ *
+ * When they are closed the tabs are genuinely emptied rather than merely
+ * hidden, so `applyFocus()` still reports a tutorial step that asks for a
+ * control living down here (the ray count) without opening the plots first.
+ * Hiding them with CSS would leave the control in the DOM and turn that
+ * loud failure into a silent one.
+ */
 function buildGraphTabs() {
+  clear(graphBarEl);
   clear(graphTabsEl);
+  clear(graphExplainEl);
+  const open = state.graphOpen;
+  graphWrapEl.classList.toggle('collapsed', !open);
+  graphBarEl.append(
+    el('button', {
+      class: 'graph-toggle', type: 'button', 'aria-expanded': open ? 'true' : 'false',
+      onclick: () => set({ graphOpen: !state.graphOpen }),
+    }, `${open ? '\u25be' : '\u25b8'} ${t(open ? 'graphHide' : 'graphShow')}`)
+  );
+  if (!open) {
+    // Say what is down here while it is shut; once the plots are on screen
+    // their own title and explanation take over.
+    graphBarEl.append(el('span', { class: 'graph-bar-hint' }, t('graphCollapsedHint')));
+    return;
+  }
+
+  graphExplainEl.append(t(state.graph === 'exit' ? 'graphExitExplain' : 'graphDistExplain'));
   graphTabsEl.append(
     segmented(
       [
@@ -671,13 +705,13 @@ function buildControls() {
 function applyFocus() {
   const step = state.mode === 'tutorial' ? TUTORIAL[state.step] : null;
   const want = (step && step.focus) || [];
-  for (const host of [controlsEl, graphTabsEl]) {
+  for (const host of [controlsEl, graphWrapEl]) {
     for (const node of host.querySelectorAll('[data-ctl]')) {
       node.classList.toggle('focus', want.includes(node.dataset.ctl));
     }
   }
   const missing = want.filter(
-    (k) => !controlsEl.querySelector(`[data-ctl="${k}"]`) && !graphTabsEl.querySelector(`[data-ctl="${k}"]`)
+    (k) => !controlsEl.querySelector(`[data-ctl="${k}"]`) && !graphWrapEl.querySelector(`[data-ctl="${k}"]`)
   );
   if (missing.length) {
     console.warn(`tutorial step ${state.step + 1} (${state.scene}): controls not on screen:`, missing);
@@ -710,7 +744,7 @@ function resetState() {
     observerMode: 'auto', observerPhi: 42.4,
     dropsObserverX: 0, dropsObserverY: 0,
     showNonRainbow: false, fanCount: 0, families: { 0: false, 1: true, 2: false, 3: false },
-    angleMode: 'antisolar', distRays: 60, distAccumulate: false,
+    angleMode: 'antisolar', distRays: 60, distAccumulate: false, graphOpen: false,
     dropCount: 1, dropsAnimate: false,
     sunElevation: 15, sunAzimuth: 180, observerHeight: 1.7,
     view: 'orbit', camYaw: -35, camPitch: 14, camDist: 3.1,
@@ -741,7 +775,7 @@ function collectAllSyncers() {
   syncers = [
     ...collectSyncers(sceneTabsEl),
     ...collectSyncers(controlsEl),
-    ...collectSyncers(graphTabsEl),
+    ...collectSyncers(graphWrapEl),
     ...collectSyncers(panelEl),
   ];
 }
@@ -755,7 +789,7 @@ function rebuild() {
   renderPanel(panelEl);
   applyVisibility();
   collectAllSyncers();
-  trackedGraph = state.graph;
+  trackedGraph = graphKey();
   trackedPanelKey = panelKey();
   trackedControlsKey = controlsKey();
 }
@@ -815,23 +849,39 @@ function panelKey() {
   return `${state.panel}|${state.scene}|${state.step}|${rayPart}|${mathPart}|${dropPart}|${guidePart}`;
 }
 
-let trackedGraph = state.graph;
+/** Everything the shape of the graph section depends on. */
+function graphKey() {
+  return `${state.graph}|${state.graphOpen}`;
+}
+
+let trackedGraph = graphKey();
 let trackedPanelKey = panelKey();
 let trackedControlsKey = controlsKey();
 
 subscribe(() => {
   applyVisibility();
 
-  if (state.graph !== trackedGraph) {
-    trackedGraph = state.graph;
+  const gk = graphKey();
+  const graphChanged = gk !== trackedGraph;
+  if (graphChanged) {
+    trackedGraph = gk;
     buildGraphTabs();
-    collectAllSyncers();
   }
 
   const ck = controlsKey();
   if (ck !== trackedControlsKey) {
     trackedControlsKey = ck;
-    buildControls(); // re-collects the syncers itself
+    buildControls(); // re-runs applyFocus() and re-collects the syncers itself
+  } else if (graphChanged) {
+    // Only when the column was NOT rebuilt. Some focused controls live in the
+    // plot bar, so opening or closing the plots can add or remove one without
+    // controlsKey() changing, and the check would otherwise never run for
+    // exactly the case it exists to catch. It has to happen after the
+    // buildControls() branch, not inside the graph branch above: a step change
+    // moves both keys, and checking first would test the OUTGOING step's
+    // column and report controls that are about to appear.
+    applyFocus();
+    collectAllSyncers();
   }
 
   const pk = panelKey();
@@ -850,8 +900,12 @@ function renderOnce() {
     view.tick();
     view.draw();
   }
-  graph.tick();
-  graph.draw();
+  // Skip entirely while collapsed: the canvas is display:none, so it would
+  // measure 0 x 0 and every plotted coordinate would be meaningless.
+  if (state.graphOpen && graphCanvas.clientWidth > 0) {
+    graph.tick();
+    graph.draw();
+  }
 }
 
 function loop() {
