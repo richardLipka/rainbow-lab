@@ -334,8 +334,8 @@ control that is on screen always does something when you move it.
   green or grey — to see every ray it sends out and every angle involved;
   click empty sky to let it go.
 - **Sky 3-D** — drag to orbit, scroll to zoom. Switch to the observer's eye to
-  see the circle cut by the horizon. Click anywhere on a bow to trace that
-  beam back to the droplet it came from.
+  see the circle cut by the horizon. The cursor changes over a bow; click it
+  to trace that beam back to the droplet it came from.
 
 ## Tracing one beam through the sky
 

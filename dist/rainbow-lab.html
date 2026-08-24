@@ -5017,6 +5017,18 @@ const ARC_EYE = 0.36;
 
 /** Screen distance at which a click counts as landing on a bow. */
 const PICK_PX = 13;
+/**
+ * How far the pointer may travel between press and release and still be a
+ * click rather than an orbit.
+ *
+ * Measured as displacement from where the button went down, NOT as the length
+ * of the path it took. Summing the path was a real bug: a physical mouse
+ * emits several one-pixel moves during any ordinary click, six of which
+ * totalled more than the threshold, so picking a bow essentially never worked
+ * on real hardware while passing a synthetic test that dispatched no moves
+ * at all.
+ */
+const CLICK_SLOP = 6;
 /** Rolls sampled around each bow when hit-testing a click: 1-degree steps. */
 const PICK_STEPS = 360;
 
@@ -5128,6 +5140,7 @@ function bowProfile() {
 function createSkyView(canvas) {
   let cam = null;
   let size = { w: 0, h: 0 };
+  let pickCache = { key: '', pts: [] };
 
   function groundDepth() {
     // observer height, compressed logarithmically so 1.7 m and 1000 m both fit
@@ -5620,47 +5633,92 @@ function createSkyView(canvas) {
 
   /* --------------------------------------------------------- interaction */
 
+  /** Everything the projected bow points depend on. */
+  function pickKey() {
+    return [
+      size.w, size.h, state.view, state.camYaw, state.camPitch, state.camDist,
+      state.eyeAzimuth, state.eyeElevation, state.fov,
+      state.sunElevation, state.sunAzimuth, state.observerHeight,
+      state.wavelength, state.dispersion, state.indexMode, state.indexScale,
+      state.show.primary, state.show.secondary, state.show.higher,
+      state.show.rainBelow, state.show.horizon, state.show.ground,
+    ].join('|');
+  }
+
   /**
-   * The bow line nearest a click, or null.
+   * Every drawn bow, sampled at 1-degree rolls and projected to the screen.
    *
-   * Brute force over 1-degree rolls of every drawn line: a few thousand
-   * projections once per click, which is nothing, and it means the test uses
-   * exactly the projection the reader was looking at rather than an inverse
-   * that would have to be kept in step with the camera by hand.
+   * Brute force, but cached against the camera and the geometry, so it is
+   * rebuilt only when the picture actually changes -- never while orbiting,
+   * which is the one time it would be rebuilt every frame, and never
+   * repeatedly while the pointer merely hovers. That makes it cheap enough
+   * to run on pointermove, which is what gives the bows a hover cursor:
+   * without one there is no way to tell they can be clicked at all.
+   *
+   * Testing against the real projection (rather than inverting the camera)
+   * means only what is actually on screen can be picked -- the horizon cut
+   * and the near plane come along for free.
    */
-  function pickAt(px, py) {
-    if (!cam) return null;
-    const anti = O.antisolarDirection(state.sunElevation, state.sunAzimuth);
-    const dip = O.horizonDipDeg(state.observerHeight);
-    let best = null;
-    for (const line of bowLines()) {
-      for (let i = 0; i < PICK_STEPS; i++) {
-        const roll = (i / PICK_STEPS) * 360;
-        const d = O.bowDirection(anti, line.phi, roll);
-        if (!visibleDir(d, dip) || cam.depth(d) <= NEAR) continue;
-        const p = cam.project(d);
-        const gap = Math.hypot(p.x - px, p.y - py);
-        if (gap < PICK_PX && (!best || gap < best.gap)) {
-          best = { gap, k: line.k, lambda: line.lambda, roll };
+  function pickPoints() {
+    const key = pickKey();
+    if (pickCache.key === key) return pickCache.pts;
+    const pts = [];
+    if (cam) {
+      const anti = O.antisolarDirection(state.sunElevation, state.sunAzimuth);
+      const dip = O.horizonDipDeg(state.observerHeight);
+      for (const line of bowLines()) {
+        for (let i = 0; i < PICK_STEPS; i++) {
+          const roll = (i / PICK_STEPS) * 360;
+          const d = O.bowDirection(anti, line.phi, roll);
+          if (!visibleDir(d, dip) || cam.depth(d) <= NEAR) continue;
+          const p = cam.project(d);
+          if (p.x < -40 || p.x > size.w + 40 || p.y < -40 || p.y > size.h + 40) continue;
+          pts.push({ x: p.x, y: p.y, k: line.k, lambda: line.lambda, roll });
         }
+      }
+    }
+    pickCache = { key, pts };
+    return pts;
+  }
+
+  /** The bow nearest a screen position, or null. */
+  function pickAt(px, py) {
+    let best = null;
+    for (const p of pickPoints()) {
+      const gap = Math.hypot(p.x - px, p.y - py);
+      if (gap < PICK_PX && (!best || gap < best.gap)) {
+        best = { gap, k: p.k, lambda: p.lambda, roll: p.roll };
       }
     }
     return best;
   }
 
-  let drag = null;
-  let travelled = 0;
+  let drag = null; // last pointer position while the button is held
+  let down = null; // where the button went down
+  let orbiting = false; // slop exceeded: this gesture is an orbit, not a click
   canvas.addEventListener('pointerdown', (e) => {
-    drag = { x: e.clientX, y: e.clientY };
-    travelled = 0;
+    down = { x: e.clientX, y: e.clientY };
+    drag = { ...down };
+    orbiting = false;
     capture(canvas, e);
-    canvas.style.cursor = 'grabbing';
   });
   canvas.addEventListener('pointermove', (e) => {
-    if (!drag) return;
+    if (!drag) {
+      const r = canvas.getBoundingClientRect();
+      const want = pickAt(e.clientX - r.left, e.clientY - r.top) ? 'pointer' : 'grab';
+      if (canvas.style.cursor !== want) canvas.style.cursor = want;
+      return;
+    }
+    if (!orbiting) {
+      // Hold the camera still until the pointer has clearly left the press
+      // point, so an ordinary click does not also nudge the view.
+      if (Math.hypot(e.clientX - down.x, e.clientY - down.y) < CLICK_SLOP) return;
+      orbiting = true;
+      canvas.style.cursor = 'grabbing';
+      drag = { x: e.clientX, y: e.clientY };
+    }
     const dx = e.clientX - drag.x;
     const dy = e.clientY - drag.y;
-    travelled += Math.hypot(dx, dy);
     drag = { x: e.clientX, y: e.clientY };
     if (state.view === 'orbit') {
       set({
@@ -5676,13 +5734,15 @@ function createSkyView(canvas) {
   });
   const stop = () => {
     drag = null;
+    down = null;
+    orbiting = false;
     canvas.style.cursor = 'grab';
   };
   canvas.addEventListener('pointerup', (e) => {
-    // Dragging is the primary gesture here, so a click only counts as a pick
-    // when the pointer essentially did not move. Without the threshold every
-    // orbit would end by re-selecting whatever the cursor happened to land on.
-    const wasClick = drag !== null && travelled < 5;
+    // Dragging is the primary gesture here, so a release only counts as a
+    // pick when the pointer never left the press point. Without the test
+    // every orbit would end by re-selecting whatever it landed on.
+    const wasClick = drag !== null && !orbiting;
     stop();
     if (!wasClick) return;
     const rect = canvas.getBoundingClientRect();
@@ -5705,7 +5765,14 @@ function createSkyView(canvas) {
   );
   canvas.style.cursor = 'grab';
 
-  return { draw, tick: () => false, reset: () => { profileCache = { key: '', profile: null }; } };
+  return {
+    draw,
+    tick: () => false,
+    reset: () => {
+      profileCache = { key: '', profile: null };
+      pickCache = { key: '', pts: [] };
+    },
+  };
 }
 
 /* ============ src/panels.js ============ */

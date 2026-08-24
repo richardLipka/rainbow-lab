@@ -348,9 +348,18 @@ Three details worth keeping:
   many-droplets inspector uses. `arc3()` sweeps them by walking the *angle*
   through the same generator that produced the direction, so an arc is
   literally the locus of the angle it is labelled with.
-- **A click is only a pick when the pointer barely moved** (`travelled < 5`).
-  Dragging is the primary gesture in this scene; without the threshold every
-  orbit would end by re-selecting whatever the cursor landed on.
+- **A click is only a pick when the pointer never left the press point**
+  (displacement < `CLICK_SLOP`). Dragging is the primary gesture in this
+  scene; without the test every orbit would end by re-selecting whatever the
+  cursor landed on. The camera also stays still until the slop is exceeded,
+  so a click does not nudge the view on its way past.
+- **The bows have a hover cursor**, which is the only thing that says they
+  can be clicked at all. That needs a hit test cheap enough for
+  `pointermove`, hence `pickPoints()`: every drawn bow sampled at 1-degree
+  rolls and projected once, cached against the camera and the geometry.
+  It is never rebuilt while orbiting (the drag branch returns before the
+  test) and never rebuilt while merely hovering. Measured at 804x734 with
+  two bows in white light: 11 ms to build, 0.36 ms per probe afterwards.
 - **The trace is cut at the horizon along with its circle.** Raising the Sun
   can carry a picked point below the ground, and a beam still drawn to a
   droplet whose circle has just vanished contradicts the very thing that
@@ -527,6 +536,22 @@ sits second in `build.mjs`'s `ORDER`.
   — "no reflection, so no concentrated direction" — lost its first several
   characters. Only visible in an exported figure, which is a good argument
   for exporting one while checking layout work.
+- **Measure a click as displacement from the press point, never as the
+  length of the path the pointer took.** The sky view's click-versus-orbit
+  test accumulated `Math.hypot(dx, dy)` over every `pointermove`. A physical
+  mouse emits several one-pixel moves during any ordinary click, so six of
+  them totalled more than the 5-pixel threshold and picking a bow essentially
+  never worked -- while a synthetic test that dispatched `pointerdown` and
+  `pointerup` with no moves in between passed happily. Reported by the user,
+  not by the suite. Any test of a click-versus-drag threshold has to emit
+  the intermediate moves a real device would; path length and displacement
+  are the same number only for a pointer that travels in a straight line and
+  never comes back.
+- **An affordance that exists but says nothing is the same as no affordance.**
+  The same feature shipped with no hover cursor, so even once the click
+  worked there was nothing on screen distinguishing a clickable bow from the
+  rest of the canvas. "I only see the cursor for the rotations" was the
+  report; both halves needed fixing.
 - **A check that reads the DOM has to run after everything that rebuilds
   it, not next to the thing that triggered it.** `applyFocus()` was called
   from the graph branch of the `subscribe()` handler, because closing the
@@ -607,11 +632,21 @@ driving the actual app:
 8. Interactions worth driving with synthetic pointer events after any change
    to them: dragging the single-droplet eye (must switch to manual mode and
    set φ from the pointer angle), clicking elsewhere on that canvas (must
-   still steer the impact parameter and leave φ alone), dragging the
+   still steer the impact parameter and leave φ alone), the wheel on that
+   canvas (must scale `dropletZoom` and clamp to `ZOOM_RANGE`), dragging the
    many-droplets observer (must move only from the glyph, and clamp to
-   `OBS_RANGE`), and clicking a droplet in that scene (must select the
-   nearest within `PICK_RADIUS`, open the readout, and be released by a
-   click on empty sky, by turning the count down past it, and by Reset).
+   `OBS_RANGE`), clicking a droplet in that scene (must select the nearest
+   within `PICK_RADIUS`, open the readout, and be released by a click on
+   empty sky, by turning the count down past it, and by Reset), and clicking
+   a bow in the sky (must pick, must show a hover cursor first, and must not
+   fire at the end of an orbit).
+
+   **Emit the intermediate `pointermove` events a real device would.** A
+   click test that dispatches only `pointerdown` and `pointerup` is not a
+   click test: it cannot see a threshold that a physically steady hand still
+   trips, which is exactly the bug that shipped here. Sweep the jitter --
+   0, 1, 2, 3, 5 px between press and release -- and require a pick at every
+   one, then require a genuine drag not to pick.
 
 ## Style notes specific to this repo
 
