@@ -8,13 +8,20 @@
  * the point the brief asks us to make.
  */
 import * as O from './optics.js';
-import { state, set, activeLambdas, indexModel } from './state.js';
-import { t, num } from './i18n.js';
-import { fitCanvas, strokePath, label, capture } from './ui.js';
-import { colorFor } from './rays.js';
+import { state, set, indexModel } from './state.js';
+import { t, num, deg } from './i18n.js';
+import { fitCanvas, strokePath, label, capture, arrowHead, angleArc } from './ui.js';
+import {
+  colorFor, bowBands, colorAtPhi, dropReport, antisolarAxis, BOW_MATCH_DEG,
+} from './rays.js';
+
+const SMALL_FONT = '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif';
 
 const MAX_DRAWN_RAYS = 34;
 const MAX_DRAWN_GREY_RAYS = 16;
+
+/** Screen distance at which a click counts as landing on a droplet. */
+const PICK_RADIUS = 14;
 
 /**
  * How far the observer may wander, in world units. Shared with app.js so the
@@ -29,6 +36,26 @@ export const OBS_RANGE = { x: [-0.28, 0.72], y: [-0.1, 0.3] };
 
 /** p offset by k world units along the unit direction d. */
 const off = (p, d, k) => ({ x: p.x + d.x * k, y: p.y + d.y * k });
+
+/** A world direction as a screen direction. P() flips y and scales uniformly. */
+const SD = (v) => ({ x: v.x, y: -v.y });
+
+const dot = (a, b) => a.x * b.x + a.y * b.y;
+
+/**
+ * The two directions, in this cross-section, into which a droplet sends its
+ * concentrated light for a bow at antisolar angle phi.
+ *
+ * The outgoing ray makes the scattering angle Theta = 180 - phi with the
+ * direction the sunlight was already travelling in, and the droplet is a
+ * sphere, so in three dimensions this is a cone; a cross-section cuts it in
+ * two rays, one either side of the axis. Both are drawn, because both are
+ * real -- it is why droplets above AND below the antisolar line light up.
+ */
+function exitDirs(anti, phiDeg) {
+  const theta = (180 - phiDeg) * O.RAD;
+  return [rotate(anti, theta), rotate(anti, -theta)];
+}
 
 export function createDropsView(canvas) {
   let drops = [];
@@ -51,36 +78,28 @@ export function createDropsView(canvas) {
       drops.push({ x: depth, y: height * depth * 1.25 });
     }
     seedKey = makeKey();
+    validateSelection();
   }
 
-  /** Bow bands, derived from the engine, as [{k, lo, hi}] in degrees. */
-  function bands() {
-    const idx = indexModel();
-    const out = [];
-    for (const k of [1, 2]) {
-      if (k === 1 && !state.show.primary) continue;
-      if (k === 2 && !state.show.secondary) continue;
-      const angles = O.NAMED_COLORS.map((c) => ({
-        lambda: c.lambda,
-        phi: O.rainbowGeometry(idx(c.lambda), k).antisolarDeg,
-      }));
-      const lo = Math.min(...angles.map((a) => a.phi));
-      const hi = Math.max(...angles.map((a) => a.phi));
-      out.push({ k, lo, hi, angles });
-    }
-    return out;
+  /**
+   * Drop a selection whose droplet the field no longer contains. Turning the
+   * count down truncates the array, so the selected droplet can simply cease
+   * to exist; leaving the marker behind would put an inspector on a piece of
+   * empty sky.
+   */
+  function validateSelection() {
+    const sel = state.selectedDrop;
+    if (!sel) return;
+    const still = drops.some((d) => Math.abs(d.x - sel.x) < 1e-9 && Math.abs(d.y - sel.y) < 1e-9);
+    if (!still) set({ selectedDrop: null });
   }
 
-  /** Which wavelength (if any) does a droplet seen at angle phi deliver? */
-  function colorAt(phi, bs) {
-    let best = null;
-    for (const band of bs) {
-      for (const a of band.angles) {
-        const d = Math.abs(a.phi - phi);
-        if (d < 0.45 && (!best || d < best.d)) best = { d, lambda: a.lambda, k: band.k };
-      }
-    }
-    return best;
+  /** Bow bands the FIELD is currently highlighting, from the engine. */
+  function bands(idx) {
+    const orders = [];
+    if (state.show.primary) orders.push(1);
+    if (state.show.secondary) orders.push(2);
+    return bowBands(idx, orders);
   }
 
   function draw() {
@@ -108,10 +127,11 @@ export function createDropsView(canvas) {
     const P = (p) => ({ x: ox + p.x * s, y: oy - p.y * s });
     const o = P(obs);
 
-    const alpha = state.sunElevation;
-    const anti = { x: Math.cos(alpha * O.RAD), y: -Math.sin(alpha * O.RAD) };
+    const anti = antisolarAxis();
     const sun = { x: -anti.x, y: -anti.y };
-    const bs = bands();
+    const idx = indexModel();
+    const bs = bands(idx);
+    const sel = state.selectedDrop;
 
     // The sun-antisolar axis: sunlight is parallel at this distance, so this
     // ONE line, running the full width of the scene through the observer, is
@@ -157,6 +177,14 @@ export function createDropsView(canvas) {
       if (state.show.labels) label(ctx, t('horizon'), w - 12, yy - 12, { align: 'right', color: '#9ec9ab' });
     }
 
+    // Every droplet in the field concentrates light into the SAME two
+    // directions: the sunlight is parallel, the droplets are identical
+    // spheres, so nothing distinguishes them but where they happen to sit.
+    // Which is the whole point -- a droplet is lit for this observer only if
+    // one of those two fixed directions happens to end at their eye.
+    const geo1 = O.rainbowGeometry(idx(650), 1);
+    const greyDirs = geo1 ? exitDirs(anti, geo1.antisolarDeg) : null;
+
     // droplets. The non-contributing ones are by far the most numerous, so
     // they go into a single path and a single fill() -- one fill per droplet
     // is what makes ten thousand of them slow.
@@ -166,6 +194,11 @@ export function createDropsView(canvas) {
     const dotR = state.dropCount > 3000 ? 0.7 : state.dropCount > 600 ? 1.1 : state.dropCount > 60 ? 1.8 : 3;
     const greyPath = new Path2D();
     let greyCount = 0;
+    ctx.save();
+    // With one droplet under inspection the field is context, not the
+    // subject: dimmed rather than hidden, so the inspected droplet's rays
+    // are still visibly parallel to every other droplet's.
+    if (sel) ctx.globalAlpha = 0.4;
     for (const d of drops) {
       // Angles are measured FROM THE OBSERVER, so this is the only place the
       // observer's position enters the physics -- and it is enough to change
@@ -174,8 +207,8 @@ export function createDropsView(canvas) {
       const len = Math.hypot(rel.x, rel.y);
       if (len < 1e-6) continue;
       const dir = { x: rel.x / len, y: rel.y / len };
-      const phi = Math.acos(O.clamp(dir.x * anti.x + dir.y * anti.y, -1, 1)) * O.DEG;
-      const hitc = colorAt(phi, bs);
+      const phi = Math.acos(O.clamp(dot(dir, anti), -1, 1)) * O.DEG;
+      const hitc = colorAtPhi(phi, bs);
       const q = P(d);
       if (q.x < -20 || q.x > w + 20 || q.y < -20 || q.y > h + 20) continue;
 
@@ -188,8 +221,7 @@ export function createDropsView(canvas) {
         if (drawnRays < MAX_DRAWN_RAYS && state.show.droplets) {
           drawnRays++;
           // incoming sunlight
-          const back = { x: d.x - sun.x * 0.22, y: d.y - sun.y * 0.22 };
-          strokePath(ctx, [P(back), q], 'rgba(255,246,214,0.5)', 1);
+          strokePath(ctx, [P(off(d, sun, 0.22)), q], 'rgba(255,246,214,0.5)', 1);
           // the ray that actually reaches the eye -- dashed for the
           // secondary bow (k=2), solid for the primary (k=1), the same
           // convention used everywhere else in the app for the two orders
@@ -202,21 +234,18 @@ export function createDropsView(canvas) {
         greyCount++;
         // A sample of the grey droplets get the same treatment as the
         // coloured ones: sunlight really does reach every droplet, and every
-        // droplet really does scatter it onward -- it is only the DIRECTION
-        // that fails to line up with this particular observer's eye. Drawn
-        // faint and undeviated (most scattered light is not concentrated
-        // into any caustic at all -- the k=0 lesson from the single-droplet
-        // view), so it reads as "goes on, unremarkably" rather than
-        // implying a second hidden rainbow direction that isn't modelled
-        // here.
-        if (drawnGreyRays < MAX_DRAWN_GREY_RAYS && len > 0.12) {
+        // droplet really does concentrate it into a bow -- it is only the
+        // DIRECTION that fails to line up with this particular observer's
+        // eye. Both exit directions come out of rainbowGeometry, so they are
+        // exactly parallel to the rays the lit droplets send to the eye, and
+        // the picture makes its own argument: the light is not missing, it
+        // is aimed somewhere else.
+        if (drawnGreyRays < MAX_DRAWN_GREY_RAYS && len > 0.12 && greyDirs) {
           drawnGreyRays++;
-          const back = { x: d.x - sun.x * 0.22, y: d.y - sun.y * 0.22 };
-          strokePath(ctx, [P(back), q], 'rgba(255,246,214,0.16)', 1);
-          // continues onward, undeviated -- same direction light was already
-          // travelling in (away from the Sun, i.e. -sun)
-          const onward = { x: d.x - sun.x * 0.16, y: d.y - sun.y * 0.16 };
-          strokePath(ctx, [q, P(onward)], 'rgba(150,175,215,0.3)', 1);
+          strokePath(ctx, [P(off(d, sun, 0.22)), q], 'rgba(255,246,214,0.16)', 1);
+          for (const gd of greyDirs) {
+            strokePath(ctx, [q, P(off(d, gd, 0.13))], 'rgba(150,175,215,0.3)', 1);
+          }
         }
       }
     }
@@ -224,6 +253,9 @@ export function createDropsView(canvas) {
       ctx.fillStyle = 'rgba(150,175,215,0.24)';
       ctx.fill(greyPath);
     }
+    ctx.restore();
+
+    if (sel) drawInspector(ctx, { sel, anti, sun, P, o, w, h, s });
 
     // observer -- drawn as a grabbable handle, since it is one
     ctx.save();
@@ -262,7 +294,7 @@ export function createDropsView(canvas) {
     // rather than a geometrically "correct" distance. It is anchored to the
     // observer, so it travels with them -- the Sun stays behind whoever is
     // looking, which is the whole precondition for seeing a bow at all.
-    const sunScreenDir = { x: sun.x, y: -sun.y };
+    const sunScreenDir = SD(sun);
     const sunMargin = 14;
     let sunDist = 70;
     if (sunScreenDir.x < -1e-6) sunDist = Math.min(sunDist, (o.x - sunMargin) / -sunScreenDir.x);
@@ -306,17 +338,142 @@ export function createDropsView(canvas) {
       };
       swatch(16, 58, '#6fd3a4');
       label(ctx, t('dropsLegendReaches'), 26, 58, {
-        align: 'left', color: '#9fd8bd', bg: false, font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
+        align: 'left', color: '#9fd8bd', bg: false, font: SMALL_FONT,
       });
       swatch(16, 74, 'rgba(150,175,215,0.7)');
       label(ctx, t('dropsLegendMisses'), 26, 74, {
-        align: 'left', color: '#8ea3c6', bg: false, font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
+        align: 'left', color: '#8ea3c6', bg: false, font: SMALL_FONT,
       });
 
-      const smallFont = '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif';
-      label(ctx, t('dropsHint'), 12, h - 46, { color: '#8ea3c6', font: smallFont });
-      label(ctx, t('dropsSunHint'), 12, h - 30, { color: '#e0a83f', font: smallFont });
-      label(ctx, t('dropsMoveHint'), 12, h - 14, { color: '#9fd8bd', font: smallFont });
+      label(ctx, t('dropsHint'), 12, h - 62, { color: '#8ea3c6', font: SMALL_FONT });
+      label(ctx, t('dropsSunHint'), 12, h - 46, { color: '#e0a83f', font: SMALL_FONT });
+      label(ctx, t('dropsMoveHint'), 12, h - 30, { color: '#9fd8bd', font: SMALL_FONT });
+      label(ctx, t(sel ? 'dropsClearHint' : 'dropsClickHint'), 12, h - 14, {
+        color: '#cfa9e8', font: SMALL_FONT,
+      });
+    }
+  }
+
+  /* --------------------------------------------------------- inspector -- */
+
+  /**
+   * Everything one droplet does with the sunlight that hits it.
+   *
+   * The field answers "which droplets reach this observer"; this answers
+   * "why that one, and where does the rest of its light go" -- for every
+   * order in DROP_ORDERS, not just the one the field is highlighting.
+   * Nothing here is positioned by hand: each exit direction is
+   * rainbowGeometry's own scattering angle rotated off the incoming
+   * sunlight, so the ray that lands in the eye lands there because the
+   * numbers put it there.
+   */
+  function drawInspector(ctx, v) {
+    const { sel, anti, sun, P, o, w, h, s } = v;
+    const { dir, phiSeen, bands, hit } = dropReport(sel);
+    if (!dir) return;
+    const toEye = { x: -dir.x, y: -dir.y };
+    const q = P(sel);
+    const maxLen = Math.min(s * 0.45, 300);
+    // The hint stack owns the bottom of the canvas; a caption placed by the
+    // optics will otherwise sit on top of it, which this project has now had
+    // to fix twice in two different views.
+    const bottom = h - (state.show.labels ? 74 : 10);
+    // Arc radii follow how far apart the eye and the droplet actually are on
+    // screen. At full canvas width they need room to read; for a droplet a
+    // few pixels from the eye, two fixed-radius arcs land on top of each
+    // other and on the observer's own label.
+    const gap = Math.hypot(q.x - o.x, q.y - o.y);
+
+    // the incoming sunlight, drawn back towards the Sun until it leaves the
+    // canvas -- parallel light, so this segment is a copy of the dashed axis
+    const sd = SD(sun);
+    const inLen = Math.min(edgeDist(q, sd, w, h), maxLen);
+    if (inLen > 12) {
+      const from = { x: q.x + sd.x * inLen, y: q.y + sd.y * inLen };
+      strokePath(ctx, [from, q], 'rgba(255,242,196,0.9)', 1.6);
+      arrowHead(ctx, from, q, 'rgba(255,242,196,0.95)', 7);
+      if (state.show.labels) {
+        tip(ctx, t('dropIncoming'), from.x - sd.x * 4, from.y - sd.y * 4 - 12, w, h, {
+          color: '#ffe9a8', bottom,
+        });
+      }
+    }
+
+    for (const band of bands) {
+      const ref = band.angles.find((a) => a.lambda === 650) || band.angles[0];
+      const refDirs = exitDirs(anti, ref.phi);
+      // Which of the two cross-section rays points at the observer's side of
+      // the axis. Both are drawn; only this one can ever end in the eye.
+      const nearSide = dot(refDirs[0], toEye) >= dot(refDirs[1], toEye) ? 0 : 1;
+
+      for (const a of band.angles) {
+        const dirs = exitDirs(anti, a.phi);
+        const reaches = Math.abs(phiSeen - a.phi) <= BOW_MATCH_DEG;
+        for (let i = 0; i < 2; i++) {
+          const away = i !== nearSide;
+          const sdir = SD(dirs[i]);
+          if (reaches && !away) {
+            // drawn to the eye itself, not to a nominal length: the whole
+            // claim is that this ray ends there
+            strokePath(ctx, [q, o], colorFor(a.lambda, 0.95), 1.8);
+            continue;
+          }
+          const L = Math.min(edgeDist(q, sdir, w, h), maxLen);
+          if (L < 6) continue;
+          strokePath(ctx, [q, { x: q.x + sdir.x * L, y: q.y + sdir.y * L }],
+            colorFor(a.lambda, away ? 0.3 : 0.55, away ? 0.7 : 0.45), 1,
+            away ? [3, 4] : null);
+        }
+      }
+
+      if (state.show.labels) {
+        const sdir = SD(refDirs[nearSide]);
+        const L = Math.min(edgeDist(q, sdir, w, h), maxLen);
+        tip(ctx, `k=${band.k} · φ ${deg(ref.phi, 1)}`,
+          q.x + sdir.x * (L - 18), q.y + sdir.y * (L - 18), w, h,
+          { color: hit && hit.k === band.k ? '#ffdca0' : '#9fb4d8', bottom });
+      }
+    }
+
+    // The two angles, each drawn where it is actually measured. Theta is the
+    // turn the droplet puts into the light, so it belongs at the droplet;
+    // phi is how far from the antisolar point the OBSERVER has to look, so
+    // it belongs at the eye. Drawing either one at the other's vertex is the
+    // mistake this project has already had to fix once.
+    if (state.show.angles) {
+      const antiAng = Math.atan2(SD(anti).y, SD(anti).x);
+      const band = hit || bands[0];
+      if (band) {
+        const ref = band.angles.find((a) => a.lambda === 650) || band.angles[0];
+        const dirs = exitDirs(anti, ref.phi);
+        const nearSide = dot(dirs[0], toEye) >= dot(dirs[1], toEye) ? 0 : 1;
+        const exitAng = Math.atan2(SD(dirs[nearSide]).y, SD(dirs[nearSide]).x);
+        arcBetween(ctx, q.x, q.y, O.clamp(gap * 0.26, 16, 34), antiAng, exitAng,
+          'rgba(224,168,63,0.85)', `Θ ${deg(180 - ref.phi, 1)}`);
+      }
+      const losAng = Math.atan2(SD(dir).y, SD(dir).x);
+      arcBetween(ctx, o.x, o.y, O.clamp(gap * 0.42, 24, 46), antiAng, losAng,
+        hit ? 'rgba(224,168,63,0.95)' : 'rgba(143,164,200,0.8)', `φ ${deg(phiSeen, 1)}`);
+    }
+
+    // the droplet itself, and the verdict
+    ctx.save();
+    ctx.strokeStyle = hit ? colorFor(hit.nearest.lambda, 0.95) : 'rgba(207,169,232,0.9)';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(q.x, q.y, 9, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 0.5;
+    ctx.beginPath();
+    ctx.arc(q.x, q.y, 14, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    if (state.show.labels) {
+      const text = hit
+        ? t('dropHits', { angle: deg(phiSeen, 1) })
+        : t('dropMisses', { angle: deg(phiSeen, 1) });
+      tip(ctx, text, q.x, q.y + 26, w, h, { color: hit ? '#ffdca0' : '#cfa9e8', bottom });
     }
   }
 
@@ -353,13 +510,18 @@ export function createDropsView(canvas) {
   function reset() {
     drops = [];
     seedKey = '';
+    if (state.selectedDrop) set({ selectedDrop: null });
   }
 
   /* ------------------------------------------------------- interaction -- */
 
-  /** Screen position of the observer, from the last frame's layout. */
+  /** Screen position of a world point, from the last frame's layout. */
+  function proj(p) {
+    return { x: layout.ox + p.x * layout.s, y: layout.oy - p.y * layout.s };
+  }
+
   function obsScreen() {
-    return { x: layout.ox + layout.obs.x * layout.s, y: layout.oy - layout.obs.y * layout.s };
+    return proj(layout.obs);
   }
 
   function obsFromEvent(e) {
@@ -375,6 +537,25 @@ export function createDropsView(canvas) {
     return Math.hypot(e.clientX - rect.left - p.x, e.clientY - rect.top - p.y) < r;
   }
 
+  /** The droplet under the pointer, if any -- nearest wins. */
+  function dropUnder(e) {
+    if (!layout) return null;
+    const rect = canvas.getBoundingClientRect();
+    const px = e.clientX - rect.left;
+    const py = e.clientY - rect.top;
+    let best = null;
+    let bestD = PICK_RADIUS;
+    for (const d of drops) {
+      const q = proj(d);
+      const dd = Math.hypot(q.x - px, q.y - py);
+      if (dd < bestD) {
+        bestD = dd;
+        best = d;
+      }
+    }
+    return best;
+  }
+
   // Only the observer glyph is a drag handle -- a click anywhere else stays a
   // plain click. Teleporting the observer to wherever the canvas happened to
   // be tapped would make the readout jump for reasons the user did not ask
@@ -387,7 +568,10 @@ export function createDropsView(canvas) {
       capture(canvas, e);
       return;
     }
-    set({ panel: 'guide' });
+    // A click on a droplet is an inspection request; a click on empty sky
+    // puts the panel back to the explanation, which is where it was.
+    const d = dropUnder(e);
+    set(d ? { selectedDrop: { x: d.x, y: d.y }, panel: 'ray' } : { selectedDrop: null, panel: 'guide' });
   });
   canvas.addEventListener('pointermove', (e) => {
     if (!layout) return;
@@ -398,9 +582,9 @@ export function createDropsView(canvas) {
     const over = near(e, obsScreen(), 18);
     if (over !== grabbing) {
       grabbing = over;
-      canvas.style.cursor = over ? 'grab' : 'default';
       draw();
     }
+    canvas.style.cursor = over ? 'grab' : dropUnder(e) ? 'pointer' : 'default';
   });
   const stopDrag = () => {
     dragging = false;
@@ -415,4 +599,40 @@ function rotate(v, a) {
   const c = Math.cos(a);
   const s = Math.sin(a);
   return { x: v.x * c - v.y * s, y: v.x * s + v.y * c };
+}
+
+/** Distance from p to the canvas edge along the unit screen direction d. */
+function edgeDist(p, d, w, h) {
+  let best = Infinity;
+  if (d.x > 1e-6) best = Math.min(best, (w - p.x) / d.x);
+  if (d.x < -1e-6) best = Math.min(best, -p.x / d.x);
+  if (d.y > 1e-6) best = Math.min(best, (h - p.y) / d.y);
+  if (d.y < -1e-6) best = Math.min(best, -p.y / d.y);
+  return Number.isFinite(best) ? Math.max(0, best) : 0;
+}
+
+/**
+ * The arc between two screen angles, taking the short way round so the sweep
+ * always shows the angle actually being named.
+ */
+function arcBetween(ctx, cx, cy, r, a0, a1, color, text) {
+  let delta = (a1 - a0) % (Math.PI * 2);
+  if (delta > Math.PI) delta -= Math.PI * 2;
+  if (delta < -Math.PI) delta += Math.PI * 2;
+  angleArc(ctx, cx, cy, r, a0, a0 + delta, color, text);
+}
+
+/**
+ * A centred caption clamped onto the canvas. Everything the inspector labels
+ * is placed by the optics, so any of these can land past an edge -- which is
+ * a class of bug this project has already shipped twice.
+ */
+function tip(ctx, text, x, y, w, h, opts = {}) {
+  ctx.save();
+  ctx.font = opts.font || SMALL_FONT;
+  const half = ctx.measureText(text).width / 2 + 6;
+  ctx.restore();
+  const bottom = opts.bottom ?? h - 10;
+  label(ctx, text, O.clamp(x, half + 2, Math.max(half + 2, w - half - 2)),
+    O.clamp(y, 10, Math.max(10, bottom)), { align: 'center', font: SMALL_FONT, ...opts });
 }

@@ -56,10 +56,10 @@ app.js         assembly + render loop
 | `src/i18n.js` | Every user-facing string, cs and en. No component may contain a literal string. |
 | `src/state.js` | Application state, `set()`/`subscribe()`, `activeOrders()` (which reflection orders are currently traced). |
 | `src/ui.js` | `el()`, `slider()`/`toggle()`/`segmented()`/`select()` controls, canvas-fitting, drawing primitives. |
-| `src/rays.js` | `buildRays()` turns state into the current ray set; `colorFor()` is the wavelength→colour policy. |
+| `src/rays.js` | `buildRays()` turns state into the current ray set; `colorFor()` is the wavelength→colour policy; `bowBand()`/`colorAtPhi()`/`dropReport()` serve the many-droplets scene and its readout. |
 | `src/dropletView.js` | Mode A — single droplet cross-section, the observer eye(s), ray prominence. |
 | `src/graphView.js` | Exit-angle and angular-distribution plots. |
-| `src/dropsView.js` | Mode B — one droplet to ten thousand, observer-centred. |
+| `src/dropsView.js` | Mode B — one droplet to ten thousand, observer-centred; the per-droplet inspector. |
 | `src/skyView.js` | Mode C — 3-D cone/circle/horizon, orbit and eye camera. |
 | `src/panels.js` | Tutorial script, ray readout, mathematics panel, questions. |
 | `src/app.js` | Shell, controls, the reactive update pipeline (see below), render loop. |
@@ -235,6 +235,54 @@ origin, so anything lower would put the observer underground. Do not be
 tempted to anchor the ground to the observer instead: that was tried, and it
 made the ground ride upwards with them, burying the very thing rising is
 supposed to reveal — rain below eye level.
+
+## Inspecting one droplet, and where those numbers live
+
+`state.selectedDrop` holds the **world position** of a clicked droplet (not
+an index — turning the count down truncates the field, and `dropsView`'s
+`validateSelection()` drops a selection whose droplet no longer exists).
+
+Two consumers need the same geometry — `drawInspector()` draws it and
+`panels.js` tabulates it — so it is computed once, by `dropReport()` in
+`rays.js`, which is upstream of both. Two copies of "the angle from the
+antisolar direction" is exactly how a diagram ends up disagreeing with its
+own caption, and this project has already shipped that bug once. `rays.js`
+also owns `antisolarAxis()`, `bowBand()`/`bowBands()` and `colorAtPhi()`, so
+the per-droplet field test and the inspector share one definition of "which
+colour does a droplet seen at φ deliver", down to `BOW_MATCH_DEG`.
+
+Three things about the inspector are deliberate:
+
+- **The orders are fixed (`DROP_ORDERS = [1, 2, 3]`), not taken from the
+  `show.primary`/`show.secondary` toggles.** Those toggles say which bows the
+  *field* should highlight; an inspection asks what this droplet does with
+  the sunlight, and the honest answer includes the orders nobody can see.
+  k=3 earns its place: it leaves at φ ≈ 137.5°, i.e. ~42° from the *Sun*,
+  forward into the rain. Drawing that costs two lines and replaces a caption
+  that would otherwise have to assert it.
+- **φ is arced at the eye, Θ at the droplet.** φ is how far from the
+  antisolar point the observer must look; Θ is the turn the droplet puts into
+  the light. Swapping the vertices is the same class of error as the
+  `drawExitAngle()` bug below, and here the two arcs are on screen
+  simultaneously, so a swap is a visible contradiction rather than a subtle
+  one.
+- **Both exit directions are drawn, not just the one facing the eye.** In
+  three dimensions the concentrated light leaves on a cone; a cross-section
+  cuts it in two rays. Drawing only one would make the droplets above the
+  antisolar line look unexplained.
+
+The grey (non-contributing) droplets now emit those same engine-derived
+directions instead of a straight-through continuation. Every droplet
+concentrates light into the *same* two directions — parallel sunlight,
+identical spheres — so the grey rays come out exactly parallel to the
+coloured rays reaching the eye, and the picture makes the scene's own
+argument without a caption: the light is not missing, it is aimed elsewhere.
+The old undeviated ray corresponded to no ray the engine traces, which made
+it the last piece of fabricated geometry in the app.
+
+`show.angles` is offered in the drops scene only once a droplet is selected
+(a `when` predicate on its `VIS_TOGGLES` entry), which is why `controlsKey()`
+carries `state.selectedDrop`.
 
 ## The control column is scene-filtered, and the scene lists are assertions
 
@@ -446,9 +494,11 @@ driving the actual app:
 8. Interactions worth driving with synthetic pointer events after any change
    to them: dragging the single-droplet eye (must switch to manual mode and
    set φ from the pointer angle), clicking elsewhere on that canvas (must
-   still steer the impact parameter and leave φ alone), and dragging the
+   still steer the impact parameter and leave φ alone), dragging the
    many-droplets observer (must move only from the glyph, and clamp to
-   `OBS_RANGE`).
+   `OBS_RANGE`), and clicking a droplet in that scene (must select the
+   nearest within `PICK_RADIUS`, open the readout, and be released by a
+   click on empty sky, by turning the count down past it, and by Reset).
 
 ## Style notes specific to this repo
 

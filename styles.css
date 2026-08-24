@@ -501,6 +501,8 @@ select {
 }
 .math-table td { text-align: right; padding: 3px; color: var(--fg-dim); border-bottom: 1px solid rgba(120, 145, 190, 0.08); }
 .math-table td:first-child, .math-table th:first-child { text-align: left; }
+/* the reflection order that actually reaches the eye, in the droplet readout */
+.math-table tr.hit td { color: var(--accent); border-bottom-color: rgba(224, 168, 63, 0.35); }
 
 .qa { border-top: 1px solid var(--line); padding-top: 10px; margin-bottom: 6px; }
 .qa h3 { margin-top: 0; text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--fg); }

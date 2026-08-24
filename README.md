@@ -78,7 +78,7 @@ app.js         assembly + render loop
 | `src/rays.js` | Builds the current ray set; display colour policy. |
 | `src/dropletView.js` | Mode A — cross-section of one droplet, plus the observer eye(s). |
 | `src/graphView.js` | Exit-angle plot and angular-distribution plot. |
-| `src/dropsView.js` | Mode B — one droplet to ten thousand. |
+| `src/dropsView.js` | Mode B — one droplet to ten thousand, plus the per-droplet inspector. |
 | `src/skyView.js` | Mode C — 3-D cone, horizon, observer's eye view. |
 | `src/panels.js` | Tutorial, ray readout, mathematics, questions. |
 | `src/app.js` | Shell, controls, render loop. |
@@ -276,6 +276,43 @@ Sun being behind you is the precondition for seeing a bow at all. The ground
 stays where it is: it is a fixed plane, and rising above it is what puts rain
 below eye level.
 
+## Asking one droplet what it is doing
+
+Click any droplet in that scene and it is taken apart: the sunlight arriving
+along the one direction all sunlight arrives from, and then, for one, two and
+three internal reflections, the directions that droplet concentrates light
+into. The angle it is seen at (φ) is drawn as an arc **at the eye**, because
+that is where φ is measured; the angle the droplet turns the light through
+(Θ = 180° − φ) is drawn as an arc **at the droplet**, because that is where
+Θ is measured. The readout panel carries the same numbers as a table —
+θᵢ, the φ range from red to violet, Θ, and how far each order misses your eye
+by — and both come from the same function, so the picture and the table
+cannot drift apart.
+
+Three internal reflections are included precisely because you can never see
+them: that light leaves at φ ≈ 137.5°, which is about 42° *from the Sun* —
+forward into the rain, away from you. The tertiary bow is not missing from
+the sky opposite the Sun because the simulation stops at two bounces; it is
+missing because it goes the other way, and the same engine that puts the
+primary at 42.4° says so.
+
+### What the grey rays are
+
+Every droplet in the scene is lit, and every droplet concentrates that light
+into exactly the same two directions — the sunlight is parallel and the
+droplets are identical spheres, so nothing distinguishes one from another
+except where it happens to sit. The faint grey rays leaving the grey droplets
+are those directions, drawn from `rainbowGeometry` just like the coloured
+ones. They are parallel to the coloured rays reaching the eye, and that is
+the whole point: a grey droplet's light is not missing or weaker, it is aimed
+somewhere else. A droplet is green when one of those two fixed directions
+happens to end at your eye.
+
+(Earlier versions drew the grey rays continuing straight on through the
+droplet, undeviated. That was a stylised "and the light goes on", and it
+corresponded to no ray the engine actually traces — the only fabricated
+geometry left in the app. It is gone.)
+
 ## Interaction map
 
 The control column shows only what the current scene actually reads, so a
@@ -292,7 +329,9 @@ control that is on screen always does something when you move it.
   from 10 rays to 100 000.
 - **Many droplets** — green droplets are the ones sending light to the
   observer. They sit at every distance, which is the point. Drag the
-  observer and a different set of droplets takes over.
+  observer and a different set of droplets takes over. Click any droplet —
+  green or grey — to see every ray it sends out and every angle involved;
+  click empty sky to let it go.
 - **Sky 3-D** — drag to orbit, scroll to zoom. Switch to the observer's eye to
   see the circle cut by the horizon.
 

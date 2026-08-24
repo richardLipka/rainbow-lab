@@ -341,6 +341,27 @@ export const translations = {
     dropsLegendReaches: 'dosáhne oka pozorovatele',
     dropsLegendMisses: 'kapka je osvětlená, ale míjí — jiný úhel',
     dropsContributing: 'Kapek přispívajících pozorovateli',
+
+    /* ---- many droplets: inspecting one of them ---- */
+    dropsClickHint: 'Klepněte na kapku — uvidíte všechny její paprsky i úhly.',
+    dropsClearHint: 'Klepnutím mimo kapku výběr zrušíte.',
+    dropIncoming: 'sluneční světlo',
+    dropHits: 'φ {angle} — míří do oka',
+    dropMisses: 'φ {angle} — oko míjí',
+    dropInfo: 'Vybraná kapka',
+    dropSeenAt: 'Úhel od antisolárního směru φ',
+    dropDistanceRow: 'Vzdálenost od pozorovatele',
+    dropDistanceNote:
+      'Vzdálenost se ve výpočtu nikde neobjeví. Rozhoduje jen směr — proto duha není předmět na určitém místě.',
+    dropOrdersTitle: 'Kam kapka posílá soustředěné světlo',
+    dropDelivers: 'Do oka posílá {color} (k = {k}).',
+    dropDeliversNone: 'Do oka neposílá nic — nejbližší duhový směr míjí o {delta}.',
+    dropPhiThetaNote:
+      'Θ je úhel, o který kapka světlo stočí; φ = 180° − Θ je úhel, pod kterým musí být kapka vidět. V obrázku je proto Θ vyneseno u kapky a φ u oka.',
+    dropHigherNote:
+      'Třetí odraz vychází až u φ ≈ {phi}, tedy asi {fromSun} od Slunce — dopředu do deště, ne zpátky k pozorovateli. Proto terciární duhu na obloze proti Slunci nikdy nenajdete.',
+    dropInfoHint: 'Klepnutím na jinou kapku v obrázku vyberete jinou.',
+    dropClear: 'Zrušit výběr',
     animateDrops: 'Animovat přibývání',
 
     /* ---- sky scene ---- */
@@ -700,6 +721,27 @@ export const translations = {
     dropsLegendReaches: 'reaches the observer’s eye',
     dropsLegendMisses: 'lit too, but misses — wrong angle',
     dropsContributing: 'Droplets reaching the observer',
+
+    /* ---- many droplets: inspecting one of them ---- */
+    dropsClickHint: 'Click a droplet to see every ray it sends out, and at what angle.',
+    dropsClearHint: 'Click empty sky to clear the selection.',
+    dropIncoming: 'sunlight',
+    dropHits: 'φ {angle} — reaches the eye',
+    dropMisses: 'φ {angle} — misses the eye',
+    dropInfo: 'Selected droplet',
+    dropSeenAt: 'Angle from the antisolar direction φ',
+    dropDistanceRow: 'Distance from the observer',
+    dropDistanceNote:
+      'Distance appears nowhere in the test. Only the direction counts — which is why a rainbow is not an object sitting in a place.',
+    dropOrdersTitle: 'Where this droplet sends its concentrated light',
+    dropDelivers: 'Delivers {color} to your eye (k = {k}).',
+    dropDeliversNone: 'Delivers nothing to your eye — the nearest bow direction misses by {delta}.',
+    dropPhiThetaNote:
+      'Θ is the angle the droplet turns the light through; φ = 180° − Θ is the angle the droplet has to be seen at. So the figure draws Θ at the droplet and φ at the eye.',
+    dropHigherNote:
+      'The third reflection only comes out at φ ≈ {phi}, about {fromSun} from the Sun — forward into the rain, not back towards the observer. That is why you never find a tertiary bow in the sky opposite the Sun.',
+    dropInfoHint: 'Click another droplet in the figure to select that one instead.',
+    dropClear: 'Clear selection',
     animateDrops: 'Animate accumulation',
 
     /* ---- sky scene ---- */

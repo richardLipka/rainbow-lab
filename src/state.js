@@ -99,6 +99,12 @@ export const state = {
 
   /* selection */
   selectedRay: null,
+
+  /* The droplet the reader has clicked on in the many-droplets scene, as
+     world coordinates ({x, y}), or null. Held as a position rather than an
+     index because the droplet field is regenerated whenever the count or the
+     spread changes; dropsView re-validates it against the field. */
+  selectedDrop: null,
 };
 
 /** Wavelengths currently in play: one, or all six for white light. */

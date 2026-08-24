@@ -6,7 +6,7 @@ import * as O from './optics.js';
 import { state, set, indexModel, activeLambdas } from './state.js';
 import { t, deg, num, CLASS_KEY, CLASS_EXPLAIN } from './i18n.js';
 import { el, row, segmented } from './ui.js';
-import { traceOne, distanceFromExtremum } from './rays.js';
+import { traceOne, distanceFromExtremum, dropReport, colorIdFor } from './rays.js';
 
 /* ==========================================================================
  * Tutorial
@@ -322,7 +322,78 @@ function rayInfoNodes(opts = {}) {
   return nodes.filter(Boolean);
 }
 
-const renderRayInfo = () => rayInfoNodes();
+/* ==========================================================================
+ * Droplet readout (many droplets)
+ * ======================================================================== */
+
+/** Which classification badge a delivered order deserves. */
+const ORDER_CLASS = { 1: 'primary', 2: 'secondary' };
+
+/**
+ * The numbers behind one clicked droplet.
+ *
+ * Everything comes from dropReport(), the same call the canvas draws from,
+ * so the table and the picture cannot end up disagreeing about which order
+ * reaches the eye or by how much the others miss.
+ */
+function dropInfoNodes() {
+  const rep = dropReport(state.selectedDrop);
+  const hit = rep.hit;
+  const missBy = rep.bands.length ? Math.min(...rep.bands.map((b) => Math.abs(b.delta))) : null;
+  const third = rep.bands.find((b) => b.k === 3);
+  const thirdRef = third ? third.angles.find((a) => a.lambda === 650) || third.angles[0] : null;
+
+  return [
+    el('h2', {}, t('dropInfo')),
+    el('div', { class: 'panel-block' },
+      row('dropSeenAt', rep.phiSeen === null ? '—' : deg(rep.phiSeen, 2)),
+      row('dropDistanceRow', num(rep.distance, 3))
+    ),
+    el('p', { class: 'note' }, t('dropDistanceNote')),
+
+    el('h3', {}, t('dropOrdersTitle')),
+    el('table', { class: 'math-table' },
+      el('thead', {}, el('tr', {},
+        el('th', {}, 'k'), el('th', {}, 'θᵢ'), el('th', {}, 'φ'), el('th', {}, 'Θ'), el('th', {}, 'Δφ'))),
+      el('tbody', {},
+        rep.bands.map((b) => {
+          const ref = b.angles.find((a) => a.lambda === 650) || b.angles[0];
+          return el('tr', { class: b.reaches ? 'hit' : null },
+            el('td', {}, String(b.k)),
+            el('td', {}, num(ref.geo.thetaIDeg, 1)),
+            el('td', {}, `${num(b.lo, 1)}–${num(b.hi, 1)}`),
+            el('td', {}, num(180 - ref.phi, 1)),
+            el('td', {}, b.delta === null ? '—' : `${b.delta >= 0 ? '+' : ''}${num(b.delta, 2)}`));
+        }))),
+
+    el('div', { class: `classification cls-${hit ? ORDER_CLASS[hit.k] || 'higherOrder' : 'nonCaustic'}` },
+      hit
+        ? t('dropDelivers', { color: t(colorIdFor(hit.nearest.lambda) || 'red'), k: hit.k })
+        : t('dropDeliversNone', { delta: missBy === null ? '—' : deg(missBy, 2) })),
+
+    el('p', { class: 'note' }, t('dropPhiThetaNote')),
+    thirdRef
+      ? el('p', { class: 'note' }, t('dropHigherNote', {
+          phi: deg(thirdRef.phi, 1), fromSun: deg(180 - thirdRef.phi, 1),
+        }))
+      : null,
+    el('button', {
+      class: 'btn wide', type: 'button',
+      onclick: () => set({ selectedDrop: null, panel: 'guide' }),
+    }, t('dropClear')),
+    el('p', { class: 'hint' }, t('dropInfoHint')),
+  ].filter(Boolean);
+}
+
+/**
+ * The many-droplets scene steers no single ray, so its readout is about the
+ * droplet the reader clicked instead.
+ */
+function renderRayInfo() {
+  if (state.scene !== 'drops') return rayInfoNodes();
+  if (state.selectedDrop) return dropInfoNodes();
+  return [el('h2', {}, t('dropInfo')), el('p', { class: 'hint' }, t('dropsClickHint'))];
+}
 
 /* ==========================================================================
  * Mathematics

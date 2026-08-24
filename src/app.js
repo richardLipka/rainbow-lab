@@ -410,7 +410,13 @@ const VIS_TOGGLES = [
   { scenes: ['drops', 'sky'], key: 'ground', labelKey: 'showGround' },
   { scenes: ['drops'], key: 'droplets', labelKey: 'showDroplets' },
   { scenes: ['droplet'], key: 'normals', labelKey: 'showNormals' },
-  { scenes: ['droplet'], key: 'angles', labelKey: 'showAngles' },
+  // The many-droplets scene reads show.angles only for the phi/Theta arcs of
+  // an inspected droplet, so it is offered there only once one is picked --
+  // a toggle with nothing to toggle teaches that the scene is decorative.
+  {
+    scenes: ['droplet', 'drops'], key: 'angles', labelKey: 'showAngles',
+    when: () => state.scene !== 'drops' || !!state.selectedDrop,
+  },
   { scenes: ALL, key: 'labels', labelKey: 'showLabels' },
   { scenes: ['droplet', 'sky'], key: 'wavelengthLabels', labelKey: 'showWavelengthLabels' },
   { scenes: ['sky'], key: 'alexander', labelKey: 'showAlexander' },
@@ -616,7 +622,7 @@ function buildControls() {
     /* --- what is drawn --- */
     sceneGroup('visualization', [
       c(ALL, () => el('div', { class: 'grid2' },
-        ...VIS_TOGGLES.filter((v) => v.scenes.includes(state.scene))
+        ...VIS_TOGGLES.filter((v) => v.scenes.includes(state.scene) && (!v.when || v.when()))
           .map((v) => showToggle(v.key, v.labelKey)))),
       c(['drops', 'sky'], () => el('small', { class: 'ctl-hint block' }, t('fullCircleNote'))),
       c(['sky'], () => toggle('showRenderedBow', () => state.show.renderedBow,
@@ -708,7 +714,7 @@ function resetState() {
     dropCount: 1, dropsAnimate: false,
     sunElevation: 15, sunAzimuth: 180, observerHeight: 1.7,
     view: 'orbit', camYaw: -35, camPitch: 14, camDist: 3.1,
-    eyeAzimuth: 0, eyeElevation: 12, fov: 75, selectedRay: null,
+    eyeAzimuth: 0, eyeElevation: 12, fov: 75, selectedRay: null, selectedDrop: null,
     show: {
       normals: false, angles: true, labels: true, wavelengthLabels: false,
       droplets: true, cone: true, antisolar: true, horizon: true, ground: true,
@@ -762,7 +768,7 @@ function rebuild() {
  * switching scenes left the previous scene's controls sitting there.
  */
 function controlsKey() {
-  return `${state.scene}|${state.view}|${state.observerMode}|${state.mode}|${state.step}`;
+  return `${state.scene}|${state.view}|${state.observerMode}|${state.mode}|${state.step}|${state.selectedDrop ? 1 : 0}`;
 }
 
 /**
@@ -792,11 +798,21 @@ function panelKey() {
     : '';
   const mathPart =
     state.panel === 'math' ? `${state.reflections}|${state.dispersion}|${state.indexMode}|${state.indexScale}` : '';
+  // The many-droplets readout is about a clicked droplet, so it moves with
+  // the droplet, the observer, the Sun and the index model -- everything
+  // dropReport() reads.
+  const dropPart =
+    state.scene === 'drops' && state.panel === 'ray'
+      ? (() => {
+          const d = state.selectedDrop;
+          return `${d ? `${d.x.toFixed(4)},${d.y.toFixed(4)}` : '-'}|${state.sunElevation}|${state.dropsObserverX}|${state.dropsObserverY}|${state.dispersion}|${state.indexMode}|${state.indexScale}`;
+        })()
+      : '';
   const guidePart =
     state.mode === 'free' && state.panel === 'guide'
       ? `${state.dispersion}|${state.indexMode}|${state.indexScale}|${state.show.renderedBow}`
       : '';
-  return `${state.panel}|${state.step}|${rayPart}|${mathPart}|${guidePart}`;
+  return `${state.panel}|${state.scene}|${state.step}|${rayPart}|${mathPart}|${dropPart}|${guidePart}`;
 }
 
 let trackedGraph = state.graph;
