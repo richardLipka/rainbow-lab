@@ -18,6 +18,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 /** Dependency order matters: a module may only use names defined above it. */
 const ORDER = [
   'optics.js',
+  'assets.js',
   'i18n.js',
   'state.js',
   'ui.js',

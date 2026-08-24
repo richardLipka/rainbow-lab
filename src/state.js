@@ -32,6 +32,17 @@ export const state = {
      fan of colour becomes visible on its way to the eye. */
   dropletZoom: 1,
 
+  /* Where the single-droplet observer's eye sits.
+     'auto'   -- one eye per active reflection family, each exactly along its
+                 own rainbow direction (the app tells you where to stand).
+     'manual' -- one eye at state.observerPhi, so the angle is the thing the
+                 user steers and ~42 deg is something they find rather than
+                 something they are shown. In manual mode a ray is emphasised
+                 when it really does point at THAT eye, so the emphasis is a
+                 geometric consequence of where the eye is, not a label. */
+  observerMode: 'auto', // 'auto' | 'manual'
+  observerPhi: 42.4, // antisolar angle (deg) of the manually placed eye
+
   /* rays */
   showNonRainbow: false,
   families: { 0: false, 1: true, 2: false, 3: false },
@@ -45,6 +56,14 @@ export const state = {
   /* many droplets */
   dropCount: 1,
   dropsAnimate: false,
+
+  /* Where the observer stands inside the rain, in the same world units the
+     droplet field uses: +x points away from the Sun (deeper into the rain),
+     +y is up. Moving it re-tests every droplet at its new angle, so a
+     completely different set of droplets delivers the bow -- which is the
+     one thing that scene exists to demonstrate. */
+  dropsObserverX: 0,
+  dropsObserverY: 0,
 
   /* sky / observer */
   sunElevation: 15,

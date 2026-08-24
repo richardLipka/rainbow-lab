@@ -10,16 +10,31 @@
 import * as O from './optics.js';
 import { state, set, activeLambdas, indexModel } from './state.js';
 import { t, num } from './i18n.js';
-import { fitCanvas, strokePath, label } from './ui.js';
+import { fitCanvas, strokePath, label, capture } from './ui.js';
 import { colorFor } from './rays.js';
 
 const MAX_DRAWN_RAYS = 34;
 const MAX_DRAWN_GREY_RAYS = 16;
 
+/**
+ * How far the observer may wander, in world units. Shared with app.js so the
+ * sliders and the drag clamp cannot disagree.
+ *
+ * The downward range is deliberately small: the ground is a fixed plane in
+ * this cross-section, and its shallowest setting sits 0.128 world units below
+ * the origin, so anything lower would put the observer underground. Up is the
+ * interesting direction anyway -- rising is what puts rain below eye level.
+ */
+export const OBS_RANGE = { x: [-0.28, 0.72], y: [-0.1, 0.3] };
+
+/** p offset by k world units along the unit direction d. */
+const off = (p, d, k) => ({ x: p.x + d.x * k, y: p.y + d.y * k });
+
 export function createDropsView(canvas) {
   let drops = [];
   let seedKey = '';
   let layout = null;
+  let grabbing = false; // pointer is over (or holding) the observer handle
 
   function makeKey() {
     return `${state.dropCount}|${state.show.rainBelow}`;
@@ -82,8 +97,16 @@ export function createDropsView(canvas) {
     const ox = w * 0.1;
     const oy = h * 0.52;
     const s = Math.min(w * 0.82, h * 1.25);
-    layout = { ox, oy, s };
+    // Where the observer is STANDING, in the same world units the droplet
+    // field uses. The rain does not move; the observer does. Every droplet is
+    // re-tested at its new angle, so moving here hands the bow to a
+    // completely different set of droplets -- which is the one thing this
+    // scene exists to show, and something a fixed observer could only assert
+    // in a caption.
+    const obs = { x: state.dropsObserverX, y: state.dropsObserverY };
+    layout = { ox, oy, s, obs };
     const P = (p) => ({ x: ox + p.x * s, y: oy - p.y * s });
+    const o = P(obs);
 
     const alpha = state.sunElevation;
     const anti = { x: Math.cos(alpha * O.RAD), y: -Math.sin(alpha * O.RAD) };
@@ -95,21 +118,26 @@ export function createDropsView(canvas) {
     // literally the direction every ray of incoming light travels along. It
     // also makes the Sun's position explicit rather than leaving it floating
     // near the observer with no visible connection to anything.
-    strokePath(ctx, [P({ x: sun.x * 1.4, y: sun.y * 1.4 }), P({ x: anti.x * 1.4, y: anti.y * 1.4 })],
+    strokePath(ctx, [P(off(obs, sun, 1.4)), P(off(obs, anti, 1.4))],
       'rgba(255,225,160,0.28)', 1, [5, 5]);
     if (state.show.labels) {
-      const e = P({ x: anti.x * 1.2, y: anti.y * 1.2 });
-      label(ctx, t('antisolarPoint'), e.x, e.y - 12, { align: 'center', color: '#9fb4d8' });
+      // Pulled back onto the canvas when the antisolar direction runs off the
+      // right edge -- which it does at every observer position, since the
+      // droplet field already fills that side. The dashed axis carries the
+      // true direction; the label only has to name what is out there.
+      const e = P(off(obs, anti, 1.2));
+      const ex = Math.min(e.x, w - 12);
+      label(ctx, t('antisolarPoint'), ex, e.y - 12, {
+        align: ex < e.x ? 'right' : 'center', color: '#9fb4d8',
+      });
     }
 
     // the two directions that can deliver bow light, in this cross-section
     for (const band of bs) {
       for (const sign of [1, -1]) {
         for (const edge of [band.lo, band.hi]) {
-          const a = (alpha * -1 + sign * edge) * O.RAD;
-          const d = { x: Math.cos(a) * (sign > 0 ? 1 : 1), y: Math.sin(a) };
           const dir = rotate(anti, sign * edge * O.RAD);
-          strokePath(ctx, [P({ x: 0, y: 0 }), P({ x: dir.x * 1.35, y: dir.y * 1.35 })],
+          strokePath(ctx, [o, P(off(obs, dir, 1.35))],
             band.k === 1 ? 'rgba(111,211,164,0.22)' : 'rgba(155,140,240,0.2)', 1,
             band.k === 1 ? [3, 4] : [2, 5]);
         }
@@ -139,9 +167,13 @@ export function createDropsView(canvas) {
     const greyPath = new Path2D();
     let greyCount = 0;
     for (const d of drops) {
-      const len = Math.hypot(d.x, d.y);
+      // Angles are measured FROM THE OBSERVER, so this is the only place the
+      // observer's position enters the physics -- and it is enough to change
+      // which droplets qualify.
+      const rel = { x: d.x - obs.x, y: d.y - obs.y };
+      const len = Math.hypot(rel.x, rel.y);
       if (len < 1e-6) continue;
-      const dir = { x: d.x / len, y: d.y / len };
+      const dir = { x: rel.x / len, y: rel.y / len };
       const phi = Math.acos(O.clamp(dir.x * anti.x + dir.y * anti.y, -1, 1)) * O.DEG;
       const hitc = colorAt(phi, bs);
       const q = P(d);
@@ -161,7 +193,7 @@ export function createDropsView(canvas) {
           // the ray that actually reaches the eye -- dashed for the
           // secondary bow (k=2), solid for the primary (k=1), the same
           // convention used everywhere else in the app for the two orders
-          strokePath(ctx, [q, P({ x: 0, y: 0 })], colorFor(hitc.lambda, 0.6), 1,
+          strokePath(ctx, [q, o], colorFor(hitc.lambda, 0.6), 1,
             hitc.k === 2 ? [4, 3] : null);
         }
       } else if (state.show.droplets) {
@@ -193,8 +225,7 @@ export function createDropsView(canvas) {
       ctx.fill(greyPath);
     }
 
-    // observer
-    const o = P({ x: 0, y: 0 });
+    // observer -- drawn as a grabbable handle, since it is one
     ctx.save();
     ctx.fillStyle = '#e8eefc';
     ctx.beginPath();
@@ -206,6 +237,15 @@ export function createDropsView(canvas) {
     ctx.arc(o.x, o.y, 10, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
+    if (grabbing) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(232,238,252,0.8)';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(o.x, o.y, 16, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
     if (state.show.labels) label(ctx, t('observerLabel'), o.x, o.y + 22, { align: 'center', color: '#e8eefc' });
 
     // Sun icon, at a small FIXED pixel distance from the observer in the
@@ -219,16 +259,18 @@ export function createDropsView(canvas) {
     // the true far-away direction; the icon only needs to sit clearly,
     // legibly, and in the right direction close to the observer, the same
     // way the single-droplet view's own Sun icon is a fixed screen element
-    // rather than a geometrically "correct" distance.
+    // rather than a geometrically "correct" distance. It is anchored to the
+    // observer, so it travels with them -- the Sun stays behind whoever is
+    // looking, which is the whole precondition for seeing a bow at all.
     const sunScreenDir = { x: sun.x, y: -sun.y };
     const sunMargin = 14;
     let sunDist = 70;
-    if (sunScreenDir.x < -1e-6) sunDist = Math.min(sunDist, (ox - sunMargin) / -sunScreenDir.x);
-    if (sunScreenDir.x > 1e-6) sunDist = Math.min(sunDist, (w - ox - sunMargin) / sunScreenDir.x);
-    if (sunScreenDir.y < -1e-6) sunDist = Math.min(sunDist, (oy - sunMargin) / -sunScreenDir.y);
-    if (sunScreenDir.y > 1e-6) sunDist = Math.min(sunDist, (h - oy - sunMargin) / sunScreenDir.y);
+    if (sunScreenDir.x < -1e-6) sunDist = Math.min(sunDist, (o.x - sunMargin) / -sunScreenDir.x);
+    if (sunScreenDir.x > 1e-6) sunDist = Math.min(sunDist, (w - o.x - sunMargin) / sunScreenDir.x);
+    if (sunScreenDir.y < -1e-6) sunDist = Math.min(sunDist, (o.y - sunMargin) / -sunScreenDir.y);
+    if (sunScreenDir.y > 1e-6) sunDist = Math.min(sunDist, (h - o.y - sunMargin) / sunScreenDir.y);
     sunDist = Math.max(24, sunDist);
-    const sp = { x: ox + sunScreenDir.x * sunDist, y: oy + sunScreenDir.y * sunDist };
+    const sp = { x: o.x + sunScreenDir.x * sunDist, y: o.y + sunScreenDir.y * sunDist };
     const sg = ctx.createRadialGradient(sp.x, sp.y, 2, sp.x, sp.y, 26);
     sg.addColorStop(0, 'rgba(255,238,180,0.9)');
     sg.addColorStop(1, 'rgba(255,210,90,0)');
@@ -272,13 +314,19 @@ export function createDropsView(canvas) {
       });
 
       const smallFont = '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif';
-      label(ctx, t('dropsHint'), 12, h - 30, { color: '#8ea3c6', font: smallFont });
-      label(ctx, t('dropsSunHint'), 12, h - 14, { color: '#e0a83f', font: smallFont });
+      label(ctx, t('dropsHint'), 12, h - 46, { color: '#8ea3c6', font: smallFont });
+      label(ctx, t('dropsSunHint'), 12, h - 30, { color: '#e0a83f', font: smallFont });
+      label(ctx, t('dropsMoveHint'), 12, h - 14, { color: '#9fd8bd', font: smallFont });
     }
   }
 
   function groundY() {
-    // observer height in metres mapped onto the scene, purely for legibility
+    // Observer height in metres, mapped onto the scene purely for legibility.
+    // Anchored in WORLD coordinates, not to the observer: tying it to the
+    // observer made the ground ride upwards with them, which buried the very
+    // thing rising is supposed to reveal -- rain below eye level. The ground
+    // is a fixed plane and the observer moves relative to it, which is also
+    // why OBS_RANGE cannot let them descend past it.
     const hm = state.observerHeight;
     return -Math.min(0.55, 0.06 + Math.log10(1 + hm) * 0.16);
   }
@@ -307,7 +355,58 @@ export function createDropsView(canvas) {
     seedKey = '';
   }
 
-  canvas.addEventListener('pointerdown', () => set({ panel: 'guide' }));
+  /* ------------------------------------------------------- interaction -- */
+
+  /** Screen position of the observer, from the last frame's layout. */
+  function obsScreen() {
+    return { x: layout.ox + layout.obs.x * layout.s, y: layout.oy - layout.obs.y * layout.s };
+  }
+
+  function obsFromEvent(e) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      dropsObserverX: O.clamp((e.clientX - rect.left - layout.ox) / layout.s, ...OBS_RANGE.x),
+      dropsObserverY: O.clamp((layout.oy - (e.clientY - rect.top)) / layout.s, ...OBS_RANGE.y),
+    };
+  }
+
+  function near(e, p, r) {
+    const rect = canvas.getBoundingClientRect();
+    return Math.hypot(e.clientX - rect.left - p.x, e.clientY - rect.top - p.y) < r;
+  }
+
+  // Only the observer glyph is a drag handle -- a click anywhere else stays a
+  // plain click. Teleporting the observer to wherever the canvas happened to
+  // be tapped would make the readout jump for reasons the user did not ask
+  // for, and the sliders in the control column cover precise placement.
+  let dragging = false;
+  canvas.addEventListener('pointerdown', (e) => {
+    if (layout && near(e, obsScreen(), 18)) {
+      dragging = true;
+      grabbing = true;
+      capture(canvas, e);
+      return;
+    }
+    set({ panel: 'guide' });
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!layout) return;
+    if (dragging) {
+      set(obsFromEvent(e));
+      return;
+    }
+    const over = near(e, obsScreen(), 18);
+    if (over !== grabbing) {
+      grabbing = over;
+      canvas.style.cursor = over ? 'grab' : 'default';
+      draw();
+    }
+  });
+  const stopDrag = () => {
+    dragging = false;
+  };
+  canvas.addEventListener('pointerup', stopDrag);
+  canvas.addEventListener('pointercancel', stopDrag);
 
   return { draw, tick, reset };
 }

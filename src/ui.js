@@ -28,13 +28,21 @@ export const clear = (node) => {
   return node;
 };
 
-/** A titled, collapsible group of controls. */
+/**
+ * A titled, collapsible group of controls. Pass `{ collapsed: true }` as the
+ * LAST argument to have it start closed -- for the knobs that must stay
+ * reachable but that most readers never touch.
+ */
 export function group(titleKey, ...children) {
-  const body = el('div', { class: 'group-body' }, ...children);
+  let opts = {};
+  const last = children[children.length - 1];
+  if (last && typeof last === 'object' && !last.nodeType) opts = children.pop();
+  const shut = !!opts.collapsed;
+  const body = el('div', { class: 'group-body' + (shut ? ' collapsed' : '') }, ...children);
   const head = el(
     'button',
     {
-      class: 'group-head',
+      class: 'group-head' + (shut ? ' closed' : ''),
       type: 'button',
       onclick: () => {
         const open = body.classList.toggle('collapsed');
@@ -84,6 +92,9 @@ export function slider(opts) {
     input,
     opts.hintKey ? el('small', { class: 'ctl-hint' }, t(opts.hintKey)) : null
   );
+  // The translation key doubles as a stable id, so the tutorial can point at
+  // a control without matching on its displayed text.
+  node.dataset.ctl = opts.labelKey;
   node.sync = () => {
     const v = opts.get();
     if (document.activeElement !== input) input.value = String(v);
@@ -106,6 +117,7 @@ export function toggle(labelKey, get, onChange, opts = {}) {
     el('span', {}, t(labelKey)),
     opts.swatch ? el('i', { class: 'swatch', style: `background:${opts.swatch}` }) : null
   );
+  node.dataset.ctl = labelKey;
   node.sync = () => {
     input.checked = !!get();
   };
@@ -150,6 +162,7 @@ export function select(labelKey, options, get, onChange) {
     )
   );
   const node = el('label', { class: 'ctl' }, el('span', { class: 'ctl-label' }, t(labelKey)), sel);
+  node.dataset.ctl = labelKey;
   node.sync = () => {
     sel.value = String(read());
   };
@@ -167,9 +180,22 @@ export function row(labelKey, value, opts = {}) {
   );
 }
 
+/**
+ * Device pixels per CSS pixel to render at, overriding the screen's own.
+ * Set only for the duration of a PNG export and then cleared.
+ *
+ * Every view draws in CSS pixels and lets the canvas transform do the rest,
+ * so raising this costs exactly one redraw and yields a genuinely
+ * higher-resolution figure -- not an upscaled screen grab.
+ */
+let renderScale = null;
+export function setRenderScale(s) {
+  renderScale = s;
+}
+
 /** Canvas that keeps its backing store matched to the CSS size and DPR. */
 export function fitCanvas(canvas) {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const dpr = renderScale || Math.min(window.devicePixelRatio || 1, 2);
   const rect = canvas.getBoundingClientRect();
   const w = Math.max(1, Math.round(rect.width * dpr));
   const h = Math.max(1, Math.round(rect.height * dpr));
@@ -220,6 +246,20 @@ export function label(ctx, text, x, y, opts = {}) {
   ctx.fillStyle = opts.color || '#dfe6f5';
   ctx.fillText(text, x, y);
   ctx.restore();
+}
+
+/**
+ * Take pointer capture, tolerating a pointer id the element cannot claim.
+ * setPointerCapture throws NotFoundError for an id that is no longer active,
+ * and it is called before the drag state is set up, so an unguarded throw
+ * takes the whole gesture with it.
+ */
+export function capture(canvas, e) {
+  try {
+    canvas.setPointerCapture(e.pointerId);
+  } catch {
+    /* capture is a convenience, not a precondition for dragging */
+  }
 }
 
 /** Arrow head at `to`, pointing along (to - from). */

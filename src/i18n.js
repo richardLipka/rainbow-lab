@@ -250,21 +250,67 @@ export const translations = {
     s5title: 'Zkuste jiné paprsky',
     s5body:
       'Projděte celý rozsah parametru dopadu a dívejte se na graf dole. Výstupní úhel není konstantní — ale ani nestoupá donekonečna.',
-    s6title: 'Proč existuje jasný směr?',
-    s6body:
-      'Křivka má extrém. V jeho okolí je skoro plochá, takže mnoho různých vstupních paprsků odchází téměř stejným směrem. Přepněte graf na rozdělení paprsků a přidávejte je.',
-    s7title: 'Teď přidejte tisíce kapek',
+    s7title: 'Proč existuje jasný směr?',
     s7body:
-      'Každá kapka dělá totéž. K pozorovateli se dostane světlo jen od těch kapek, které leží ve správném úhlu. Zapněte přidávání kapek.',
-    s8title: 'Proč je to oblouk?',
+      'Křivka má extrém. V jeho okolí je skoro plochá, takže mnoho různých vstupních paprsků odchází téměř stejným směrem. Přepněte graf na rozdělení paprsků a přidávejte je.',
+    s8title: 'Teď přidejte tisíce kapek',
     s8body:
-      'Ve třech rozměrech tvoří všechny takové směry kužel kolem antisolárního bodu. Průnik kužele s oblohou je kružnice. Zapněte horizont a dolní část zmizí.',
-    s9title: 'Odkud jsou barvy?',
-    s9body:
-      'Index lomu vody závisí na vlnové délce. Posuňte disperzi z 0 % na 100 % a sledujte, jak se jediný úhel rozpadne na pás barev.',
-    s10title: 'Může být duh víc?',
+      'Každá kapka dělá totéž. K pozorovateli se dostane světlo jen od těch kapek, které leží ve správném úhlu. Zapněte přidávání kapek.',
+    s10title: 'Proč je to oblouk?',
     s10body:
+      'Ve třech rozměrech tvoří všechny takové směry kužel kolem antisolárního bodu. Průnik kužele s oblohou je kružnice. Zapněte horizont a dolní část zmizí.',
+    s11title: 'Odkud jsou barvy?',
+    s11body:
+      'Index lomu vody závisí na vlnové délce. Posuňte disperzi z 0 % na 100 % a sledujte, jak se jediný úhel rozpadne na pás barev.',
+    s12title: 'Může být duh víc?',
+    s12body:
       'Nastavte dva vnitřní odrazy. Vznikne slabší duha s větším poloměrem a obráceným pořadím barev. Mezi nimi zůstane Alexandrův temný pás.',
+
+/* ---- controls: the observer ---- */
+    observerGroup: 'Pozorovatel',
+    observerPlacement: 'Umístění oka',
+    observerAuto: 'automaticky',
+    observerManual: 'ručně',
+    observerAngle: 'Úhel pozorovatele φ',
+    observerAngleHint:
+      'Kam se pozorovatel postaví, měřeno od antisolárního směru. Táhněte okem přímo v obrázku nebo tímto posuvníkem a hledejte úhel, ve kterém do oka dorazí nejvíc paprsků.',
+    observerSnap: 'Na duhu',
+    observerDepth: 'Pozorovatel — dopředu / dozadu',
+    observerRise: 'Pozorovatel — nahoru / dolů',
+    observerMoveHint:
+      'Posunutím pozorovatele se změní úhly ke všem kapkám, takže duhu začne tvořit jiná skupina kapek. Pozorovatele lze také přetáhnout myší v obrázku.',
+    observerRecentre: 'Zpět na výchozí',
+    indexGroup: 'Index lomu (pokročilé)',
+    observerOnBow: '✓ přesně na duze',
+    observerManualHint:
+      'Zvýrazněné paprsky vycházejí právě pod úhlem, na kterém stojí oko. Čím víc jich je, tím jasnější je ten směr.',
+    dropsMoveHint: 'Přetáhněte pozorovatele — duha se přesune s vámi na jiné kapky.',
+    obsChipForward: 'dál do deště',
+    obsChipUp: 'výš',
+    obsChipDown: 'níž',
+
+    /* ---- tutorial: the two observer steps ---- */
+    s6title: 'Kde musí pozorovatel stát?',
+    s6body:
+      'Oko je teď na vás. Táhněte jím po obrázku (nebo použijte posuvník úhlu) a sledujte počítadlo paprsků vpravo nahoře. Ve většině úhlů dorazí do oka jeden nebo dva paprsky. V jednom jediném úhlu jich dorazí celý svazek — a právě pod tím úhlem vidíme duhu.',
+    explObserverAngle:
+      'Úhel φ se měří u pozorovatele: mezi pohledem na kapku a antisolárním směrem, tedy směrem, kterým slunečné světlo letělo dál. Je to přesně to samé φ, které ukazuje výpis u výstupu paprsku.',
+    s9title: 'Duha není na jednom místě',
+    s9body:
+      'Kapky se teď nezmění ani o jednu. Změní se jen to, kde stojíte. Posuňte pozorovatele — a duhu začne tvořit úplně jiná skupina kapek, protože rozhoduje výhradně úhel, pod kterým je vidíte.',
+    explBowFollowsYou:
+      'Proto k duze nelze dojít a proto ji každý vidí na jiných kapkách. Vaše duha je jen vaše.',
+    explDispersionZoom:
+      'Oddálením se kapka zmenší, ale úhlový rozestup barev zůstane stejný — proto se z jednoho paprsku stane viditelně barevný vějíř.',
+
+/* ---- export & footer ---- */
+    exportPng: 'Uložit PNG',
+    exportPngHint: 'Uloží tento obrázek ve trojnásobném rozlišení, včetně popisku.',
+    exportWorking: 'ukládám…',
+    exportSaved: 'uloženo',
+    exportDeclined: 'zrušeno',
+    exportFailed: 'nepodařilo se uložit',
+    favFaculty: 'Fakulta aplikovaných věd, Západočeská univerzita v Plzni',
 
     /* ---- quiz ---- */
     quiz: 'Otázky',
@@ -563,21 +609,67 @@ export const translations = {
     s5title: 'Try different incoming rays',
     s5body:
       'Sweep the whole range of the impact parameter and watch the graph below. The exit angle is not constant — but it does not grow without limit either.',
-    s6title: 'Why is there a bright direction?',
-    s6body:
-      'The curve has an extremum. Near it the curve is almost flat, so many different incoming rays leave in almost the same direction. Switch the graph to the ray distribution and add rays.',
-    s7title: 'Now add thousands of droplets',
+    s7title: 'Why is there a bright direction?',
     s7body:
-      'Every droplet does the same thing. Light reaches the observer only from those droplets that lie at the right angle. Turn on droplet accumulation.',
-    s8title: 'Why does it look like an arc?',
+      'The curve has an extremum. Near it the curve is almost flat, so many different incoming rays leave in almost the same direction. Switch the graph to the ray distribution and add rays.',
+    s8title: 'Now add thousands of droplets',
     s8body:
-      'In three dimensions all those directions form a cone around the antisolar point. The cone meets the sky in a circle. Switch the horizon on and the lower part disappears.',
-    s9title: 'Where do the colors come from?',
-    s9body:
-      "Water's refractive index depends on wavelength. Move dispersion from 0 % to 100 % and watch a single angle split into a band of colours.",
-    s10title: 'Can there be another rainbow?',
+      'Every droplet does the same thing. Light reaches the observer only from those droplets that lie at the right angle. Turn on droplet accumulation.',
+    s10title: 'Why does it look like an arc?',
     s10body:
+      'In three dimensions all those directions form a cone around the antisolar point. The cone meets the sky in a circle. Switch the horizon on and the lower part disappears.',
+    s11title: 'Where do the colors come from?',
+    s11body:
+      "Water's refractive index depends on wavelength. Move dispersion from 0 % to 100 % and watch a single angle split into a band of colours.",
+    s12title: 'Can there be another rainbow?',
+    s12body:
       "Set two internal reflections. A fainter bow appears with a larger radius and reversed colour order, with Alexander's dark band between them.",
+
+/* ---- controls: the observer ---- */
+    observerGroup: 'Observer',
+    observerPlacement: 'Eye placement',
+    observerAuto: 'automatic',
+    observerManual: 'by hand',
+    observerAngle: 'Observer angle φ',
+    observerAngleHint:
+      'Where the observer stands, measured from the antisolar direction. Drag the eye in the picture, or use this slider, and hunt for the angle where the most rays arrive.',
+    observerSnap: 'Snap to the bow',
+    observerDepth: 'Observer — forward / back',
+    observerRise: 'Observer — up / down',
+    observerMoveHint:
+      'Moving the observer changes the angle to every droplet, so a different set of droplets forms the bow. The observer can also be dragged in the picture.',
+    observerRecentre: 'Back to the start',
+    indexGroup: 'Refractive index (advanced)',
+    observerOnBow: '✓ exactly on the bow',
+    observerManualHint:
+      'Highlighted rays leave at exactly the angle the eye is standing at. The more of them there are, the brighter that direction.',
+    dropsMoveHint: 'Drag the observer — the bow moves with you, onto different droplets.',
+    obsChipForward: 'further into the rain',
+    obsChipUp: 'higher',
+    obsChipDown: 'lower',
+
+    /* ---- tutorial: the two observer steps ---- */
+    s6title: 'Where does the observer have to stand?',
+    s6body:
+      'The eye is yours now. Drag it across the picture (or use the angle slider) and watch the ray tally in the top right. At most angles one or two rays arrive. At one angle a whole bundle arrives at once — and that is the angle a rainbow is seen at.',
+    explObserverAngle:
+      'φ is measured at the observer: between the line of sight to the droplet and the antisolar direction, the direction the sunlight was already travelling. It is the same φ the exit readout prints.',
+    s9title: 'A rainbow is not in a place',
+    s9body:
+      'Not one droplet moves here. Only where you are standing does. Move the observer, and a completely different set of droplets forms the bow — because the only thing that decides is the angle you see them at.',
+    explBowFollowsYou:
+      'This is why you can never walk up to a rainbow, and why no two people see theirs on the same droplets. Yours is yours alone.',
+    explDispersionZoom:
+      'Zooming out shrinks the droplet but not the angular spread between the colours — which is what turns one ray into a visibly coloured fan.',
+
+/* ---- export & footer ---- */
+    exportPng: 'Save PNG',
+    exportPngHint: 'Saves this figure at triple resolution, with a caption.',
+    exportWorking: 'saving…',
+    exportSaved: 'saved',
+    exportDeclined: 'cancelled',
+    exportFailed: 'could not save',
+    favFaculty: 'Faculty of Applied Sciences, University of West Bohemia',
 
     /* ---- quiz ---- */
     quiz: 'Questions',

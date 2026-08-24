@@ -5,10 +5,11 @@
 import * as O from './optics.js';
 import { t, setLang, getLang, num, deg, LANGS } from './i18n.js';
 import { state, set, subscribe, indexModel } from './state.js';
-import { el, clear, group, slider, toggle, segmented, select, collectSyncers } from './ui.js';
+import { el, clear, group, slider, toggle, segmented, select, collectSyncers, setRenderScale } from './ui.js';
+import { FAV_LOGO } from './assets.js';
 import { createDropletView } from './dropletView.js';
 import { createGraphView } from './graphView.js';
-import { createDropsView } from './dropsView.js';
+import { createDropsView, OBS_RANGE } from './dropsView.js';
 import { createSkyView } from './skyView.js';
 import { renderPanel, applyStep, TUTORIAL } from './panels.js';
 
@@ -29,6 +30,7 @@ const headerEl = el('header', { class: 'app-header' });
 const sceneTabsEl = el('div', { class: 'scene-tabs' });
 const sceneDescEl = el('p', { class: 'scene-desc' });
 const graphTabsEl = el('div', { class: 'graph-tabs' });
+const footerEl = el('footer', { class: 'app-footer' });
 
 root.append(
   headerEl,
@@ -45,7 +47,8 @@ root.append(
     ),
     el('aside', { class: 'col col-panel' }, panelEl)
   ),
-  el('section', { class: 'graph-wrap' }, graphTabsEl, el('div', { class: 'graph-stage' }, graphCanvas))
+  el('section', { class: 'graph-wrap' }, graphTabsEl, el('div', { class: 'graph-stage' }, graphCanvas)),
+  footerEl
 );
 
 const views = {
@@ -118,6 +121,11 @@ function buildSceneTabs() {
       ],
       () => state.scene,
       (v) => set({ scene: v })
+    ),
+    exportButton(
+      () => sceneCanvases[state.scene],
+      () => views[state.scene].draw(),
+      () => state.scene
     )
   );
 }
@@ -158,7 +166,8 @@ function buildGraphTabs() {
           }),
           toggle('accumulate', () => state.distAccumulate, (v) => set({ distAccumulate: v }))
         ),
-    el('span', { class: 'graph-hint' }, t('graphHint'))
+    el('span', { class: 'graph-hint' }, t('graphHint')),
+    exportButton(() => graphCanvas, () => graph.draw(), () => `graph-${state.graph}`)
   );
 }
 
@@ -168,204 +177,505 @@ function fmtCount(c) {
   return String(c);
 }
 
+/* --------------------------------------------------------------- export -- */
+
+/**
+ * How many device pixels per CSS pixel an exported figure is rendered at.
+ * 3× turns a ~860 px canvas into a ~2600 px image, which survives being
+ * dropped into a slide or printed.
+ */
+const EXPORT_SCALE = 3;
+
+/** Height of the credit strip under an exported figure, in CSS pixels. */
+const CREDIT_H = 26;
+
+/**
+ * PNG, not SVG, and deliberately so: Canvas 2-D is the only renderer in this
+ * project. An SVG export would mean a second drawing path for every view,
+ * and two paths that have to agree about every angle is exactly the class of
+ * thing this codebase exists to avoid. Rendering at EXPORT_SCALE recovers
+ * most of what vector output would have been for.
+ */
+function renderForExport(canvas, drawAt) {
+  setRenderScale(EXPORT_SCALE);
+  try {
+    drawAt();
+  } finally {
+    // Restore before anything can throw its way out of here, or the app is
+    // left rendering at 3× for the rest of the session.
+    setRenderScale(null);
+  }
+  const w = canvas.width;
+  const h = canvas.height;
+
+  const out = el('canvas');
+  out.width = w;
+  out.height = h + CREDIT_H * EXPORT_SCALE;
+  const ctx = out.getContext('2d');
+  ctx.fillStyle = '#080b14';
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.drawImage(canvas, 0, 0);
+
+  // A figure pasted into a slide loses every trace of where it came from, so
+  // the credit travels inside the image rather than only on the page.
+  ctx.save();
+  ctx.scale(EXPORT_SCALE, EXPORT_SCALE);
+  const cw = w / EXPORT_SCALE;
+  const cy = h / EXPORT_SCALE + CREDIT_H / 2;
+  ctx.strokeStyle = 'rgba(126,150,196,0.22)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, h / EXPORT_SCALE + 0.5);
+  ctx.lineTo(cw, h / EXPORT_SCALE + 0.5);
+  ctx.stroke();
+  ctx.font = '11px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#8ea3c6';
+  ctx.textAlign = 'left';
+  ctx.fillText(t('appTitle'), 12, cy);
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#6f86ab';
+  ctx.fillText(CREDIT_URL, cw - 12, cy);
+  ctx.restore();
+
+  // Put the screen back the way it was.
+  drawAt();
+  return out;
+}
+
+/** `rainbow-lab-droplet-20260824-1530.png` */
+function exportName(key) {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  const stamp = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+  return `rainbow-lab-${key}-${stamp}.png`;
+}
+
+/**
+ * Hand the file to the user.
+ *
+ * Inside the claude.ai artifact viewer a page cannot start a download
+ * itself; the host offers the file and the viewer confirms it. Everywhere
+ * else -- GitHub Pages, the standalone dist file, file:// -- the ordinary
+ * anchor is the only thing that works. Feature-detected at runtime rather
+ * than built two ways, and the two paths never both run: if the capability
+ * is present, a refusal from it is the answer, not a reason to try an
+ * anchor the sandbox would ignore anyway.
+ */
+async function offerDownload(blob, filename) {
+  let downloads = null;
+  try {
+    if (typeof window.claude?.use === 'function') downloads = await window.claude.use('downloads');
+  } catch {
+    downloads = null;
+  }
+  if (downloads) {
+    try {
+      await downloads.save({ filename, data: blob });
+      return 'exportSaved';
+    } catch (err) {
+      return err && err.code === 'declined' ? 'exportDeclined' : 'exportFailed';
+    }
+  }
+  const url = URL.createObjectURL(blob);
+  const a = el('a', { href: url, download: filename });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  return 'exportSaved';
+}
+
+/** A "save this canvas" button, with its own transient status line. */
+function exportButton(getCanvas, drawAt, getKey) {
+  const status = el('span', { class: 'export-status' });
+  let busy = false;
+  const btn = el(
+    'button',
+    {
+      class: 'btn tiny', type: 'button', title: t('exportPngHint'),
+      onclick: async () => {
+        if (busy) return;
+        busy = true;
+        btn.disabled = true;
+        // Rendering at 3x and PNG-encoding a ~2600 px image takes most of a
+        // second; without this the button just goes dead for that long.
+        status.textContent = t('exportWorking');
+        status.className = 'export-status';
+        try {
+          const out = renderForExport(getCanvas(), drawAt);
+          const blob = await new Promise((res) => out.toBlob(res, 'image/png'));
+          const key = blob ? await offerDownload(blob, exportName(getKey())) : 'exportFailed';
+          status.textContent = t(key);
+          status.className = `export-status${key === 'exportSaved' ? ' ok' : ' warn'}`;
+        } catch {
+          status.textContent = t('exportFailed');
+          status.className = 'export-status warn';
+        } finally {
+          busy = false;
+          btn.disabled = false;
+          setTimeout(() => { status.textContent = ''; }, 4000);
+        }
+      },
+    },
+    t('exportPng')
+  );
+  return el('span', { class: 'export-ctl' }, btn, status);
+}
+
+/* --------------------------------------------------------------- footer -- */
+
+const CREDIT_URL = 'home.zcu.cz/~lipka';
+const CREDIT_HREF = 'https://home.zcu.cz/~lipka/';
+const CREDIT_EMAIL = 'lipka@fav.zcu.cz';
+const FAV_HREF = 'https://www.fav.zcu.cz/';
+
+function buildFooter() {
+  clear(footerEl);
+  const lang = getLang();
+  footerEl.append(
+    el(
+      'a',
+      { class: 'fav-logo', href: FAV_HREF, target: '_blank', rel: 'noopener noreferrer',
+        'aria-label': t('favFaculty') },
+      el('img', { src: FAV_LOGO[lang] || FAV_LOGO.cs, alt: t('favFaculty') })
+    ),
+    el(
+      'p',
+      { class: 'credit' },
+      `© ${new Date().getFullYear()} `,
+      el('a', { href: CREDIT_HREF, target: '_blank', rel: 'noopener noreferrer' }, CREDIT_EMAIL)
+    )
+  );
+}
+
 /* ------------------------------------------------------------- controls -- */
 
 const HEIGHT_STOPS = [1.7, 5, 10, 50, 100, 300, 1000, 3000, 10000];
+const ALL = ['droplet', 'drops', 'sky'];
+
+/** Zoom-out range for the single-droplet scene, driven on a log slider. */
+const ZOOM_MAX = 40;
+const ZOOM_MAX_LOG = Math.log10(ZOOM_MAX);
+
+/**
+ * One entry in the control column: the scenes that actually READ this
+ * control, a thunk that builds it, and an optional extra condition.
+ *
+ * The column used to show every control in every scene. That is not harmless
+ * extra choice: a reader in the 3-D sky scrolled past the impact parameter,
+ * the fan count and the zoom-out slider -- none of which that scene reads --
+ * to reach the horizon toggle, and moving any of them did nothing. A control
+ * that visibly does nothing teaches that the simulation is decorative. So
+ * these scene lists are not cosmetic; each one is what the corresponding view
+ * actually reads out of the store.
+ */
+const c = (scenes, node, when) => ({ scenes, node, when });
+const shown = (i) => i && i.scenes.includes(state.scene) && (!i.when || i.when());
+
+/** A group holding only the items the current scene can act on; null if none. */
+function sceneGroup(titleKey, items, opts) {
+  const kids = items.filter(shown).map((i) => i.node());
+  if (!kids.length) return null;
+  return opts ? group(titleKey, ...kids, opts) : group(titleKey, ...kids);
+}
+
+const chipRow = (...chips) => el('div', { class: 'action-row' }, ...chips);
+const chip = (labelKey, onclick) => el('button', { class: 'chip', type: 'button', onclick }, t(labelKey));
+
+/** The rainbow angle for order k, from the engine -- never a literal. */
+function rainbowPhi(k) {
+  const geo = O.rainbowGeometry(indexModel()(650), Math.max(1, k));
+  return geo ? geo.antisolarDeg : 42;
+}
+
+/**
+ * The angle the single-droplet eye is at right now. In auto mode that is the
+ * angle the engine derives, so the slider tracks the eye rather than sitting
+ * on a stale number the user never set -- and dragging it out of auto is then
+ * one continuous gesture instead of a jump.
+ */
+function observerPhiNow() {
+  return state.observerMode === 'manual' ? state.observerPhi : rainbowPhi(state.reflections);
+}
+
+/** Which visualisation toggles each scene actually reads. */
+const VIS_TOGGLES = [
+  { scenes: ['drops', 'sky'], key: 'primary', labelKey: 'showPrimary' },
+  { scenes: ['drops', 'sky'], key: 'secondary', labelKey: 'showSecondary' },
+  { scenes: ['sky'], key: 'higher', labelKey: 'showHigherOrder' },
+  { scenes: ['sky'], key: 'cone', labelKey: 'showCone' },
+  { scenes: ['sky'], key: 'antisolar', labelKey: 'showAntisolar' },
+  { scenes: ['sky'], key: 'horizon', labelKey: 'showHorizon' },
+  { scenes: ['drops', 'sky'], key: 'ground', labelKey: 'showGround' },
+  { scenes: ['drops'], key: 'droplets', labelKey: 'showDroplets' },
+  { scenes: ['droplet'], key: 'normals', labelKey: 'showNormals' },
+  { scenes: ['droplet'], key: 'angles', labelKey: 'showAngles' },
+  { scenes: ALL, key: 'labels', labelKey: 'showLabels' },
+  { scenes: ['droplet', 'sky'], key: 'wavelengthLabels', labelKey: 'showWavelengthLabels' },
+  { scenes: ['sky'], key: 'alexander', labelKey: 'showAlexander' },
+  { scenes: ['sky'], key: 'sky', labelKey: 'showSky' },
+  { scenes: ['drops', 'sky'], key: 'rainBelow', labelKey: 'rainBelow' },
+];
 
 function buildControls() {
   clear(controlsEl);
   const idx = indexModel();
 
-  /* --- light --- */
   const colorOptions = [
     { value: 'white', labelKey: 'white' },
-    ...O.NAMED_COLORS.map((c) => ({
-      value: c.lambda,
-      labelKey: c.id,
-      color: O.rgbCss(c.lambda),
+    ...O.NAMED_COLORS.map((col) => ({
+      value: col.lambda,
+      labelKey: col.id,
+      color: O.rgbCss(col.lambda),
     })),
   ];
 
-  const lightGroup = group(
-    'light',
-    el('div', { class: 'ctl' },
-      el('span', { class: 'ctl-label' }, t('wavelength')),
-      segmented(colorOptions, () => state.wavelength, (v) =>
-        set({ wavelength: v === 'white' ? 'white' : Number(v), selectedRay: null }), { wrap: true })),
-    slider({
-      labelKey: 'dispersion', min: 0, max: 1, step: 0.01,
-      get: () => state.dispersion,
-      format: (v) => `${num(v * 100, 0)} %`,
-      onInput: (v) => set({ dispersion: v }),
-      hintKey: 'dispersionHint',
-    })
-  );
-
-  /* --- droplet & optics --- */
-  const opticsGroup = group(
-    'droplet',
-    slider({
-      labelKey: 'impactParameter', min: -0.999, max: 0.999, step: 0.001,
-      get: () => state.impact,
-      format: (v) => num(v, 3),
-      onInput: (v) => set({ impact: v }),
-    }),
-    el('div', { class: 'ctl' },
-      el('span', { class: 'ctl-label' }, t('reflections')),
-      segmented(
-        [0, 1, 2, 3, 4].map((k) => ({ value: k, label: String(k) })),
-        () => state.reflections,
-        (v) => {
-          // Solo-select: picking a value here shows exactly that one family,
-          // clearing any others left on from the checkboxes below so this
-          // control always visibly drives the scene by itself.
-          const k = Number(v);
-          set({
-            reflections: k,
-            families: { 0: k === 0, 1: k === 1, 2: k === 2, 3: k >= 3 },
-            selectedRay: null,
-          });
-        }
-      )),
-    slider({
-      labelKey: 'dropletRadius', min: 0.05, max: 5, step: 0.05,
-      get: () => state.dropletRadiusMm,
-      format: (v) => `${num(v, 2)} mm`,
-      onInput: (v) => set({ dropletRadiusMm: v }),
-    }),
-    el('small', { class: 'ctl-hint block' }, t('dropletSizeNote')),
-    slider({
-      labelKey: 'dropletZoom', min: 1, max: 9, step: 0.1,
-      get: () => state.dropletZoom,
-      format: (v) => `${num(v, 1)}×`,
-      onInput: (v) => set({ dropletZoom: v }),
-      hintKey: 'dropletZoomHint',
-    }),
-    select('indexModel',
-      [{ value: 'table', labelKey: 'indexTable' }, { value: 'cauchy', labelKey: 'indexCauchy' }],
-      () => state.indexMode, (v) => set({ indexMode: v })),
-    slider({
-      labelKey: 'indexScale', min: 0.85, max: 1.15, step: 0.001,
-      get: () => state.indexScale,
-      format: (v) => `×${num(v, 3)} → n=${num(idx(650) * 1, 4)}`,
-      onInput: (v) => set({ indexScale: v }),
-    })
-  );
-
-  /* --- rays --- */
-  const raysGroup = group(
-    'rays',
-    toggle('showNonRainbow', () => state.showNonRainbow, (v) => set({ showNonRainbow: v }), { strong: true }),
-    el('div', { class: 'ctl' },
-      el('span', { class: 'ctl-label' }, t('showFamilies')),
-      el('div', { class: 'stack' },
-        toggle('family0', () => state.families[0], (v) => set({ families: { 0: v } })),
-        toggle('family1', () => state.families[1], (v) => set({ families: { 1: v } })),
-        toggle('family2', () => state.families[2], (v) => set({ families: { 2: v } })),
-        toggle('family3', () => state.families[3], (v) => set({ families: { 3: v } })))),
-    slider({
-      labelKey: 'fanCount', min: 0, max: 60, step: 1,
-      get: () => state.fanCount,
-      format: (v) => (v === 0 ? '1' : String(v)),
-      onInput: (v) => set({ fanCount: Math.round(v) }),
-    })
-  );
-
-  /* --- sun & observer --- */
-  const skyGroup = group(
-    'sun',
-    slider({
-      labelKey: 'sunElevation', min: 0, max: 90, step: 0.5,
-      get: () => state.sunElevation,
-      format: (v) => deg(v, 1),
-      onInput: (v) => set({ sunElevation: v }),
-    }),
-    slider({
-      labelKey: 'sunAzimuth', min: 0, max: 360, step: 1,
-      get: () => state.sunAzimuth,
-      format: (v) => deg(v, 0),
-      onInput: (v) => set({ sunAzimuth: v }),
-    }),
-    slider({
-      labelKey: 'observerHeight', min: 0, max: HEIGHT_STOPS.length - 1, step: 0.01,
-      get: () => heightToSlider(state.observerHeight),
-      format: (v) => `${num(sliderToHeight(v), sliderToHeight(v) < 10 ? 1 : 0)} ${t('metres')}`,
-      onInput: (v) => set({ observerHeight: sliderToHeight(v) }),
-    }),
-    el('small', { class: 'ctl-hint block' }, t('explObserverHeight')),
-    el('div', { class: 'ctl' },
-      el('span', { class: 'ctl-label' }, t('viewMode')),
-      segmented(
-        [{ value: 'orbit', labelKey: 'viewOrbit' }, { value: 'eye', labelKey: 'viewEye' }],
-        () => state.view,
-        (v) => set({ view: v, scene: 'sky' })
-      )),
-    slider({
-      labelKey: 'lookAzimuth', min: -180, max: 180, step: 1,
-      get: () => state.eyeAzimuth,
-      format: (v) => deg(v, 0),
-      onInput: (v) => set({ eyeAzimuth: v }),
-    }),
-    slider({
-      labelKey: 'lookElevation', min: -60, max: 85, step: 1,
-      get: () => state.eyeElevation,
-      format: (v) => deg(v, 0),
-      onInput: (v) => set({ eyeElevation: v }),
-    }),
-    slider({
-      labelKey: 'fieldOfView', min: 25, max: 120, step: 1,
-      get: () => state.fov,
-      format: (v) => deg(v, 0),
-      onInput: (v) => set({ fov: v }),
-    }),
-    toggle('rainBelow', () => state.show.rainBelow, (v) => set({ show: { rainBelow: v } })),
-    el('small', { class: 'ctl-hint block' }, t('fullCircleNote'))
-  );
-
-  /* --- droplets scene --- */
-  const dropsGroup = group(
-    'sceneDrops',
-    slider({
-      labelKey: 'dropCount', min: 0, max: 4, step: 0.01,
-      get: () => Math.log10(Math.max(1, state.dropCount)),
-      format: (v) => fmtCount(Math.round(Math.pow(10, v))),
-      onInput: (v) => set({ dropCount: Math.round(Math.pow(10, v)) }),
-    }),
-    toggle('animateDrops', () => state.dropsAnimate, (v) => set({ dropsAnimate: v }))
-  );
-
-  /* --- visualisation --- */
   const showToggle = (key, labelKey) =>
     toggle(labelKey, () => state.show[key], (v) => set({ show: { [key]: v } }));
 
-  const visGroup = group(
-    'visualization',
-    el('div', { class: 'grid2' },
-      showToggle('primary', 'showPrimary'),
-      showToggle('secondary', 'showSecondary'),
-      showToggle('higher', 'showHigherOrder'),
-      showToggle('cone', 'showCone'),
-      showToggle('antisolar', 'showAntisolar'),
-      showToggle('horizon', 'showHorizon'),
-      showToggle('ground', 'showGround'),
-      showToggle('droplets', 'showDroplets'),
-      showToggle('normals', 'showNormals'),
-      showToggle('angles', 'showAngles'),
-      showToggle('labels', 'showLabels'),
-      showToggle('wavelengthLabels', 'showWavelengthLabels'),
-      showToggle('alexander', 'showAlexander'),
-      showToggle('sky', 'showSky')),
-    toggle('showRenderedBow', () => state.show.renderedBow, (v) => set({ show: { renderedBow: v } }), { strong: true }),
-    el('small', { class: 'ctl-hint block' }, t('warningNoRender'))
-  );
+  const groups = [
+    /* --- the light going in --- */
+    sceneGroup('light', [
+      c(ALL, () => el('div', { class: 'ctl', dataset: { ctl: 'wavelength' } },
+        el('span', { class: 'ctl-label' }, t('wavelength')),
+        segmented(colorOptions, () => state.wavelength, (v) =>
+          set({ wavelength: v === 'white' ? 'white' : Number(v), selectedRay: null }), { wrap: true }))),
+      c(ALL, () => slider({
+        labelKey: 'dispersion', min: 0, max: 1, step: 0.01,
+        get: () => state.dispersion,
+        format: (v) => `${num(v * 100, 0)} %`,
+        onInput: (v) => set({ dispersion: v }),
+        hintKey: 'dispersionHint',
+      })),
+    ]),
 
-  controlsEl.append(lightGroup, opticsGroup, raysGroup, skyGroup, dropsGroup, visGroup,
+    /* --- the ray being steered, and the droplet it goes through --- */
+    sceneGroup('droplet', [
+      c(['droplet'], () => slider({
+        labelKey: 'impactParameter', min: -0.999, max: 0.999, step: 0.001,
+        get: () => state.impact,
+        format: (v) => num(v, 3),
+        onInput: (v) => set({ impact: v }),
+      })),
+      c(['droplet'], () => slider({
+        labelKey: 'fanCount', min: 0, max: 60, step: 1,
+        get: () => state.fanCount,
+        format: (v) => (v === 0 ? '1' : String(v)),
+        onInput: (v) => set({ fanCount: Math.round(v) }),
+      })),
+      c(['droplet'], () =>
+        toggle('showNonRainbow', () => state.showNonRainbow, (v) => set({ showNonRainbow: v }),
+          { strong: true })),
+      c(['droplet'], () => slider({
+        labelKey: 'dropletZoom', min: 0, max: ZOOM_MAX_LOG, step: 0.004,
+        get: () => Math.log10(O.clamp(state.dropletZoom, 1, ZOOM_MAX)),
+        format: (v) => `${num(Math.pow(10, v), 1)}×`,
+        onInput: (v) => set({ dropletZoom: Math.pow(10, v) }),
+        hintKey: 'dropletZoomHint',
+      })),
+      c(['droplet'], () => slider({
+        labelKey: 'dropletRadius', min: 0.05, max: 5, step: 0.05,
+        get: () => state.dropletRadiusMm,
+        format: (v) => `${num(v, 2)} mm`,
+        onInput: (v) => set({ dropletRadiusMm: v }),
+      })),
+      c(['droplet'], () => el('small', { class: 'ctl-hint block' }, t('dropletSizeNote'))),
+    ]),
+
+    /* --- which reflection families are traced at all. The bounce count lives
+           here rather than under "droplet": it is the same question as the
+           family checkboxes below it, and in the scenes that draw no single
+           ray it was the only thing left in the droplet group. --- */
+    sceneGroup('rays', [
+      c(ALL, () => el('div', { class: 'ctl', dataset: { ctl: 'reflections' } },
+        el('span', { class: 'ctl-label' }, t('reflections')),
+        segmented(
+          [0, 1, 2, 3, 4].map((k) => ({ value: k, label: String(k) })),
+          () => state.reflections,
+          (v) => {
+            // Solo-select: picking a value here shows exactly that one family,
+            // clearing any others left on from the checkboxes below so this
+            // control always visibly drives the scene by itself.
+            const k = Number(v);
+            set({
+              reflections: k,
+              families: { 0: k === 0, 1: k === 1, 2: k === 2, 3: k >= 3 },
+              selectedRay: null,
+            });
+          }))),
+      c(ALL, () => el('div', { class: 'ctl', dataset: { ctl: 'showFamilies' } },
+        el('span', { class: 'ctl-label' }, t('showFamilies')),
+        el('div', { class: 'stack' },
+          toggle('family0', () => state.families[0], (v) => set({ families: { 0: v } })),
+          toggle('family1', () => state.families[1], (v) => set({ families: { 1: v } })),
+          toggle('family2', () => state.families[2], (v) => set({ families: { 2: v } })),
+          toggle('family3', () => state.families[3], (v) => set({ families: { 3: v } }))))),
+    ]),
+
+    /* --- where the observer is standing, in whichever scene we are in --- */
+    sceneGroup('observerGroup', [
+      c(['droplet'], () => el('div', { class: 'ctl', dataset: { ctl: 'observerPlacement' } },
+        el('span', { class: 'ctl-label' }, t('observerPlacement')),
+        segmented(
+          [{ value: 'auto', labelKey: 'observerAuto' }, { value: 'manual', labelKey: 'observerManual' }],
+          () => state.observerMode,
+          // Seed the manual angle from wherever the eye already is, so
+          // switching mode never teleports it.
+          (v) => set({ observerMode: v, observerPhi: observerPhiNow() })))),
+      c(['droplet'], () => slider({
+        labelKey: 'observerAngle', min: 0, max: 180, step: 0.1,
+        get: () => observerPhiNow(),
+        format: (v) => deg(v, 1),
+        onInput: (v) => set({ observerMode: 'manual', observerPhi: v }),
+        hintKey: 'observerAngleHint',
+      })),
+      c(['droplet'], () => chipRow(
+        chip('observerSnap', () =>
+          set({ observerMode: 'manual', observerPhi: Math.round(rainbowPhi(state.reflections) * 10) / 10 })),
+        chip('observerAuto', () => set({ observerMode: 'auto' })))),
+
+      c(['drops'], () => slider({
+        labelKey: 'observerDepth', min: OBS_RANGE.x[0], max: OBS_RANGE.x[1], step: 0.005,
+        get: () => state.dropsObserverX,
+        format: (v) => `${v >= 0 ? '+' : ''}${num(v, 2)}`,
+        onInput: (v) => set({ dropsObserverX: v }),
+        hintKey: 'observerMoveHint',
+      })),
+      c(['drops'], () => slider({
+        labelKey: 'observerRise', min: OBS_RANGE.y[0], max: OBS_RANGE.y[1], step: 0.005,
+        get: () => state.dropsObserverY,
+        format: (v) => `${v >= 0 ? '+' : ''}${num(v, 2)}`,
+        onInput: (v) => set({ dropsObserverY: v }),
+      })),
+      c(['drops'], () => chipRow(
+        chip('observerRecentre', () => set({ dropsObserverX: 0, dropsObserverY: 0 })))),
+
+      c(['drops', 'sky'], () => slider({
+        labelKey: 'observerHeight', min: 0, max: HEIGHT_STOPS.length - 1, step: 0.01,
+        get: () => heightToSlider(state.observerHeight),
+        format: (v) => `${num(sliderToHeight(v), sliderToHeight(v) < 10 ? 1 : 0)} ${t('metres')}`,
+        onInput: (v) => set({ observerHeight: sliderToHeight(v) }),
+      })),
+      c(['sky'], () => el('small', { class: 'ctl-hint block' }, t('explObserverHeight'))),
+      c(['sky'], () => el('div', { class: 'ctl', dataset: { ctl: 'viewMode' } },
+        el('span', { class: 'ctl-label' }, t('viewMode')),
+        segmented(
+          [{ value: 'orbit', labelKey: 'viewOrbit' }, { value: 'eye', labelKey: 'viewEye' }],
+          () => state.view,
+          (v) => set({ view: v, scene: 'sky' })))),
+      // Only the eye view reads these three: in orbit view the camera is
+      // driven by dragging, so moving them there looked broken.
+      c(['sky'], () => slider({
+        labelKey: 'lookAzimuth', min: -180, max: 180, step: 1,
+        get: () => state.eyeAzimuth,
+        format: (v) => deg(v, 0),
+        onInput: (v) => set({ eyeAzimuth: v }),
+      }), () => state.view === 'eye'),
+      c(['sky'], () => slider({
+        labelKey: 'lookElevation', min: -60, max: 85, step: 1,
+        get: () => state.eyeElevation,
+        format: (v) => deg(v, 0),
+        onInput: (v) => set({ eyeElevation: v }),
+      }), () => state.view === 'eye'),
+      c(['sky'], () => slider({
+        labelKey: 'fieldOfView', min: 25, max: 120, step: 1,
+        get: () => state.fov,
+        format: (v) => deg(v, 0),
+        onInput: (v) => set({ fov: v }),
+      }), () => state.view === 'eye'),
+    ]),
+
+    /* --- the Sun. The single-droplet scene has no sky, so no elevation. --- */
+    sceneGroup('sun', [
+      c(['drops', 'sky'], () => slider({
+        labelKey: 'sunElevation', min: 0, max: 90, step: 0.5,
+        get: () => state.sunElevation,
+        format: (v) => deg(v, 1),
+        onInput: (v) => set({ sunElevation: v }),
+      })),
+      c(['sky'], () => slider({
+        labelKey: 'sunAzimuth', min: 0, max: 360, step: 1,
+        get: () => state.sunAzimuth,
+        format: (v) => deg(v, 0),
+        onInput: (v) => set({ sunAzimuth: v }),
+      })),
+    ]),
+
+    /* --- the droplet field --- */
+    sceneGroup('sceneDrops', [
+      c(['drops'], () => slider({
+        labelKey: 'dropCount', min: 0, max: 4, step: 0.01,
+        get: () => Math.log10(Math.max(1, state.dropCount)),
+        format: (v) => fmtCount(Math.round(Math.pow(10, v))),
+        onInput: (v) => set({ dropCount: Math.round(Math.pow(10, v)) }),
+      })),
+      c(['drops'], () => toggle('animateDrops', () => state.dropsAnimate, (v) => set({ dropsAnimate: v }))),
+    ]),
+
+    /* --- what is drawn --- */
+    sceneGroup('visualization', [
+      c(ALL, () => el('div', { class: 'grid2' },
+        ...VIS_TOGGLES.filter((v) => v.scenes.includes(state.scene))
+          .map((v) => showToggle(v.key, v.labelKey)))),
+      c(['drops', 'sky'], () => el('small', { class: 'ctl-hint block' }, t('fullCircleNote'))),
+      c(['sky'], () => toggle('showRenderedBow', () => state.show.renderedBow,
+        (v) => set({ show: { renderedBow: v } }), { strong: true })),
+      c(['sky'], () => el('small', { class: 'ctl-hint block' }, t('warningNoRender'))),
+    ]),
+
+    /* --- the physics knobs. Reachable in every scene but closed by default:
+           the refractive-index model is the one thing in here that changes
+           the answer, so it must not be hidden, but it is not where anyone
+           starts. --- */
+    sceneGroup('indexGroup', [
+      c(ALL, () => select('indexModel',
+        [{ value: 'table', labelKey: 'indexTable' }, { value: 'cauchy', labelKey: 'indexCauchy' }],
+        () => state.indexMode, (v) => set({ indexMode: v }))),
+      c(ALL, () => slider({
+        labelKey: 'indexScale', min: 0.85, max: 1.15, step: 0.001,
+        get: () => state.indexScale,
+        format: (v) => `×${num(v, 3)} → n=${num(idx(650) * 1, 4)}`,
+        onInput: (v) => set({ indexScale: v }),
+      })),
+    ], { collapsed: true }),
+  ];
+
+  controlsEl.append(
+    ...groups.filter(Boolean),
     el('button', {
       class: 'btn wide', type: 'button',
       onclick: () => { resetState(); rebuild(); },
-    }, t('reset')));
+    }, t('reset'))
+  );
 
+  applyFocus();
   collectAllSyncers();
+}
+
+/**
+ * In tutorial mode, mark the controls the current step is actually about.
+ *
+ * The scene filter already removed the controls this scene ignores; this
+ * points at the ones this step needs. It doubles as the check that they are
+ * there at all: a focus key with no matching control in the current scene is
+ * a step asking for something the column is not offering, which is a bug in
+ * the step, so it is reported rather than silently ignored.
+ */
+function applyFocus() {
+  const step = state.mode === 'tutorial' ? TUTORIAL[state.step] : null;
+  const want = (step && step.focus) || [];
+  for (const host of [controlsEl, graphTabsEl]) {
+    for (const node of host.querySelectorAll('[data-ctl]')) {
+      node.classList.toggle('focus', want.includes(node.dataset.ctl));
+    }
+  }
+  const missing = want.filter(
+    (k) => !controlsEl.querySelector(`[data-ctl="${k}"]`) && !graphTabsEl.querySelector(`[data-ctl="${k}"]`)
+  );
+  if (missing.length) {
+    console.warn(`tutorial step ${state.step + 1} (${state.scene}): controls not on screen:`, missing);
+  }
 }
 
 function heightToSlider(h) {
@@ -391,6 +701,8 @@ function resetState() {
   set({
     wavelength: 'white', dispersion: 1, impact: 0.861, reflections: 1,
     dropletRadiusMm: 1, dropletZoom: 1, indexMode: 'table', indexScale: 1,
+    observerMode: 'auto', observerPhi: 42.4,
+    dropsObserverX: 0, dropsObserverY: 0,
     showNonRainbow: false, fanCount: 0, families: { 0: false, 1: true, 2: false, 3: false },
     angleMode: 'antisolar', distRays: 60, distAccumulate: false,
     dropCount: 1, dropsAnimate: false,
@@ -432,12 +744,25 @@ function rebuild() {
   buildHeader();
   buildSceneTabs();
   buildGraphTabs();
+  buildFooter();
   buildControls();
   renderPanel(panelEl);
   applyVisibility();
   collectAllSyncers();
   trackedGraph = state.graph;
   trackedPanelKey = panelKey();
+  trackedControlsKey = controlsKey();
+}
+
+/**
+ * Everything the SHAPE of the control column depends on: the scene (which
+ * controls are relevant at all), the sky view mode (the look/FOV sliders
+ * exist only in the eye view), the observer mode, and the tutorial position
+ * (which controls are highlighted). None of these used to rebuild it, so
+ * switching scenes left the previous scene's controls sitting there.
+ */
+function controlsKey() {
+  return `${state.scene}|${state.view}|${state.observerMode}|${state.mode}|${state.step}`;
 }
 
 /**
@@ -476,6 +801,7 @@ function panelKey() {
 
 let trackedGraph = state.graph;
 let trackedPanelKey = panelKey();
+let trackedControlsKey = controlsKey();
 
 subscribe(() => {
   applyVisibility();
@@ -484,6 +810,12 @@ subscribe(() => {
     trackedGraph = state.graph;
     buildGraphTabs();
     collectAllSyncers();
+  }
+
+  const ck = controlsKey();
+  if (ck !== trackedControlsKey) {
+    trackedControlsKey = ck;
+    buildControls(); // re-collects the syncers itself
   }
 
   const pk = panelKey();

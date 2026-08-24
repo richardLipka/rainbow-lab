@@ -12,15 +12,30 @@ import { traceOne, distanceFromExtremum } from './rays.js';
  * Tutorial
  * ======================================================================== */
 
+/**
+ * The guided path. Each step owns three things:
+ *
+ *   apply  the state it needs on screen, pushed on entry
+ *   focus  the control-column ids (translation keys, see ui.js) the step is
+ *          actually asking the reader to move. app.js highlights them and
+ *          warns to the console if a focused control is not present in the
+ *          scene this step selected -- so "the step tells you to turn a knob
+ *          that this scene hides" is a loud bug rather than a dead end.
+ *   actions optional chips, either a patch object or a function returning one
+ *          (used where the value has to come out of the engine instead of
+ *          being written down as a literal).
+ */
 export const TUTORIAL = [
   {
     title: 's1title', body: 's1body',
     apply: {
       scene: 'droplet', graph: 'exit', reflections: 0, dispersion: 0, wavelength: 'white',
       impact: 0.6, fanCount: 0, showNonRainbow: false, angleMode: 'antisolar',
+      dropletZoom: 1, observerMode: 'auto',
       show: { angles: false, normals: false, labels: true, renderedBow: false },
       families: { 0: true, 1: false, 2: false, 3: false },
     },
+    focus: ['impactParameter', 'wavelength'],
   },
   {
     title: 's2title', body: 's2body',
@@ -28,6 +43,7 @@ export const TUTORIAL = [
       scene: 'droplet', reflections: 0, show: { angles: true, normals: true },
       families: { 0: true, 1: false, 2: false, 3: false },
     },
+    focus: ['impactParameter', 'showNormals', 'showAngles'],
     actions: [
       { label: 'b/R = 0.2', patch: { impact: 0.2 } },
       { label: 'b/R = 0.6', patch: { impact: 0.6 } },
@@ -41,16 +57,19 @@ export const TUTORIAL = [
       families: { 0: false, 1: true, 2: false, 3: false },
       show: { normals: false, angles: true },
     },
+    focus: ['reflections', 'showNonRainbow'],
   },
   {
     title: 's4title', body: 's4body',
     apply: { scene: 'droplet', reflections: 1, showNonRainbow: false, panel: 'guide', show: { angles: true } },
+    focus: ['impactParameter', 'showAngles'],
     actions: [{ labelKey: 'extremumLabel', patch: { impact: 0.861 } }],
     showRay: true,
   },
   {
     title: 's5title', body: 's5body',
     apply: { scene: 'droplet', graph: 'exit', reflections: 1, fanCount: 9, panel: 'guide' },
+    focus: ['fanCount', 'impactParameter'],
     actions: [
       { label: '1', patch: { fanCount: 0 } },
       { label: '9', patch: { fanCount: 9 } },
@@ -58,8 +77,42 @@ export const TUTORIAL = [
     ],
   },
   {
+    /* Where must you stand? The eye is handed over to the reader here: the
+       fan is already on screen from the previous step, so sweeping the eye
+       across it makes the caustic count itself, and 42 deg arrives as a
+       measurement rather than as an assertion. Deliberately started off the
+       bow -- an eye that is already correct has nothing to demonstrate. */
     title: 's6title', body: 's6body',
+    apply: {
+      // One wavelength, full dispersion: the tally then counts exactly the
+      // rays that are visible on screen (under white light all six overlap
+      // at once and it would read 48/276 for 46 visible lines), and the
+      // angle being hunted for is the real n(650) one the rest of the app
+      // quotes rather than the mean-index 41.9 that dispersion=0 produces.
+      scene: 'droplet', graph: 'exit', reflections: 1, fanCount: 45, dispersion: 1,
+      wavelength: 650, impact: 0.861, dropletZoom: 2.6, observerMode: 'manual', observerPhi: 30,
+      panel: 'guide', show: { angles: true, normals: false, labels: true },
+      families: { 0: false, 1: true, 2: false, 3: false },
+    },
+    focus: ['observerAngle', 'observerPlacement'],
+    actions: [
+      { label: '30°', patch: { observerMode: 'manual', observerPhi: 30 } },
+      { label: '38°', patch: { observerMode: 'manual', observerPhi: 38 } },
+      {
+        labelKey: 'observerSnap',
+        patch: () => ({
+          observerMode: 'manual',
+          observerPhi: Math.round(O.rainbowGeometry(indexModel()(650), 1).antisolarDeg * 10) / 10,
+        }),
+      },
+      { label: '55°', patch: { observerMode: 'manual', observerPhi: 55 } },
+    ],
+    note: 'explObserverAngle',
+  },
+  {
+    title: 's7title', body: 's7body',
     apply: { scene: 'droplet', graph: 'dist', reflections: 1, fanCount: 25, distRays: 40 },
+    focus: ['rayCount'],
     actions: [
       { label: '10', patch: { distRays: 10 } },
       { label: '100', patch: { distRays: 100 } },
@@ -69,11 +122,13 @@ export const TUTORIAL = [
     note: 'explCaustic',
   },
   {
-    title: 's7title', body: 's7body',
+    title: 's8title', body: 's8body',
     apply: {
       scene: 'drops', graph: 'dist', dropCount: 1, dropsAnimate: true,
+      dropsObserverX: 0, dropsObserverY: 0,
       show: { droplets: true, primary: true, secondary: false },
     },
+    focus: ['dropCount', 'animateDrops'],
     actions: [
       { label: '1', patch: { dropCount: 1 } },
       { label: '10', patch: { dropCount: 10 } },
@@ -84,11 +139,32 @@ export const TUTORIAL = [
     note: 'explNotAnObject',
   },
   {
-    title: 's8title', body: 's8body',
+    /* The bow is not a place. Nothing about the droplet field changes here --
+       only where the reader is standing -- and a different set of droplets
+       lights up, which is the claim the previous step could only make in
+       words. */
+    title: 's9title', body: 's9body',
+    apply: {
+      scene: 'drops', graph: 'dist', dropCount: 1500, dropsAnimate: false,
+      dropsObserverX: 0, dropsObserverY: 0, sunElevation: 15,
+      show: { droplets: true, primary: true, secondary: false, ground: true, labels: true },
+    },
+    focus: ['observerDepth', 'observerRise'],
+    actions: [
+      { labelKey: 'observerRecentre', patch: { dropsObserverX: 0, dropsObserverY: 0 } },
+      { labelKey: 'obsChipForward', patch: { dropsObserverX: 0.45 } },
+      { labelKey: 'obsChipUp', patch: { dropsObserverY: 0.28 } },
+      { labelKey: 'obsChipDown', patch: { dropsObserverY: -0.09 } },
+    ],
+    note: 'explBowFollowsYou',
+  },
+  {
+    title: 's10title', body: 's10body',
     apply: {
       scene: 'sky', view: 'orbit', sunElevation: 15,
       show: { cone: true, horizon: false, ground: false, antisolar: true, primary: true, secondary: false, renderedBow: false },
     },
+    focus: ['showCone', 'showHorizon', 'viewMode'],
     actions: [
       { labelKey: 'showCone', patch: { show: { cone: true } } },
       { labelKey: 'showHorizon', patch: { show: { horizon: true, ground: true } } },
@@ -96,19 +172,23 @@ export const TUTORIAL = [
     ],
   },
   {
-    title: 's9title', body: 's9body',
+    title: 's11title', body: 's11body',
     apply: {
       scene: 'droplet', graph: 'exit', wavelength: 'white', dispersion: 0, reflections: 1,
-      show: { wavelengthLabels: true },
+      fanCount: 0, dropletZoom: 9, observerMode: 'auto',
+      show: { wavelengthLabels: true, angles: true },
+      families: { 0: false, 1: true, 2: false, 3: false },
     },
+    focus: ['dispersion', 'dropletZoom', 'showWavelengthLabels'],
     actions: [
       { label: '0 %', patch: { dispersion: 0 } },
       { label: '50 %', patch: { dispersion: 0.5 } },
       { label: '100 %', patch: { dispersion: 1 } },
     ],
+    note: 'explDispersionZoom',
   },
   {
-    title: 's10title', body: 's10body',
+    title: 's12title', body: 's12body',
     apply: {
       scene: 'sky', view: 'eye', dispersion: 1, wavelength: 'white', reflections: 2,
       families: { 0: false, 1: true, 2: true, 3: false },
@@ -117,6 +197,7 @@ export const TUTORIAL = [
         renderedBow: true, cone: false, wavelengthLabels: true,
       },
     },
+    focus: ['showSecondary', 'showAlexander', 'showRenderedBow'],
     actions: [
       { labelKey: 'showRenderedBow', patch: { show: { renderedBow: true } } },
       { labelKey: 'showAlexander', patch: { show: { alexander: true } } },
@@ -143,8 +224,13 @@ function renderTutorial() {
     nodes.push(
       el('div', { class: 'action-row' },
         s.actions.map((a) =>
-          el('button', { class: 'chip', type: 'button', onclick: () => set(a.patch) },
-            a.labelKey ? t(a.labelKey) : a.label)
+          el('button', {
+            class: 'chip', type: 'button',
+            // A patch may be a function when the value has to come out of the
+            // engine -- a chip that jumps to the rainbow angle must not carry
+            // that angle as a literal.
+            onclick: () => set(typeof a.patch === 'function' ? a.patch() : a.patch),
+          }, a.labelKey ? t(a.labelKey) : a.label)
         ))
     );
   }

@@ -37,6 +37,12 @@ Build the single-file version:
 node build.mjs
 ```
 
+After changing a logo in `assets/`, regenerate the inlined copies:
+
+```bash
+node tools-make-assets.mjs
+```
+
 This writes `dist/rainbow-lab.html` (a complete standalone page, no external
 requests) and `dist/artifact.html` (the same page without the document
 skeleton, for hosts that supply their own).
@@ -76,7 +82,14 @@ app.js         assembly + render loop
 | `src/skyView.js` | Mode C — 3-D cone, horizon, observer's eye view. |
 | `src/panels.js` | Tutorial, ray readout, mathematics, questions. |
 | `src/app.js` | Shell, controls, render loop. |
+| `src/assets.js` | Generated — logos inlined as data: URIs. |
 | `test/optics.test.mjs` | 42 tests over the engine. |
+
+The control column is filtered per scene: every control declares which
+scenes read its state, and groups left empty are dropped. Tutorial steps
+declare the controls they need, which are highlighted — and a step naming a
+control its own scene doesn't offer is reported to the console rather than
+leaving a reader hunting for it.
 
 ---
 
@@ -208,30 +221,94 @@ because the arc it draws (from the forward/antisolar reference to the
 actual outgoing ray) geometrically sweeps Θ, the scattering angle — showing
 that arc's size next to a `φ` number alone would silently mismatch.
 
+### Standing somewhere else on purpose
+
+The eye can also be **placed by hand**: drag it, or use the observer-angle
+slider. The angle is φ, measured at the observer between the line of sight
+back to the droplet and the antisolar direction, and it is drawn there as an
+arc so that "the observer is at 42°" and "the ray leaves at φ = 42°" are
+visibly one statement about one angle rather than two coincidental numbers.
+
+In this mode a ray is emphasised when it genuinely comes out where the eye
+is standing, rather than by its classification — so the emphasis is a
+consequence of where you put the eye, and the ray tally becomes a
+measurement. Sweep it and the count reports the caustic: with a 45-ray fan,
+**2 rays** reach an eye at 20–30°, **8** at 42.4°, and **none** at all past
+50°, because no once-reflected ray leaves at a larger angle. The caption
+prints the distance to the bow (`Δ +4.4° → 42.4°`) and flips to
+"✓ exactly on the bow" when the eye is within the caustic tolerance. At the
+rainbow angle the hand-placed eye lands on the auto-placed one to fifteen
+decimal places — same code path, one substituted number.
+
+### Zooming out
+
 At the default zoom the eye sits close enough that six wavelengths' worth of
-dispersion is barely a few pixels wide — visually indistinguishable from one
-ray. The **zoom-out slider** pulls the (dampened, `1/√zoom`) droplet down in
-size while pushing the observer proportionally farther away and lengthening
-the drawn rays to match, so the same angular dispersion becomes an
-increasingly wide, clearly rainbow-coloured band by the time it reaches the
-eye. The ratio of that band's width to the droplet's own size grows roughly
-linearly with the zoom setting (measured: ~0.1 at 1×, ~0.8 at 9×) — turn on
-white light and full dispersion, then zoom out, to watch it happen.
+dispersion is a few pixels wide — visually indistinguishable from one ray.
+The **zoom-out slider** (up to 40×, on a log scale) shrinks the droplet,
+lengthens the drawn rays to match, and slides the droplet away from the eye's
+direction so the droplet-to-eye baseline uses as much of the canvas as it
+can. The angular spread between red and violet is fixed at 1.72° and no
+amount of zooming changes it — so what actually grows is the fan's size
+*relative to the droplet*, which is the honest version of the effect:
+
+| zoom | droplet radius | fan width | ratio |
+| --- | --- | --- | --- |
+| 1× | 164 px | 10.0 px | 0.06 |
+| 9× | 55 px | 13.3 px | 0.24 |
+| 40× | 26 px | 13.3 px | 0.51 |
+
+(measured at 864×562; it scales with the canvas). Turn on white light and
+full dispersion, then zoom out, to watch a single white ray become a plainly
+rainbow-coloured band on its way to the eye.
+
+## The observer, in the many-droplets view
+
+The observer can be **moved through the rain** — dragged, or placed with the
+forward/back and up/down sliders. Not one droplet moves when you do; only
+the angles change, and a completely different set of droplets lights up.
+That is the whole claim of the scene made checkable: moving forward by 0.45
+scene units shifts the contributing droplets' centroid by 146 px and changes
+how many of them qualify at all. You cannot walk up to a rainbow, and no two
+observers see theirs on the same droplets.
+
+The Sun icon and the sun–antisolar axis travel with the observer, since the
+Sun being behind you is the precondition for seeing a bow at all. The ground
+stays where it is: it is a fixed plane, and rising above it is what puts rain
+below eye level.
 
 ## Interaction map
+
+The control column shows only what the current scene actually reads, so a
+control that is on screen always does something when you move it.
 
 - **Single droplet** — drag vertically in the canvas, or use the impact
   parameter slider, to move the incoming ray. Click any ray to classify it.
   Watch the eye: it lights up brass exactly when the current ray reaches it.
+  Drag the eye itself to stand somewhere else and hunt for the angle where
+  the rays pile up.
 - **Exit-angle graph** — click anywhere to set the impact parameter; the marker
   in the droplet follows, and vice versa.
 - **Ray distribution** — raise the ray count and watch the caustic peak build
   from 10 rays to 100 000.
 - **Many droplets** — green droplets are the ones sending light to the
-  observer. They sit at every distance, which is the point.
+  observer. They sit at every distance, which is the point. Drag the
+  observer and a different set of droplets takes over.
 - **Sky 3-D** — drag to orbit, scroll to zoom. Switch to the observer's eye to
   see the circle cut by the horizon.
+
+Both the scene and the graph have a **Save PNG** button that writes the
+figure at triple resolution with a credit line baked in, so a figure pasted
+into a slide keeps its provenance. PNG rather than SVG on purpose: the whole
+app renders through Canvas 2-D, and a vector export would mean a second
+drawing path per view that would have to agree with the first about every
+angle.
 
 The rendered bow is **off by default**. The intended path is to reconstruct it:
 individual rays → distribution of exit angles → caustic → many droplets →
 3-D cone → circular bow → horizon → visible arc.
+
+---
+
+© 2026 [lipka@fav.zcu.cz](https://home.zcu.cz/~lipka/) — Faculty of Applied
+Sciences, University of West Bohemia. FAV marks used per the faculty
+[visual style guide](https://www.fav.zcu.cz/cs/Faculty/Important-documents/fav-visual-style.html).

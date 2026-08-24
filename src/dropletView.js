@@ -9,7 +9,7 @@ import * as O from './optics.js';
 import { state, set, indexModel, activeOrders } from './state.js';
 import { buildRays, distanceFromExtremum, colorFor, traceOne } from './rays.js';
 import { t, deg, num } from './i18n.js';
-import { fitCanvas, strokePath, label, arrowHead, angleArc } from './ui.js';
+import { fitCanvas, strokePath, label, arrowHead, angleArc, capture } from './ui.js';
 
 /** Rays classified into one of these families are the ones a real observer
  * would actually see as a bright rainbow -- everything else is scattered
@@ -21,6 +21,12 @@ const SEG_LABELS = ['R0', 'R1', 'R2', 'R3', 'R4', 'R5'];
 export function createDropletView(canvas) {
   let layout = null;
   let hover = null;
+  /* The eyes currently on screen, and where each one was last drawn.
+     rayStyle(), the tally and the pointer hit-test all have to agree with
+     what drawObserver() actually painted, so they read these rather than
+     each re-deriving the geometry. */
+  let eyes = [];
+  let eyeScreen = [];
 
   function project(p) {
     return { x: layout.cx + p.x * layout.s, y: layout.cy - p.y * layout.s };
@@ -36,14 +42,34 @@ export function createDropletView(canvas) {
     // dispersed fan of colour become visible on the way to the eye instead
     // of being lost in a droplet that fills most of the frame.
     const zoom = Math.max(1, state.dropletZoom);
-    const s = Math.min(w * 0.19, h * 0.34) / Math.sqrt(zoom);
-    layout = { cx: w * 0.47, cy: h * 0.5, s, w, h, zoom };
+    // Floored: below ~16 px the droplet stops reading as a sphere with a
+    // traceable path inside it, and the point of zooming out is to compare
+    // the fan's spread WITH the droplet, not to lose the droplet.
+    const s = Math.max(16, Math.min(w * 0.19, h * 0.34) / Math.sqrt(zoom));
+
+    // Where the eyes are depends only on optics, so it can be settled before
+    // the layout -- which lets the layout use it. With essentially one exit
+    // direction in play, centring the droplet wastes half the canvas: the fan
+    // we are trying to spread out runs off one edge while the opposite side
+    // stays empty. Sliding the droplet AGAINST the mean eye direction as the
+    // zoom rises makes the droplet-to-eye baseline as long as the canvas
+    // allows, and the drawn width of the dispersion fan is proportional to
+    // exactly that baseline.
+    eyes = computeObservers();
+    const lean = meanScreenDir(eyes);
+    const pull = Math.min(1, (zoom - 1) / 6);
+    layout = {
+      cx: w * 0.47 - (lean ? lean.x * w * 0.24 * pull : 0),
+      cy: h * 0.5 - (lean ? lean.y * h * 0.2 * pull : 0),
+      s, w, h, zoom,
+    };
+    eyeScreen = [];
 
     drawBackground(ctx, w, h);
     drawDroplet(ctx);
     drawSun(ctx, w, h);
 
-    const observers = computeObservers();
+    const observers = eyes;
 
     const rays = buildRays();
     // Rays that reach the observer are drawn LAST, above everything else.
@@ -54,13 +80,11 @@ export function createDropletView(canvas) {
     // within each group.
     const order = { fan: 0, demo0: 1, demoNC: 1, main: 2 };
     rays.sort((a, b) => {
-      const ra = REACHES_OBSERVER.has(a.classification) ? 1 : 0;
-      const rb = REACHES_OBSERVER.has(b.classification) ? 1 : 0;
+      const ra = reachesEye(a) ? 1 : 0;
+      const rb = reachesEye(b) ? 1 : 0;
       return ra !== rb ? ra - rb : order[a.role] - order[b.role];
     });
-    const reachingKs = new Set(
-      rays.filter((r) => REACHES_OBSERVER.has(r.classification)).map((r) => r.k)
-    );
+    const reachingKs = new Set(rays.filter(reachesEye).map((r) => r.k));
     for (const ray of rays) drawRay(ctx, ray);
 
     const main = rays.filter((r) => r.role === 'main');
@@ -81,7 +105,7 @@ export function createDropletView(canvas) {
     for (const observer of observers) drawObserver(ctx, observer, reachingKs.has(observer.kRef));
     drawLegend(ctx, w, h, rays);
     if (state.show.labels) {
-      label(ctx, t('observerReachHint'), 12, h - 14, {
+      label(ctx, t(state.observerMode === 'manual' ? 'observerManualHint' : 'observerReachHint'), 12, h - 14, {
         color: '#6f86ab', font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
       });
     }
@@ -106,10 +130,17 @@ export function createDropletView(canvas) {
    * k=0 has no extremum -- no reflection ever produces a concentrated
    * direction -- so it never gets an eye; if it is the only active family, a
    * single inactive placeholder eye is still shown, captioned accordingly.
+   *
+   * In MANUAL mode the eyes keep their per-family structure and their side of
+   * the axis, but sit at the angle the user chose instead of the angle the
+   * extremum dictates. Same code path, one substituted number -- so the two
+   * modes cannot drift apart, and 42 deg becomes something to find rather
+   * than something the app quietly asserts.
    */
   function computeObservers() {
     const idx = indexModel();
     const nRef = idx(650); // red, the same reference wavelength used elsewhere
+    const manual = state.observerMode === 'manual';
     const orders = activeOrders().filter((k) => k >= 1);
     const observers = [];
     for (const kRef of orders) {
@@ -117,13 +148,75 @@ export function createDropletView(canvas) {
       if (!geo) continue;
       const canonical = traceOne(650, nRef, kRef, geo.impactParameter);
       if (!canonical.path.dirOut) continue;
-      observers.push({ dir: canonical.path.dirOut, valid: true, kRef, phiDeg: geo.antisolarDeg });
+      const common = { valid: true, kRef, rainbowPhiDeg: geo.antisolarDeg, manual };
+      if (!manual) {
+        observers.push({ ...common, dir: canonical.path.dirOut, phiDeg: geo.antisolarDeg });
+        continue;
+      }
+      // The exit side flips with every internal reflection (k=1 leaves below
+      // the axis for b>0, k=2 above), so the side has to come from this
+      // family's own canonical ray -- a manual eye placed on the wrong side
+      // would be mirrored away from the light and could never light up.
+      const side = Math.sign(canonical.path.dirOut.y) || 1;
+      // phi is measured AT the observer, between the line back to the droplet
+      // and the antisolar direction (+x), so the droplet-to-eye direction is
+      // Theta = 180 - phi away from +x.
+      const phi = O.clamp(state.observerPhi, 0, 180) * O.RAD;
+      observers.push({
+        ...common,
+        dir: O.vec(-Math.cos(phi), side * Math.sin(phi), 0),
+        phiDeg: O.clamp(state.observerPhi, 0, 180),
+      });
     }
     if (!observers.length) {
       const kRef = state.reflections >= 1 ? state.reflections : 0;
-      observers.push({ dir: O.vec(-1, 0, 0), valid: false, kRef, phiDeg: null });
+      observers.push({ dir: O.vec(-1, 0, 0), valid: false, kRef, phiDeg: null, rainbowPhiDeg: null, manual });
     }
     return observers;
+  }
+
+  /** Mean screen-space direction of the eyes, for the layout lean. */
+  function meanScreenDir(observers) {
+    let x = 0;
+    let y = 0;
+    let n = 0;
+    for (const o of observers) {
+      if (!o.valid) continue;
+      x += o.dir.x;
+      y += -o.dir.y; // world -> screen y-flip
+      n++;
+    }
+    if (!n) return null;
+    const len = Math.hypot(x, y);
+    return len < 1e-6 ? null : { x: x / len, y: y / len };
+  }
+
+  /**
+   * Does this ray actually deliver light into an eye that is on screen?
+   *
+   * AUTO mode asks the ray's own classification, which measures the ray
+   * against the extremum computed from the ray's OWN refractive index. A
+   * geometric test would be subtly wrong here: the eyes are positioned with
+   * n(650), so a violet primary ray -- dead on its own caustic, 1.7 deg away
+   * from red's -- would stop counting as reaching.
+   *
+   * MANUAL mode asks the geometric question instead, because that is the
+   * question the user is now steering: does this ray come out at the angle
+   * the eye is sitting at? Answering it geometrically is what makes the
+   * caustic discoverable -- sweeping the eye through the rainbow angle makes
+   * the count of arriving rays spike, and nothing had to be told to it.
+   * Both tests use the same tolerance, so at the rainbow angle the two modes
+   * agree ray for ray.
+   */
+  function reachesEye(ray) {
+    if (state.observerMode !== 'manual') return REACHES_OBSERVER.has(ray.classification);
+    if (ray.k < 1 || ray.path.antisolar === null) return false;
+    const phi = ray.path.antisolar * O.DEG;
+    for (const eye of eyes) {
+      if (!eye.valid || eye.kRef !== ray.k) continue;
+      if (Math.abs(phi - eye.phiDeg) <= O.CAUSTIC_TOLERANCE_DEG) return true;
+    }
+    return false;
   }
 
   function drawBackground(ctx, w, h) {
@@ -211,7 +304,7 @@ export function createDropletView(canvas) {
    * an off-caustic main ray is dimmed exactly like a non-rainbow fan ray.
    */
   function rayStyle(ray) {
-    const reaches = REACHES_OBSERVER.has(ray.classification);
+    const reaches = reachesEye(ray);
     // greyMix is the primary cue (see colorFor): a ray that misses the
     // observer loses most of its hue, so with a whole fan on screen the few
     // that matter stand out by colour and not merely by being a little less
@@ -310,7 +403,7 @@ export function createDropletView(canvas) {
     const ux = screenDir.x / len;
     const uy = screenDir.y / len;
 
-    const margin = 52;
+    const margin = 58; // room for the eye glyph and its centred caption
     let radius = s * 3.3 * Math.sqrt(zoom);
     const limits = [];
     if (ux > 1e-6) limits.push((w - margin - cx) / ux);
@@ -322,6 +415,7 @@ export function createDropletView(canvas) {
     const x = cx + ux * radius;
     const y = cy + uy * radius;
     const faceAngle = Math.atan2(cy - y, cx - x); // eye looks back at the droplet
+    eyeScreen.push({ x, y, kRef: observer.kRef });
 
     ctx.save();
     if (active) {
@@ -353,16 +447,67 @@ export function createDropletView(canvas) {
     ctx.fill();
     ctx.restore();
 
+    // phi, drawn where phi is actually defined: AT the eye, between the line
+    // of sight back to the droplet and the antisolar direction (+x on screen
+    // -- the direction the sunlight was already travelling, continuing past
+    // the droplet). Sweeping the same arc at the droplet centre instead would
+    // sweep Theta, not phi; that exact confusion is what the exit-angle
+    // readout had to be fixed for, so it is not repeated here. With the arc
+    // drawn, "the observer is at 42 deg" and "the ray leaves at phi = 42 deg"
+    // are visibly the same statement about the same angle.
+    if (state.show.angles && observer.valid && observer.phiDeg !== null) {
+      const losAng = Math.atan2(cy - y, cx - x);
+      const stub = Math.min(x + 66, w - 6);
+      if (stub > x + 12) {
+        strokePath(ctx, [{ x, y }, { x: stub, y }], 'rgba(143,164,200,0.4)', 1, [3, 4]);
+      }
+      // Labelled with the symbol only. The value is already in the caption a
+      // few pixels away, and printing it twice put the two labels on top of
+      // each other whenever the caption flipped up past the arc.
+      angleArc(ctx, x, y, 34, Math.min(losAng, 0), Math.max(losAng, 0),
+        active ? 'rgba(224,168,63,0.95)' : 'rgba(143,164,200,0.75)', 'φ');
+    }
+
     if (state.show.labels) {
       const belowLine2 = observer.valid
-        ? `φ ≈ ${deg(observer.phiDeg, 1)}${observer.kRef ? ` · k=${observer.kRef}` : ''}`
+        ? `φ ${observer.manual ? '=' : '≈'} ${deg(observer.phiDeg, 1)}${observer.kRef ? ` · k=${observer.kRef}` : ''}`
         : t('observerNoConcentration');
-      label(ctx, t('observerLabel'), x, y + 20, {
-        align: 'center', color: active ? '#e0a83f' : '#93a3bd',
+      // Stack the caption upwards when a downward stack would not fit. The
+      // eye's position is dictated by the optics -- for k=1 it lands on the
+      // bottom margin at every zoom -- so the caption is the part that has to
+      // give way. The reserved band at the foot is the hint row, which a
+      // three-line stack from a bottom-margin eye lands exactly on top of.
+      const HINT_BAND = 26;
+      const dir = y + 62 > h - HINT_BAND ? -1 : 1;
+      const y1 = dir > 0 ? y + 20 : y - 52;
+      // Centred on the eye, but slid back onto the canvas when that would
+      // run it off an edge. The eye's position is dictated by the optics and
+      // routinely sits hard against a margin, where the longest caption --
+      // the k=0 "no reflection, so no concentrated direction" one -- loses
+      // its first several characters.
+      const centred = (text, ty, opts = {}) => {
+        ctx.save();
+        ctx.font = opts.font || '11px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif';
+        const half = ctx.measureText(text).width / 2 + 6;
+        ctx.restore();
+        label(ctx, text, O.clamp(x, half + 2, Math.max(half + 2, w - half - 2)), ty,
+          { align: 'center', ...opts });
+      };
+      centred(t('observerLabel'), y1, { color: active ? '#e0a83f' : '#93a3bd' });
+      centred(belowLine2, y1 + 16, {
+        color: '#6f86ab', font: '10px "IBM Plex Mono", ui-monospace, monospace',
       });
-      label(ctx, belowLine2, x, y + 36, {
-        align: 'center', color: '#6f86ab', font: '10px "IBM Plex Mono", ui-monospace, monospace',
-      });
+      // Manual mode has to say plainly how far from the bow the eye is, or
+      // "move it until something happens" is a search with no feedback.
+      if (observer.manual && observer.rainbowPhiDeg !== null) {
+        const d = observer.phiDeg - observer.rainbowPhiDeg;
+        const onBow = Math.abs(d) <= O.CAUSTIC_TOLERANCE_DEG;
+        centred(onBow ? t('observerOnBow') : `Δ ${d > 0 ? '+' : ''}${num(d, 1)}° → ${deg(observer.rainbowPhiDeg, 1)}`,
+          y1 + 32, {
+            color: onBow ? '#6fd3a4' : '#c9905c',
+            font: '10px "IBM Plex Mono", ui-monospace, monospace',
+          });
+      }
     }
   }
 
@@ -486,7 +631,7 @@ export function createDropletView(canvas) {
     if (!state.show.labels) return;
     const traced = rays.filter((r) => r.path.hit && !r.path.tangent);
     if (traced.length < 2) return;
-    const reaching = traced.filter((r) => REACHES_OBSERVER.has(r.classification)).length;
+    const reaching = traced.filter(reachesEye).length;
 
     let y = y0;
     label(ctx, `${t('rayTally')}: ${reaching} / ${traced.length}`, w - 12, y, {
@@ -532,31 +677,72 @@ export function createDropletView(canvas) {
     return Math.max(-0.999, Math.min(0.999, b));
   }
 
+  /** The eye under the pointer, if any -- the drag handle for phi. */
+  function eyeUnder(e) {
+    const rect = canvas.getBoundingClientRect();
+    const px = e.clientX - rect.left;
+    const py = e.clientY - rect.top;
+    return eyeScreen.find((eye) => Math.hypot(px - eye.x, py - eye.y) < 22) || null;
+  }
+
+  /**
+   * The phi a pointer position implies: the angle at the pointer between the
+   * line back to the droplet and the antisolar direction. Only the magnitude
+   * of the screen angle is used, so the eye stays on whichever side of the
+   * axis its own reflection family actually exits towards, however far round
+   * the droplet the pointer wanders.
+   */
+  function phiFromEvent(e) {
+    const rect = canvas.getBoundingClientRect();
+    const dx = e.clientX - rect.left - layout.cx;
+    const dy = e.clientY - rect.top - layout.cy;
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-6) return state.observerPhi;
+    const theta = Math.acos(O.clamp(dx / len, -1, 1)) * O.DEG;
+    return Math.round(O.clamp(180 - theta, 0, 180) * 10) / 10;
+  }
+
   let dragging = false;
+  let eyeDrag = false;
   canvas.addEventListener('pointerdown', (e) => {
     if (!layout) return;
+    capture(canvas, e);
+    // Grabbing the eye steers phi directly. Doing it while still in auto mode
+    // is what switches the mode over: the gesture IS the request to place the
+    // eye by hand, and making the user find a radio button first would only
+    // give the drag a way to look broken.
+    if (eyeUnder(e)) {
+      eyeDrag = true;
+      set({ observerMode: 'manual', observerPhi: phiFromEvent(e) });
+      return;
+    }
     dragging = true;
-    canvas.setPointerCapture(e.pointerId);
     set({ impact: impactFromEvent(e) });
     selectNearest(e);
   });
   canvas.addEventListener('pointermove', (e) => {
     if (!layout) return;
+    if (eyeDrag) {
+      set({ observerPhi: phiFromEvent(e) });
+      return;
+    }
     if (dragging) {
       set({ impact: impactFromEvent(e) });
     } else {
       const rect = canvas.getBoundingClientRect();
       const y = e.clientY - rect.top;
       const hy = layout.cy - state.impact * layout.s;
-      const nowHover = Math.abs(y - hy) < 14;
+      const overEye = !!eyeUnder(e);
+      const nowHover = !overEye && Math.abs(y - hy) < 14;
+      const cursor = overEye ? 'grab' : nowHover ? 'ns-resize' : 'crosshair';
+      if (canvas.style.cursor !== cursor) canvas.style.cursor = cursor;
       if (nowHover !== hover) {
         hover = nowHover;
-        canvas.style.cursor = hover ? 'ns-resize' : 'crosshair';
         draw();
       }
     }
   });
-  const stop = () => { dragging = false; };
+  const stop = () => { dragging = false; eyeDrag = false; };
   canvas.addEventListener('pointerup', stop);
   canvas.addEventListener('pointercancel', stop);
 

@@ -129,18 +129,202 @@ direction from `phi`/`theta` trig by hand — the two are easy to get
 subtly wrong (see below), and tracing reuses code already covered by the
 unit tests.
 
-`state.dropletZoom` (default 1) controls how far away the observer is drawn,
-in droplet radii. `draw()` derives the droplet's pixel scale as
-`baseS / sqrt(zoom)` (dampened so it stays legible even at high zoom) and
-`buildRays()` scales the drawn ray length as `6 * zoom`, while
-`drawObserver()`'s eye distance scales as `3.3 * sqrt(zoom)` on that same
-shrinking pixel scale. The combination is what makes the effect work: at
-zoom 1 the six wavelengths' worth of dispersion is a few pixels, invisible;
-by zoom 9 the ratio of ray-fan spread to droplet size has grown roughly
-8×, because the fan spread shrinks slower than the droplet does as the
-scale contracts. If you touch any of these three formulas, touch the other
-two the same way, or the fan-to-droplet ratio stops growing with zoom and
-the control stops doing what it's for.
+### Auto vs. manual placement, and why the reach test differs between them
+
+`state.observerMode` picks between two placements of the same per-family
+eyes:
+
+- `'auto'` — each eye sits on its own family's rainbow direction (the
+  traced canonical ray, as above).
+- `'manual'` — each eye keeps its family and its **side of the axis**, but
+  sits at `state.observerPhi`. The side has to come from that family's own
+  canonical ray (`Math.sign(canonical.path.dirOut.y)`), because the exit
+  side flips with every internal reflection: k=1 leaves below the axis for
+  b > 0, k=2 above. An eye placed on the wrong side is mirrored away from
+  the light and can never light up.
+
+Only one number is substituted between the two branches, so they cannot
+drift apart. Verified: reconstructing the manual direction at the rainbow
+angle reproduces the traced auto direction to 1.1e-15.
+
+`reachesEye()` deliberately asks a **different question in each mode**, and
+this is not an inconsistency:
+
+- Auto mode reads `ray.classification`, which measures the ray against the
+  extremum computed from *that ray's own* refractive index. A geometric
+  test would be subtly wrong here: the eyes are positioned with `n(650)`,
+  so a violet primary ray — dead on its own caustic, 1.7° away from red's —
+  would stop counting as reaching, and the dispersion lesson would break.
+- Manual mode compares the ray's own `path.antisolar` against the eye's
+  angle, because that is the question the user is now steering: does this
+  ray come out where the eye is standing? Answering it geometrically is
+  what makes the caustic *discoverable* — sweeping the eye through the
+  rainbow angle makes the ray tally spike, and nothing had to assert it.
+
+Both use `CAUSTIC_TOLERANCE_DEG`, so at the rainbow angle the two modes
+agree ray for ray. Measured on tutorial step 6 (k=1, 45-ray fan, single
+wavelength): 2/46 rays reach an eye at 20–30°, **8/46** at 42.4°, 0/46 at
+50°. The peak is the caustic, counted rather than claimed.
+
+φ is drawn as an arc **at the eye**, between the line of sight back to the
+droplet and the antisolar direction (+x on screen). Sweeping that arc at
+the droplet centre instead would sweep Θ, not φ — the exact confusion the
+exit-angle readout had to be fixed for once already. The arc carries only
+the symbol; the value is in the caption a few pixels away, and printing it
+in both places put the two labels on top of each other whenever the caption
+flipped up past the arc.
+
+### Zoom, and the three formulas that have to move together
+
+`state.dropletZoom` (1 … 40, on a log slider) controls how far away the
+observer is drawn, in droplet radii. Three things scale with it, and if you
+change one you must change the others the same way or the control stops
+doing what it is for:
+
+- `draw()` derives the droplet's pixel scale as
+  `max(16, baseS / sqrt(zoom))` — dampened so it stays legible, floored
+  because below ~16 px it stops reading as a sphere with a traceable path
+  inside it.
+- `buildRays()` scales the drawn ray length as `6 * zoom`.
+- `drawObserver()`'s eye distance scales as `3.3 * sqrt(zoom)` on that same
+  shrinking pixel scale, then clamps to the canvas.
+
+The clamp is load-bearing, not a safety net: the unclamped distance already
+exceeds the canvas at zoom 1, so **the baseline is canvas-limited at every
+zoom**. That is why `draw()` also slides the droplet *against* the mean eye
+direction as the zoom rises (`meanScreenDir()`, ramped over zoom 1 → 7).
+Centring the droplet wastes half the canvas when there is essentially one
+exit direction in play; the lean buys a 34% longer baseline (331 → 443 px
+at 864×562), and the drawn width of the dispersion fan is proportional to
+exactly that baseline.
+
+Beyond the point where the baseline saturates, the gain comes purely from
+the droplet shrinking — which is the honest mechanism, since the angular
+spread between red and violet is fixed at 1.72° and no amount of zooming
+changes it. Measured fan width ÷ droplet radius at 864×562:
+
+| zoom | droplet radius | baseline | fan | ratio |
+| --- | --- | --- | --- | --- |
+| 1 | 164 px | 331 px | 10.0 px | 0.061 |
+| 9 | 55 px | 443 px | 13.3 px | 0.244 |
+| 40 | 26 px | 443 px | 13.3 px | 0.514 |
+
+Resolution-dependent, so re-measure rather than trusting these numbers
+after a layout change.
+
+## The observer in the many-droplets scene
+
+`state.dropsObserverX` / `dropsObserverY` place the observer inside the rain,
+in the same world units the droplet field uses (+x away from the Sun, +y up).
+The rain does not move; the observer does. This is the whole point of that
+scene — the bow is an *angle*, not a place — and it is the one claim the
+previously fixed observer could only make in a caption.
+
+Everything angular in `dropsView.js` is measured from that position: the
+per-droplet test (`rel = d - obs`), the rays drawn to the eye, the bow
+direction guides, the sun-antisolar axis, and the Sun icon's clamp anchor.
+Adding a new angular quantity means anchoring it there too. Verified: moving
+from the origin to +0.45 forward moves the contributing-droplet centroid by
+146 px and changes how many droplets qualify (7201 → 4600 lit pixels), so a
+genuinely different set of droplets delivers the bow.
+
+`OBS_RANGE` (exported, so the sliders and the drag clamp cannot disagree)
+allows only a little downward travel. The ground is a **fixed plane** in
+world coordinates whose shallowest setting sits 0.128 world units below the
+origin, so anything lower would put the observer underground. Do not be
+tempted to anchor the ground to the observer instead: that was tried, and it
+made the ground ride upwards with them, burying the very thing rising is
+supposed to reveal — rain below eye level.
+
+## The control column is scene-filtered, and the scene lists are assertions
+
+`app.js` builds the column from entries of the form
+`c(scenes, () => control, when?)`, where `scenes` lists the scenes that
+actually **read** that piece of state. `sceneGroup()` drops any group left
+with no visible children, so a scene never shows an empty or single-orphan
+group.
+
+Those lists are not cosmetic. Showing every control in every scene meant a
+reader in the 3-D sky scrolled past the impact parameter, the fan count and
+the zoom-out slider — none of which that scene reads — to reach the horizon
+toggle, and moving any of them did nothing at all. A control that visibly
+does nothing teaches that the simulation is decorative, which is the exact
+opposite of this project's point. So when you add state:
+
+- Add its control with the scene list matching where the view code reads it.
+  Grep for `state.<field>` and `state.show.<field>` across the view files;
+  the current split was derived that way, not guessed.
+- If a scene stops reading something, remove that scene from the list.
+
+`controlsKey()` is what makes this live: the column is rebuilt whenever the
+scene, the sky view mode (the look/FOV sliders exist only in the eye view),
+the observer mode, or the tutorial position changes. Adding a new condition
+to a `when` predicate means adding its state to `controlsKey()`, or the
+column will not rebuild when it changes.
+
+### Tutorial steps declare which controls they need
+
+Each `TUTORIAL` entry carries `focus: [...]` — control ids, which are just
+the translation keys, stamped onto the DOM as `data-ctl` by `slider()`,
+`toggle()`, `select()` and the hand-built `.ctl` wrappers. `applyFocus()`
+highlights them and **warns to the console when a focused control is not
+present in the scene that step selected**.
+
+That warning is the point of the mechanism, not a nicety: it turns "this
+step tells you to turn a knob this scene hides" from a dead end a reader
+discovers into a loud failure a developer sees. After any change to a
+step's `apply.scene` or to a control's scene list, walk all steps and
+confirm the console stays silent (see *How to verify changes*).
+
+A step's `actions` chip may carry a **function** instead of a patch object,
+for values that have to come out of the engine — the "snap to the bow" chip
+computes the angle from `O.rainbowGeometry` rather than carrying 42.4 as a
+literal, which is the same no-hard-coded-angles rule the rest of the app
+follows.
+
+## Exporting figures, and the two download paths
+
+Both toolbars carry a "Save PNG" button. The export re-renders the canvas at
+`EXPORT_SCALE` (3) device pixels per CSS pixel via `setRenderScale()` and then
+puts the scale back in a `finally` — leaving it raised would render the whole
+session at 3×. Every view already draws in CSS pixels and lets the canvas
+transform do the rest, so this costs one redraw and yields a real
+high-resolution figure rather than an upscaled screen grab.
+
+**PNG, not SVG, deliberately.** Canvas 2-D is the only renderer here; an SVG
+export would mean a second drawing path for every view, and two paths that
+have to agree about every angle is the exact class of thing this project
+exists to avoid. (`svg` is also in the artifact host's *extended* download
+allowlist, which may not be enabled; `png` is in the base set.)
+
+There are two ways to hand over the file and they are feature-detected, not
+built separately:
+
+- Inside the claude.ai artifact viewer a page cannot start a download itself.
+  `await window.claude.use('downloads')` returns a namespace whose
+  `save({filename, data})` asks the viewer to confirm. If that namespace
+  exists, a refusal from it is the answer — do **not** fall through to an
+  anchor the sandbox ignores anyway.
+- Everywhere else (GitHub Pages, `dist/rainbow-lab.html`, `file://`) an
+  object-URL `<a download>` is the only thing that works.
+
+Publishing the artifact therefore needs `capabilities: {downloads: true}`, or
+the button is present and inert for viewers.
+
+Encoding a ~2600 px PNG takes most of a second, which is why the button
+disables itself and shows a "saving…" status. Any browser test that clicks it
+must wait well past that before reading the result — a 260 ms wait made this
+look like a silent failure once already.
+
+## Inlined assets
+
+`src/assets.js` is **generated** by `tools-make-assets.mjs` from the files in
+`assets/`; edit those and re-run rather than editing the generated file. The
+logos are inlined as data: URIs because the built page must run from
+`file://` and inside a CSP that blocks every external request, and they are
+used through `<img src>` rather than inline `<svg>` so the logo's own styles
+and ids cannot collide with the page's. `assets.js` has no dependencies and
+sits second in `build.mjs`'s `ORDER`.
 
 ## Lessons from bugs found in this codebase (don't reintroduce these)
 
@@ -174,6 +358,30 @@ the control stops doing what it's for.
   angle-arc's sweep against the labelled value with real numbers, not by
   eye — the mismatch is not obvious at a glance once dispersion or a
   different `k` changes the numbers.
+- **A label placed relative to something the optics position will collide
+  with fixed furniture.** The single-droplet eye lands on the bottom margin
+  at every zoom for k=1, so its three-line caption landed exactly on the
+  bottom hint row. Captions near optics-driven elements need a flip (or a
+  reserved band), and the threshold has to count the *whole* stack, not one
+  line. Same class of bug: the many-droplets antisolar label was drawn 1.2
+  world units along the antisolar direction and was off the right edge at
+  every observer position, including the default.
+- **A second control for a quantity that already has one will fight it.**
+  Making the many-droplets ground follow the observer looked self-consistent
+  ("the ground stays the same distance under their feet") and was still
+  wrong: raising the observer raised the ground with them, hiding the rain
+  below eye level that rising is supposed to reveal. Ask what the control is
+  *for* before making it locally consistent.
+- **A label centred on an optics-placed element needs a horizontal clamp,
+  not just a vertical one.** The single-droplet eye sits hard against the
+  left margin whenever there is no extremum (k=0), and the longest caption
+  — "no reflection, so no concentrated direction" — lost its first several
+  characters. Only visible in an exported figure, which is a good argument
+  for exporting one while checking layout work.
+- **`setPointerCapture()` throws for a pointer id the element cannot
+  claim,** and it is called before the drag state is set up, so an
+  unguarded throw takes the whole gesture with it. Use `capture()` from
+  `ui.js`.
 
 ## How to verify changes
 
@@ -217,9 +425,30 @@ driving the actual app:
    *after* navigating, then call the exposed `R.renderOnce()` in your own
    loop — the app's internal `loop()` already got a dead callback queued
    against the real (silent) rAF before you can patch it.
-5. Full 10-step tutorial script + a few free-mode sweeps (impact parameter,
-   all `k` values, white light, multi-family) with zero thrown errors is the
-   practical regression bar this project has been held to so far.
+5. **The canvas never sizes itself in that pane.** `fitCanvas()` runs inside
+   the rAF loop, so with no compositing the backing store stays at the
+   default 300×150 and every capture and pixel measurement is garbage. Call
+   `R.renderOnce()` once first; the canvas then reports its real size.
+   Screenshots via `computer{action:"screenshot"}` fail outright there —
+   capture `canvas.toDataURL('image/jpeg', 0.7)` instead, let the oversized
+   tool result auto-save to a file, and decode that file to an image.
+6. **Prefer exact computation to pixel-scanning** when checking geometry.
+   Replicating a formula against `window.RainbowLab.O` gives an answer to
+   15 digits; pixel heuristics have already produced noise here. Pixel
+   counting is still the right tool for "did the *set* of highlighted things
+   change" questions — count saturated pixels and compare centroids.
+7. Full 12-step tutorial script in **both languages** + free-mode sweeps
+   (every scene, sky orbit and eye view, zoom extremes, reset) with zero
+   thrown errors **and zero console warnings** is the practical regression
+   bar. The warnings matter: `applyFocus()` reports tutorial steps whose
+   focused controls the current scene does not offer, so a silent console is
+   part of the pass, not just an absence of crashes.
+8. Interactions worth driving with synthetic pointer events after any change
+   to them: dragging the single-droplet eye (must switch to manual mode and
+   set φ from the pointer angle), clicking elsewhere on that canvas (must
+   still steer the impact parameter and leave φ alone), and dragging the
+   many-droplets observer (must move only from the glyph, and clamp to
+   `OBS_RANGE`).
 
 ## Style notes specific to this repo
 

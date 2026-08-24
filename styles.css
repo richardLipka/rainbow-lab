@@ -130,7 +130,15 @@ html, body {
   color: var(--fg-faint);
 }
 
-.scene-tabs { padding: 8px 12px 0; }
+.scene-tabs {
+  padding: 8px 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.scene-tabs .export-ctl { margin-left: auto; }
+.graph-tabs .export-ctl { margin-left: 10px; }
 .scene-desc {
   margin: 6px 12px 0;
   font-size: 11.5px;
@@ -228,6 +236,19 @@ html, body {
 .ctl-hint { display: block; color: var(--fg-faint); font-size: 10.5px; line-height: 1.45; margin-top: 3px; }
 .ctl-hint.block { margin: -4px 0 12px; }
 
+/* The control(s) the current tutorial step is actually asking about. The step
+   text says "switch the internal reflections to 1"; with several groups open
+   that is otherwise a search. */
+.ctl.focus {
+  position: relative;
+  border-left: 2px solid var(--accent);
+  margin-left: -8px;
+  padding-left: 6px;
+  background: linear-gradient(90deg, rgba(224, 168, 63, 0.09), transparent 70%);
+  border-radius: 0 3px 3px 0;
+}
+.ctl.focus > .ctl-label { color: var(--fg); }
+
 input[type='range'] {
   width: 100%;
   appearance: none;
@@ -318,6 +339,35 @@ select {
 .btn:disabled { opacity: 0.4; cursor: default; }
 .btn.primary { background: color-mix(in srgb, var(--accent) 22%, var(--bg-raised)); border-color: var(--accent); color: #fff; }
 .btn.wide { width: 100%; margin-top: 12px; }
+.btn.tiny { padding: 3px 9px; font-size: 11px; color: var(--fg-dim); }
+.btn.tiny:hover:not(:disabled) { color: var(--fg); }
+
+.export-ctl { display: inline-flex; align-items: center; gap: 7px; }
+.export-status { font-size: 10.5px; color: var(--fg-faint); }
+.export-status.ok { color: var(--good, #6fd3a4); }
+.export-status.warn { color: var(--accent); }
+
+/* ------------------------------------------------------------------ footer */
+
+.app-footer {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px 14px;
+  border-top: 1px solid var(--line);
+  background: var(--bg-panel);
+}
+.fav-logo { display: block; line-height: 0; opacity: 0.82; transition: opacity 0.15s; }
+.fav-logo:hover { opacity: 1; }
+.fav-logo img { height: 30px; width: auto; display: block; }
+.credit {
+  margin: 0 0 0 auto;
+  font-size: 11.5px;
+  color: var(--fg-faint);
+}
+.credit a { color: var(--fg-dim); text-decoration: none; border-bottom: 1px solid var(--line-strong); }
+.credit a:hover { color: var(--accent); border-bottom-color: var(--accent); }
 
 .chip {
   background: var(--bg-raised);
@@ -475,6 +525,9 @@ select {
   .scene-stage { height: 58vh; min-height: 320px; }
   .graph-stage { height: 200px; }
   .graph-hint { margin-left: 0; }
+  .scene-tabs .export-ctl { margin-left: 0; }
+  .app-footer { flex-wrap: wrap; gap: 10px; }
+  .credit { margin-left: 0; }
 }
 
 @media (max-width: 560px) {
