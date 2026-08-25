@@ -31,8 +31,14 @@ const PICK_RADIUS = 14;
  * this cross-section, and its shallowest setting sits 0.128 world units below
  * the origin, so anything lower would put the observer underground. Up is the
  * interesting direction anyway -- rising is what puts rain below eye level.
+ *
+ * The sunward end is limited by the canvas, not by the physics. At the old
+ * -0.28 the observer projected to x = -104 on an 804 px canvas and simply
+ * vanished off the left edge, taking the thing the reader was dragging with
+ * it. The current bound keeps the glyph on screen at every layout this scene
+ * uses, with room left over for the Sun marker beyond it.
  */
-export const OBS_RANGE = { x: [-0.28, 0.72], y: [-0.1, 0.3] };
+export const OBS_RANGE = { x: [-0.16, 0.72], y: [-0.1, 0.3] };
 
 /** p offset by k world units along the unit direction d. */
 const off = (p, d, k) => ({ x: p.x + d.x * k, y: p.y + d.y * k });
@@ -64,21 +70,39 @@ export function createDropsView(canvas) {
   let grabbing = false; // pointer is over (or holding) the observer handle
 
   function makeKey() {
-    return `${state.dropCount}|${state.show.rainBelow}`;
+    return String(state.dropCount);
   }
 
   function regenerate() {
     const target = state.dropCount;
     if (drops.length > target) drops.length = target;
-    while (drops.length < target) {
-      // spread in depth and height; log-ish depth so near and far are both seen
-      const depth = 0.12 + Math.pow(Math.random(), 0.6) * 0.88;
-      const spread = state.show.rainBelow ? 1 : 0.62;
-      const height = (Math.random() * 2 - 1) * spread;
-      drops.push({ x: depth, y: height * depth * 1.25 });
-    }
+    while (drops.length < target) drops.push(newDrop());
     seedKey = makeKey();
     validateSelection();
+  }
+
+  /** Spread in depth and height; log-ish depth so near and far are both seen. */
+  function newDrop() {
+    const depth = 0.12 + Math.pow(Math.random(), 0.6) * 0.88;
+    return { x: depth, y: (Math.random() * 2 - 1) * depth * 1.25 };
+  }
+
+  /**
+   * The lowest height that has rain in it, in world units.
+   *
+   * Applied when DRAWING rather than when generating, for two reasons. The
+   * observer moves, so a limit baked into the field at generation time would
+   * be wrong the moment they walked anywhere -- and rising until the rain is
+   * below you is precisely what the height control is for, so that has to
+   * update as you move. Narrowing the generated spread (which is what this
+   * used to do) also left droplets sitting below the observer and below the
+   * ground, which is the one thing the toggle claims to remove.
+   */
+  function rainFloor(obs) {
+    let floor = -Infinity;
+    if (state.show.ground) floor = Math.max(floor, groundY());
+    if (!state.show.rainBelow) floor = Math.max(floor, obs.y);
+    return floor;
   }
 
   /**
@@ -113,9 +137,12 @@ export function createDropsView(canvas) {
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, h);
 
-    const ox = w * 0.1;
+    // The observer sits in from the left edge far enough to leave the Sun
+    // marker somewhere to be: the sunward side of the axis needs real canvas,
+    // or the marker lands on top of the observer it is supposed to be behind.
+    const ox = w * 0.17;
     const oy = h * 0.52;
-    const s = Math.min(w * 0.82, h * 1.25);
+    const s = Math.min(w * 0.76, h * 1.25);
     // Where the observer is STANDING, in the same world units the droplet
     // field uses. The rain does not move; the observer does. Every droplet is
     // re-tested at its new angle, so moving here hands the bow to a
@@ -174,7 +201,9 @@ export function createDropsView(canvas) {
       ctx.fillStyle = gg;
       ctx.fillRect(0, yy, w, h - yy);
       strokePath(ctx, [{ x: 0, y: yy }, { x: w, y: yy }], 'rgba(120,170,140,0.45)', 1.2);
-      if (state.show.labels) label(ctx, t('horizon'), w - 12, yy - 12, { align: 'right', color: '#9ec9ab' });
+      // Left-aligned: the antisolar label is clamped to the right edge and at
+      // low Sun elevations the two land on exactly the same spot.
+      if (state.show.labels) label(ctx, t('horizon'), 12, yy - 12, { align: 'left', color: '#9ec9ab' });
     }
 
     // Every droplet in the field concentrates light into the SAME two
@@ -189,8 +218,10 @@ export function createDropsView(canvas) {
     // they go into a single path and a single fill() -- one fill per droplet
     // is what makes ten thousand of them slow.
     let contributing = 0;
+    let shown = 0;
     let drawnRays = 0;
     let drawnGreyRays = 0;
+    const floor = rainFloor(obs);
     const dotR = state.dropCount > 3000 ? 0.7 : state.dropCount > 600 ? 1.1 : state.dropCount > 60 ? 1.8 : 3;
     const greyPath = new Path2D();
     let greyCount = 0;
@@ -200,6 +231,8 @@ export function createDropsView(canvas) {
     // are still visibly parallel to every other droplet's.
     if (sel) ctx.globalAlpha = 0.4;
     for (const d of drops) {
+      if (d.y < floor) continue; // no rain underground, or below the eye
+      shown++;
       // Angles are measured FROM THE OBSERVER, so this is the only place the
       // observer's position enters the physics -- and it is enough to change
       // which droplets qualify.
@@ -280,51 +313,45 @@ export function createDropsView(canvas) {
     }
     if (state.show.labels) label(ctx, t('observerLabel'), o.x, o.y + 22, { align: 'center', color: '#e8eefc' });
 
-    // Sun icon, at a small FIXED pixel distance from the observer in the
-    // correct direction -- not scaled by world units. The observer sits
-    // close to the left edge (ox is only ~10% of the width, to leave room
-    // for droplet depth on the antisolar side), so at low sun elevations the
-    // true sun direction points almost straight off the left edge: there is
-    // close to zero margin on that side by construction of the layout, so
-    // no world-space radius reliably keeps the icon on-canvas. The dashed
-    // axis line above is drawn unclamped (harmless off-canvas) and carries
-    // the true far-away direction; the icon only needs to sit clearly,
-    // legibly, and in the right direction close to the observer, the same
-    // way the single-droplet view's own Sun icon is a fixed screen element
-    // rather than a geometrically "correct" distance. It is anchored to the
-    // observer, so it travels with them -- the Sun stays behind whoever is
-    // looking, which is the whole precondition for seeing a bow at all.
+    // The Sun marks a DIRECTION, not a place.
+    //
+    // It used to be drawn as a small disc a fixed 70 px from the observer,
+    // which travelled around with them and read as a nearby object -- as if
+    // you could walk up to it, and as if the rays reaching a droplet came
+    // from that spot rather than from infinitely far away. Putting the
+    // marker where the sun-antisolar axis leaves the canvas fixes both: it
+    // sits at the end of the line, it stops looking like a thing at a
+    // distance you could pace out, and the whole axis reads as one arrow
+    // saying "the light comes from over there".
     const sunScreenDir = SD(sun);
-    const sunMargin = 14;
-    let sunDist = 70;
-    if (sunScreenDir.x < -1e-6) sunDist = Math.min(sunDist, (o.x - sunMargin) / -sunScreenDir.x);
-    if (sunScreenDir.x > 1e-6) sunDist = Math.min(sunDist, (w - o.x - sunMargin) / sunScreenDir.x);
-    if (sunScreenDir.y < -1e-6) sunDist = Math.min(sunDist, (o.y - sunMargin) / -sunScreenDir.y);
-    if (sunScreenDir.y > 1e-6) sunDist = Math.min(sunDist, (h - o.y - sunMargin) / sunScreenDir.y);
-    sunDist = Math.max(24, sunDist);
+    const sunDist = Math.max(30, edgeDist(o, sunScreenDir, w, h) - 26);
     const sp = { x: o.x + sunScreenDir.x * sunDist, y: o.y + sunScreenDir.y * sunDist };
-    const sg = ctx.createRadialGradient(sp.x, sp.y, 2, sp.x, sp.y, 26);
-    sg.addColorStop(0, 'rgba(255,238,180,0.9)');
+    const sg = ctx.createRadialGradient(sp.x, sp.y, 2, sp.x, sp.y, 30);
+    sg.addColorStop(0, 'rgba(255,238,180,0.85)');
     sg.addColorStop(1, 'rgba(255,210,90,0)');
     ctx.fillStyle = sg;
     ctx.beginPath();
-    ctx.arc(sp.x, sp.y, 26, 0, Math.PI * 2);
+    ctx.arc(sp.x, sp.y, 30, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#ffe9a8';
-    ctx.beginPath();
-    ctx.arc(sp.x, sp.y, 6, 0, Math.PI * 2);
-    ctx.fill();
+    // An arrow along the travel direction, so the marker states which way the
+    // light is going instead of only where it started.
+    const tail = { x: sp.x - sunScreenDir.x * 14, y: sp.y - sunScreenDir.y * 14 };
+    arrowHead(ctx, sp, tail, 'rgba(255,233,168,0.9)', 8);
     if (state.show.labels) {
-      // Left-aligned, not centred: the icon sits close to the left edge at
-      // most sun elevations (see the clamp above), and a centred label would
-      // clip against that edge.
-      label(ctx, `${t('sunLabel')} · ${num(state.sunElevation, 0)}°`, Math.max(sp.x - 4, 4), sp.y - 28, {
-        align: 'left', color: '#ffe9a8',
+      // Pushed back along the axis and clamped, since the marker sits hard
+      // against whichever edge the axis happens to leave through.
+      const lx = O.clamp(sp.x - sunScreenDir.x * 34, 46, w - 46);
+      const ly = O.clamp(sp.y - sunScreenDir.y * 34, 14, h - 14);
+      label(ctx, `${t('sunLabel')} · ${num(state.sunElevation, 0)}°`, lx, ly, {
+        align: 'center', color: '#ffe9a8',
       });
     }
 
     // readout
-    label(ctx, `${t('dropCount')}: ${fmt(drops.length)}`, 12, 16, { color: '#cfe0ff' });
+    // The count of droplets that are actually rain right now, not the size
+    // of the generated field: raising the observer really does leave fewer of
+    // them above eye level, and hiding that would make the toggle look inert.
+    label(ctx, `${t('dropCount')}: ${fmt(shown)}`, 12, 16, { color: '#cfe0ff' });
     label(ctx, `${t('dropsContributing')}: ${fmt(contributing)}`, 12, 36, { color: '#6fd3a4' });
 
     // legend: what green vs grey actually means, spelled out next to a
@@ -498,11 +525,7 @@ export function createDropsView(canvas) {
     if (drops.length >= state.dropCount) return false;
     const add = Math.max(1, Math.ceil(drops.length * 0.25));
     const target = Math.min(state.dropCount, drops.length + add);
-    while (drops.length < target) {
-      const depth = 0.12 + Math.pow(Math.random(), 0.6) * 0.88;
-      const spread = state.show.rainBelow ? 1 : 0.62;
-      drops.push({ x: depth, y: (Math.random() * 2 - 1) * spread * depth * 1.25 });
-    }
+    while (drops.length < target) drops.push(newDrop());
     seedKey = makeKey();
     return true;
   }

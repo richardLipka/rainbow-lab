@@ -271,10 +271,16 @@ scene units shifts the contributing droplets' centroid by 146 px and changes
 how many of them qualify at all. You cannot walk up to a rainbow, and no two
 observers see theirs on the same droplets.
 
-The Sun icon and the sun–antisolar axis travel with the observer, since the
-Sun being behind you is the precondition for seeing a bow at all. The ground
-stays where it is: it is a fixed plane, and rising above it is what puts rain
-below eye level.
+The Sun travels with the observer, since the Sun being behind you is the
+precondition for seeing a bow at all — but it is drawn at the far end of the
+sun–antisolar axis, where that line leaves the picture, rather than as a small
+disc parked nearby. It marks a direction; it is not somewhere you could walk.
+
+The ground stays where it is: it is a fixed plane, and rising above it is what
+puts rain below eye level. With **rain below the observer** switched off there
+is genuinely none — no droplets under your feet and none under the ground —
+and the droplet count reports what is actually falling, so climbing costs you
+droplets instead of quietly doing nothing.
 
 ## Asking one droplet what it is doing
 
@@ -336,6 +342,23 @@ control that is on screen always does something when you move it.
 - **Sky 3-D** — drag to orbit, scroll to zoom. Switch to the observer's eye to
   see the circle cut by the horizon. The cursor changes over a bow; click it
   to trace that beam back to the droplet it came from.
+
+## One rainbow, not six
+
+White light is traced at six sampled wavelengths, which is the only way to
+trace it at all. Drawing the *band* that way was a different matter: six
+separate rings with sky between them look like six rainbows. The sky view now
+samples the band across the whole visible spectrum, so a bow is a continuous
+run of colour — and because the ring directions are cached against the Sun
+rather than the camera, it also draws faster than the six-ring version did.
+
+The same confusion reached the single-droplet observer, which reported its
+distance from *red's* bow wherever it stood. An eye at 41.1° is not 1.3° away
+from the rainbow; it is exactly on **blue's**. Under white light there is no
+single rainbow angle — there is a band from 40.6° to 42.4°, and where you
+stand in it decides which colour reaches you. The eye now names that colour.
+Moving the observer does not find a different rainbow; it changes which
+wavelength of the one bow arrives.
 
 ## Tracing one beam through the sky
 

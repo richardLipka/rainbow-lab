@@ -3305,15 +3305,31 @@ function createDropletView(canvas) {
     const nRef = idx(650); // red, the same reference wavelength used elsewhere
     const manual = state.observerMode === 'manual';
     const orders = activeOrders().filter((k) => k >= 1);
+    const lambdas = activeLambdas();
     const observers = [];
     for (const kRef of orders) {
       const geo = O.rainbowGeometry(nRef, kRef);
       if (!geo) continue;
       const canonical = traceOne(650, nRef, kRef, geo.impactParameter);
       if (!canonical.path.dirOut) continue;
-      const common = { valid: true, kRef, rainbowPhiDeg: geo.antisolarDeg, manual };
+      // Every active colour's bow for this order. Under white light the bows
+      // are 1.7 deg apart, so "the rainbow is at 42.4 deg" is red's edge of a
+      // band, not the whole band -- an eye parked at 41.1 deg is on the bow
+      // just as truly, it is simply catching blue. Quoting red's angle at
+      // every eye position was the thing that made a single bow read as
+      // several: nothing on screen ever said which colour was arriving.
+      const bows = [];
+      for (const lambda of lambdas) {
+        const g = O.rainbowGeometry(idx(lambda), kRef);
+        if (g) bows.push({ lambda, phi: g.antisolarDeg });
+      }
+      const common = { valid: true, kRef, manual, bows };
       if (!manual) {
-        observers.push({ ...common, dir: canonical.path.dirOut, phiDeg: geo.antisolarDeg });
+        const near = nearestBow(bows, geo.antisolarDeg);
+        observers.push({
+          ...common, dir: canonical.path.dirOut, phiDeg: geo.antisolarDeg,
+          rainbowPhiDeg: geo.antisolarDeg, bowLambda: near ? near.lambda : 650,
+        });
         continue;
       }
       // The exit side flips with every internal reflection (k=1 leaves below
@@ -3325,17 +3341,33 @@ function createDropletView(canvas) {
       // and the antisolar direction (+x), so the droplet-to-eye direction is
       // Theta = 180 - phi away from +x.
       const phi = O.clamp(state.observerPhi, 0, 180) * O.RAD;
+      const phiDeg = O.clamp(state.observerPhi, 0, 180);
+      const near = nearestBow(bows, phiDeg);
       observers.push({
         ...common,
         dir: O.vec(-Math.cos(phi), side * Math.sin(phi), 0),
-        phiDeg: O.clamp(state.observerPhi, 0, 180),
+        phiDeg,
+        rainbowPhiDeg: near ? near.phi : geo.antisolarDeg,
+        bowLambda: near ? near.lambda : 650,
       });
     }
     if (!observers.length) {
       const kRef = state.reflections >= 1 ? state.reflections : 0;
-      observers.push({ dir: O.vec(-1, 0, 0), valid: false, kRef, phiDeg: null, rainbowPhiDeg: null, manual });
+      observers.push({
+        dir: O.vec(-1, 0, 0), valid: false, kRef, phiDeg: null,
+        rainbowPhiDeg: null, bowLambda: null, bows: [], manual,
+      });
     }
     return observers;
+  }
+
+  /** Whichever active colour's bow for this order sits closest to phiDeg. */
+  function nearestBow(bows, phiDeg) {
+    let best = null;
+    for (const b of bows) {
+      if (!best || Math.abs(b.phi - phiDeg) < Math.abs(best.phi - phiDeg)) best = b;
+    }
+    return best;
   }
 
   /** Mean screen-space direction of the eyes, for the layout lean. */
@@ -3632,6 +3664,11 @@ function createDropletView(canvas) {
     }
 
     if (state.show.labels) {
+      // Name the colour whenever more than one is in play. Without it the
+      // caption reads as one rainbow that moves around, when what actually
+      // moves is which wavelength arrives at the eye.
+      const manyColours = observer.bows && observer.bows.length > 1;
+      const nm = manyColours && observer.bowLambda ? ` · ${observer.bowLambda} ${t('nm')}` : '';
       const belowLine2 = observer.valid
         ? `φ ${observer.manual ? '=' : '≈'} ${deg(observer.phiDeg, 1)}${observer.kRef ? ` · k=${observer.kRef}` : ''}`
         : t('observerNoConcentration');
@@ -3664,12 +3701,23 @@ function createDropletView(canvas) {
       // "move it until something happens" is a search with no feedback.
       if (observer.manual && observer.rainbowPhiDeg !== null) {
         const d = observer.phiDeg - observer.rainbowPhiDeg;
-        const onBow = Math.abs(d) <= O.CAUSTIC_TOLERANCE_DEG;
-        centred(onBow ? t('observerOnBow') : `Δ ${d > 0 ? '+' : ''}${num(d, 1)}° → ${deg(observer.rainbowPhiDeg, 1)}`,
+        // Measured against the NEAREST active colour's bow, with the tighter
+        // of the two tolerances. Against red's angle at the caustic
+        // half-width, "on the bow" lit up across a window wider than the
+        // whole band -- including angles where nothing is concentrated at
+        // all -- so the badge stopped meaning anything.
+        const onBow = Math.abs(d) <= BOW_MATCH_DEG;
+        centred(onBow
+          ? `${t('observerOnBow')}${nm}`
+          : `Δ ${d > 0 ? '+' : ''}${num(d, 1)}° → ${deg(observer.rainbowPhiDeg, 1)}${nm}`,
           y1 + 32, {
             color: onBow ? '#6fd3a4' : '#c9905c',
             font: '10px "IBM Plex Mono", ui-monospace, monospace',
           });
+      } else if (observer.valid && nm) {
+        centred(`${t('observerOnBow')}${nm}`, y1 + 32, {
+          color: '#6fd3a4', font: '10px "IBM Plex Mono", ui-monospace, monospace',
+        });
       }
     }
   }
@@ -4376,8 +4424,14 @@ const PICK_RADIUS = 14;
  * this cross-section, and its shallowest setting sits 0.128 world units below
  * the origin, so anything lower would put the observer underground. Up is the
  * interesting direction anyway -- rising is what puts rain below eye level.
+ *
+ * The sunward end is limited by the canvas, not by the physics. At the old
+ * -0.28 the observer projected to x = -104 on an 804 px canvas and simply
+ * vanished off the left edge, taking the thing the reader was dragging with
+ * it. The current bound keeps the glyph on screen at every layout this scene
+ * uses, with room left over for the Sun marker beyond it.
  */
-const OBS_RANGE = { x: [-0.28, 0.72], y: [-0.1, 0.3] };
+const OBS_RANGE = { x: [-0.16, 0.72], y: [-0.1, 0.3] };
 
 /** p offset by k world units along the unit direction d. */
 const off = (p, d, k) => ({ x: p.x + d.x * k, y: p.y + d.y * k });
@@ -4409,21 +4463,39 @@ function createDropsView(canvas) {
   let grabbing = false; // pointer is over (or holding) the observer handle
 
   function makeKey() {
-    return `${state.dropCount}|${state.show.rainBelow}`;
+    return String(state.dropCount);
   }
 
   function regenerate() {
     const target = state.dropCount;
     if (drops.length > target) drops.length = target;
-    while (drops.length < target) {
-      // spread in depth and height; log-ish depth so near and far are both seen
-      const depth = 0.12 + Math.pow(Math.random(), 0.6) * 0.88;
-      const spread = state.show.rainBelow ? 1 : 0.62;
-      const height = (Math.random() * 2 - 1) * spread;
-      drops.push({ x: depth, y: height * depth * 1.25 });
-    }
+    while (drops.length < target) drops.push(newDrop());
     seedKey = makeKey();
     validateSelection();
+  }
+
+  /** Spread in depth and height; log-ish depth so near and far are both seen. */
+  function newDrop() {
+    const depth = 0.12 + Math.pow(Math.random(), 0.6) * 0.88;
+    return { x: depth, y: (Math.random() * 2 - 1) * depth * 1.25 };
+  }
+
+  /**
+   * The lowest height that has rain in it, in world units.
+   *
+   * Applied when DRAWING rather than when generating, for two reasons. The
+   * observer moves, so a limit baked into the field at generation time would
+   * be wrong the moment they walked anywhere -- and rising until the rain is
+   * below you is precisely what the height control is for, so that has to
+   * update as you move. Narrowing the generated spread (which is what this
+   * used to do) also left droplets sitting below the observer and below the
+   * ground, which is the one thing the toggle claims to remove.
+   */
+  function rainFloor(obs) {
+    let floor = -Infinity;
+    if (state.show.ground) floor = Math.max(floor, groundY());
+    if (!state.show.rainBelow) floor = Math.max(floor, obs.y);
+    return floor;
   }
 
   /**
@@ -4458,9 +4530,12 @@ function createDropsView(canvas) {
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, h);
 
-    const ox = w * 0.1;
+    // The observer sits in from the left edge far enough to leave the Sun
+    // marker somewhere to be: the sunward side of the axis needs real canvas,
+    // or the marker lands on top of the observer it is supposed to be behind.
+    const ox = w * 0.17;
     const oy = h * 0.52;
-    const s = Math.min(w * 0.82, h * 1.25);
+    const s = Math.min(w * 0.76, h * 1.25);
     // Where the observer is STANDING, in the same world units the droplet
     // field uses. The rain does not move; the observer does. Every droplet is
     // re-tested at its new angle, so moving here hands the bow to a
@@ -4519,7 +4594,9 @@ function createDropsView(canvas) {
       ctx.fillStyle = gg;
       ctx.fillRect(0, yy, w, h - yy);
       strokePath(ctx, [{ x: 0, y: yy }, { x: w, y: yy }], 'rgba(120,170,140,0.45)', 1.2);
-      if (state.show.labels) label(ctx, t('horizon'), w - 12, yy - 12, { align: 'right', color: '#9ec9ab' });
+      // Left-aligned: the antisolar label is clamped to the right edge and at
+      // low Sun elevations the two land on exactly the same spot.
+      if (state.show.labels) label(ctx, t('horizon'), 12, yy - 12, { align: 'left', color: '#9ec9ab' });
     }
 
     // Every droplet in the field concentrates light into the SAME two
@@ -4534,8 +4611,10 @@ function createDropsView(canvas) {
     // they go into a single path and a single fill() -- one fill per droplet
     // is what makes ten thousand of them slow.
     let contributing = 0;
+    let shown = 0;
     let drawnRays = 0;
     let drawnGreyRays = 0;
+    const floor = rainFloor(obs);
     const dotR = state.dropCount > 3000 ? 0.7 : state.dropCount > 600 ? 1.1 : state.dropCount > 60 ? 1.8 : 3;
     const greyPath = new Path2D();
     let greyCount = 0;
@@ -4545,6 +4624,8 @@ function createDropsView(canvas) {
     // are still visibly parallel to every other droplet's.
     if (sel) ctx.globalAlpha = 0.4;
     for (const d of drops) {
+      if (d.y < floor) continue; // no rain underground, or below the eye
+      shown++;
       // Angles are measured FROM THE OBSERVER, so this is the only place the
       // observer's position enters the physics -- and it is enough to change
       // which droplets qualify.
@@ -4625,51 +4706,45 @@ function createDropsView(canvas) {
     }
     if (state.show.labels) label(ctx, t('observerLabel'), o.x, o.y + 22, { align: 'center', color: '#e8eefc' });
 
-    // Sun icon, at a small FIXED pixel distance from the observer in the
-    // correct direction -- not scaled by world units. The observer sits
-    // close to the left edge (ox is only ~10% of the width, to leave room
-    // for droplet depth on the antisolar side), so at low sun elevations the
-    // true sun direction points almost straight off the left edge: there is
-    // close to zero margin on that side by construction of the layout, so
-    // no world-space radius reliably keeps the icon on-canvas. The dashed
-    // axis line above is drawn unclamped (harmless off-canvas) and carries
-    // the true far-away direction; the icon only needs to sit clearly,
-    // legibly, and in the right direction close to the observer, the same
-    // way the single-droplet view's own Sun icon is a fixed screen element
-    // rather than a geometrically "correct" distance. It is anchored to the
-    // observer, so it travels with them -- the Sun stays behind whoever is
-    // looking, which is the whole precondition for seeing a bow at all.
+    // The Sun marks a DIRECTION, not a place.
+    //
+    // It used to be drawn as a small disc a fixed 70 px from the observer,
+    // which travelled around with them and read as a nearby object -- as if
+    // you could walk up to it, and as if the rays reaching a droplet came
+    // from that spot rather than from infinitely far away. Putting the
+    // marker where the sun-antisolar axis leaves the canvas fixes both: it
+    // sits at the end of the line, it stops looking like a thing at a
+    // distance you could pace out, and the whole axis reads as one arrow
+    // saying "the light comes from over there".
     const sunScreenDir = SD(sun);
-    const sunMargin = 14;
-    let sunDist = 70;
-    if (sunScreenDir.x < -1e-6) sunDist = Math.min(sunDist, (o.x - sunMargin) / -sunScreenDir.x);
-    if (sunScreenDir.x > 1e-6) sunDist = Math.min(sunDist, (w - o.x - sunMargin) / sunScreenDir.x);
-    if (sunScreenDir.y < -1e-6) sunDist = Math.min(sunDist, (o.y - sunMargin) / -sunScreenDir.y);
-    if (sunScreenDir.y > 1e-6) sunDist = Math.min(sunDist, (h - o.y - sunMargin) / sunScreenDir.y);
-    sunDist = Math.max(24, sunDist);
+    const sunDist = Math.max(30, edgeDist(o, sunScreenDir, w, h) - 26);
     const sp = { x: o.x + sunScreenDir.x * sunDist, y: o.y + sunScreenDir.y * sunDist };
-    const sg = ctx.createRadialGradient(sp.x, sp.y, 2, sp.x, sp.y, 26);
-    sg.addColorStop(0, 'rgba(255,238,180,0.9)');
+    const sg = ctx.createRadialGradient(sp.x, sp.y, 2, sp.x, sp.y, 30);
+    sg.addColorStop(0, 'rgba(255,238,180,0.85)');
     sg.addColorStop(1, 'rgba(255,210,90,0)');
     ctx.fillStyle = sg;
     ctx.beginPath();
-    ctx.arc(sp.x, sp.y, 26, 0, Math.PI * 2);
+    ctx.arc(sp.x, sp.y, 30, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#ffe9a8';
-    ctx.beginPath();
-    ctx.arc(sp.x, sp.y, 6, 0, Math.PI * 2);
-    ctx.fill();
+    // An arrow along the travel direction, so the marker states which way the
+    // light is going instead of only where it started.
+    const tail = { x: sp.x - sunScreenDir.x * 14, y: sp.y - sunScreenDir.y * 14 };
+    arrowHead(ctx, sp, tail, 'rgba(255,233,168,0.9)', 8);
     if (state.show.labels) {
-      // Left-aligned, not centred: the icon sits close to the left edge at
-      // most sun elevations (see the clamp above), and a centred label would
-      // clip against that edge.
-      label(ctx, `${t('sunLabel')} · ${num(state.sunElevation, 0)}°`, Math.max(sp.x - 4, 4), sp.y - 28, {
-        align: 'left', color: '#ffe9a8',
+      // Pushed back along the axis and clamped, since the marker sits hard
+      // against whichever edge the axis happens to leave through.
+      const lx = O.clamp(sp.x - sunScreenDir.x * 34, 46, w - 46);
+      const ly = O.clamp(sp.y - sunScreenDir.y * 34, 14, h - 14);
+      label(ctx, `${t('sunLabel')} · ${num(state.sunElevation, 0)}°`, lx, ly, {
+        align: 'center', color: '#ffe9a8',
       });
     }
 
     // readout
-    label(ctx, `${t('dropCount')}: ${fmt(drops.length)}`, 12, 16, { color: '#cfe0ff' });
+    // The count of droplets that are actually rain right now, not the size
+    // of the generated field: raising the observer really does leave fewer of
+    // them above eye level, and hiding that would make the toggle look inert.
+    label(ctx, `${t('dropCount')}: ${fmt(shown)}`, 12, 16, { color: '#cfe0ff' });
     label(ctx, `${t('dropsContributing')}: ${fmt(contributing)}`, 12, 36, { color: '#6fd3a4' });
 
     // legend: what green vs grey actually means, spelled out next to a
@@ -4843,11 +4918,7 @@ function createDropsView(canvas) {
     if (drops.length >= state.dropCount) return false;
     const add = Math.max(1, Math.ceil(drops.length * 0.25));
     const target = Math.min(state.dropCount, drops.length + add);
-    while (drops.length < target) {
-      const depth = 0.12 + Math.pow(Math.random(), 0.6) * 0.88;
-      const spread = state.show.rainBelow ? 1 : 0.62;
-      drops.push({ x: depth, y: (Math.random() * 2 - 1) * spread * depth * 1.25 });
-    }
+    while (drops.length < target) drops.push(newDrop());
     seedKey = makeKey();
     return true;
   }
@@ -5002,9 +5073,51 @@ function tip(ctx, text, x, y, w, h, opts = {}) {
 
 const NEAR = 0.02;
 
+/**
+ * How far away the Sun is drawn, in the unit-sphere world of this scene.
+ *
+ * Far enough that the parallax between the observer and a droplet on the bow
+ * is under a degree, which is what makes a ray drawn parallel to the sunlight
+ * actually point at the Sun on screen. It used to sit at 1.25 -- barely
+ * outside the bow itself -- and at that range the (correct) parallel ray
+ * visibly failed to line up with the (nearby) disc, which reads as a bug in
+ * the geometry when it is really a bug in the staging.
+ */
+const SUN_FAR = 40;
+
+/**
+ * How many wavelengths the bow is drawn from, and how many points per circle.
+ *
+ * Not six. Sampling white light at the six named colours is right for tracing
+ * rays -- you cannot trace a continuum, and the readout names each one -- but
+ * drawing six circles produced six separate rings with dark sky between them,
+ * which reads as several rainbows rather than one band of colour. The index
+ * model is continuous (Cauchy for anything not in the table), so the band can
+ * be sampled as finely as it needs to be; at this density the rings overlap
+ * into a continuous spectrum at every zoom the camera allows.
+ */
+const BOW_SAMPLES = 40;
+const BOW_STEPS = 96;
+const BOW_LAMBDA_MIN = 400;
+const BOW_LAMBDA_MAX = 680;
+
 /** Where the traced droplet sits, in the unit-sphere world of this scene. */
 const DROP_DIST = 1;
-const SUN_LEN = 0.55;
+/**
+ * The traced beam's incoming ray runs the whole way back to the Sun, not a
+ * token stub.
+ *
+ * This is perspective, so parallel lines are NOT parallel on screen -- they
+ * converge on the direction's vanishing point, which for the Sun is far off
+ * canvas. A short stub at the droplet therefore leaves at a screen bearing
+ * ~11 degrees off the sunlight axis drawn through the observer, and the two
+ * read as contradicting each other even though both are exactly right. Drawn
+ * full length, the ray runs off the same edge the axis does and the eye reads
+ * the convergence instead of a mismatch.
+ */
+const SUN_LEN = SUN_FAR;
+/** Where along that ray its arrow and caption sit, in world units. */
+const SUN_LABEL_AT = 0.5;
 // The orders that miss run PAST the observer rather than stopping short: the
 // gap between such a ray and the eye is then the miss angle drawn to scale,
 // the ray visibly sails by, and its caption lands clear of the observer's own
@@ -5033,6 +5146,9 @@ const CLICK_SLOP = 6;
 const PICK_STEPS = 360;
 
 const MONO_FONT = '10px "IBM Plex Mono", ui-monospace, monospace';
+
+/** Height of the readout block in the top-left corner, in CSS pixels. */
+const READOUT_H = 118;
 
 /** Reflection order -> chrome colour, the same convention drawCone() uses. */
 const ORDER_COLOR = {
@@ -5135,12 +5251,27 @@ function bowProfile() {
   return profile;
 }
 
+/** Pull a screen point back onto the canvas, along the line from its centre. */
+function clampToCanvas(p, w, h, margin) {
+  const cx = w / 2;
+  const cy = h / 2;
+  const dx = p.x - cx;
+  const dy = p.y - cy;
+  const len = Math.hypot(dx, dy);
+  if (len < 1e-6) return { x: cx, y: cy };
+  let t = len;
+  if (Math.abs(dx) > 1e-9) t = Math.min(t, ((w / 2 - margin) * len) / Math.abs(dx));
+  if (Math.abs(dy) > 1e-9) t = Math.min(t, ((h / 2 - margin) * len) / Math.abs(dy));
+  return { x: cx + (dx / len) * t, y: cy + (dy / len) * t };
+}
+
 /* ------------------------------------------------------------- the view -- */
 
 function createSkyView(canvas) {
   let cam = null;
   let size = { w: 0, h: 0 };
   let pickCache = { key: '', pts: [] };
+  let bandCache = { key: '', bands: [] };
 
   function groundDepth() {
     // observer height, compressed logarithmically so 1.7 m and 1000 m both fit
@@ -5304,24 +5435,68 @@ function createSkyView(canvas) {
     }
   }
 
+  /** Everything the bow band geometry depends on -- not the camera. */
+  function bandKey() {
+    return [
+      state.sunElevation, state.sunAzimuth, state.wavelength, state.dispersion,
+      state.indexMode, state.indexScale,
+      state.show.primary, state.show.secondary, state.show.higher,
+    ].join('|');
+  }
+
+  /**
+   * Each active order as a dense stack of wavelength circles.
+   *
+   * Cached against the Sun and the index model, so orbiting and resizing
+   * re-project the same directions instead of rebuilding them: the geometry
+   * only moves when the physics does.
+   */
+  function bowBands(anti) {
+    const key = bandKey();
+    if (bandCache.key === key) return bandCache.bands;
+    const idx = indexModel();
+    const orders = [];
+    if (state.show.primary) orders.push(1);
+    if (state.show.secondary) orders.push(2);
+    if (state.show.higher) orders.push(3);
+    const lambdas = [];
+    if (state.wavelength === 'white') {
+      for (let i = 0; i < BOW_SAMPLES; i++) {
+        lambdas.push(BOW_LAMBDA_MIN + ((BOW_LAMBDA_MAX - BOW_LAMBDA_MIN) * i) / (BOW_SAMPLES - 1));
+      }
+    } else {
+      lambdas.push(state.wavelength);
+    }
+    const bands = [];
+    for (const k of orders) {
+      const rings = [];
+      for (const lambda of lambdas) {
+        const geo = O.rainbowGeometry(idx(lambda), k);
+        if (geo) rings.push({ lambda, pts: O.rainbowCircle(anti, geo.antisolarDeg, BOW_STEPS) });
+      }
+      if (rings.length) bands.push({ k, rings });
+    }
+    bandCache = { key, bands };
+    return bands;
+  }
+
   function drawBowCircles(ctx, anti, dip) {
     const idx = indexModel();
     const orders = [];
     if (state.show.primary) orders.push(1);
     if (state.show.secondary) orders.push(2);
     if (state.show.higher) orders.push(3);
-    const lambdas =
-      state.wavelength === 'white' ? O.NAMED_COLORS.map((c) => c.lambda) : [state.wavelength];
 
-    for (const k of orders) {
-      for (const lam of lambdas) {
-        const geo = O.rainbowGeometry(idx(lam), k);
-        if (!geo) continue;
-        const circle = O.rainbowCircle(anti, geo.antisolarDeg, 220);
+    for (const band of bowBands(anti)) {
+      // Wide enough that neighbouring wavelengths overlap rather than leaving
+      // sky between them -- the band has to read as one bow, not as a stack.
+      const width = band.k === 1 ? 2.4 : 1.9;
+      const alpha = band.k === 1 ? 0.95 : 0.72;
+      for (const ring of band.rings) {
         // split into runs of visible directions, so the horizon does the cutting
         let run = [];
         const runs = [];
-        for (const d of circle) {
+        for (const d of ring.pts) {
           if (visibleDir(d, dip)) run.push(d);
           else {
             if (run.length > 1) runs.push(run);
@@ -5331,7 +5506,7 @@ function createSkyView(canvas) {
         if (run.length > 1) runs.push(run);
         for (const r of runs) {
           for (const seg of clipPolyline(cam, r)) {
-            strokePath(ctx, seg, colorFor(lam, k === 1 ? 0.95 : 0.7), k === 1 ? 2 : 1.4);
+            strokePath(ctx, seg, colorFor(ring.lambda, alpha), width);
           }
         }
       }
@@ -5339,7 +5514,7 @@ function createSkyView(canvas) {
 
     if (state.show.wavelengthLabels && orders.length) {
       for (const k of orders) {
-        const lam = lambdas[0];
+        const lam = state.wavelength === 'white' ? 650 : state.wavelength;
         const geo = O.rainbowGeometry(idx(lam), k);
         if (!geo) continue;
         const top = topOfBow(anti, geo.antisolarDeg);
@@ -5406,24 +5581,48 @@ function createSkyView(canvas) {
   }
 
   function drawSunAndAntisolar(ctx, sun, anti, w, h) {
-    const sp = O.vmul(sun, 1.25);
-    if (cam.depth(sp) > NEAR) {
-      const p = cam.project(sp);
-      const g = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, 26);
-      g.addColorStop(0, 'rgba(255,240,190,0.95)');
+    // The sunlight axis, drawn the full way through the scene: one line that
+    // says the light arrives along this direction and carries on past the
+    // observer to the antisolar point. With the Sun marked at the end of it
+    // rather than as a disc parked just outside the bow, the marker reads as
+    // a direction instead of as an object at a reachable distance.
+    for (const run of clipPolyline(cam, [O.vmul(sun, SUN_FAR), O.vmul(anti, SUN_FAR)])) {
+      strokePath(ctx, run, 'rgba(255,225,160,0.22)', 1, [6, 6]);
+    }
+    const far = O.vmul(sun, SUN_FAR);
+    if (cam.depth(far) > NEAR) {
+      // At a believable distance the Sun is normally off-canvas, so the
+      // marker is pulled to the edge along its own bearing: "that way", which
+      // is the only thing a direction marker should claim.
+      // Clamped onto the canvas along its own bearing from the centre, so it
+      // stays on the sunlight axis; then pushed clear of the readout block,
+      // which owns the top-left corner and is drawn over everything.
+      const p = clampToCanvas(cam.project(far), w, h, 30);
+      if (p.x < 330 && p.y < READOUT_H) p.y = READOUT_H;
+      const g = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, 30);
+      g.addColorStop(0, 'rgba(255,240,190,0.9)');
       g.addColorStop(1, 'rgba(255,215,110,0)');
       ctx.fillStyle = g;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 26, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, 30, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = '#fff2c4';
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
-      ctx.fill();
-      if (state.show.labels) {
-        label(ctx, `${t('sunLabel')} · ${deg(state.sunElevation, 0)}`, p.x, p.y - 30, {
-          align: 'center', color: '#ffe9a8',
-        });
+      // An arrow along the way the light travels, pointing into the scene.
+      const inward = cam.depth(O.vec(0, 0, 0)) > NEAR ? cam.project(O.vec(0, 0, 0)) : { x: w / 2, y: h / 2 };
+      const dx = inward.x - p.x;
+      const dy = inward.y - p.y;
+      const len = Math.hypot(dx, dy);
+      if (len > 1e-6) {
+        arrowHead(ctx, p, { x: p.x + (dx / len) * 16, y: p.y + (dy / len) * 16 },
+          'rgba(255,233,168,0.9)', 8);
+        if (state.show.labels) {
+          const lx = O.clamp(p.x - (dx / len) * 34, 52, w - 52);
+          let ly = O.clamp(p.y - (dy / len) * 34, 14, h - 14);
+          // the marker was pushed clear of the readout; its caption has to be
+          // pushed with it, or it lands back under the block it dodged
+          if (lx < 330 && ly < READOUT_H + 14) ly = READOUT_H + 14;
+          label(ctx, `${t('sunLabel')} · ${deg(state.sunElevation, 0)}`, lx, ly,
+            { align: 'center', color: '#ffe9a8' });
+        }
       }
     }
     if (state.show.antisolar) {
@@ -5571,15 +5770,12 @@ function createSkyView(canvas) {
     const toEye = O.vneg(pick.dir);
 
     // sunlight in, along the one direction all of it travels
-    const from = O.vadd(P, O.vmul(sun, SUN_LEN));
-    line3(ctx, [from, P], 'rgba(255,242,196,0.9)', 1.6);
-    if (cam.depth(from) > NEAR && cam.depth(P) > NEAR) {
-      const a = cam.project(from);
-      const b = cam.project(P);
-      arrowHead(ctx, a, b, 'rgba(255,242,196,0.95)', 7);
-      if (state.show.labels) {
-        capLabel(ctx, t('dropIncoming'), a.x, a.y - 12, w, h, '#ffe9a8');
-      }
+    line3(ctx, [O.vadd(P, O.vmul(sun, SUN_LEN)), P], 'rgba(255,242,196,0.9)', 1.6);
+    const nearSun = O.vadd(P, O.vmul(sun, SUN_LABEL_AT));
+    if (cam.depth(nearSun) > NEAR && cam.depth(P) > NEAR) {
+      const a = cam.project(nearSun);
+      arrowHead(ctx, a, cam.project(P), 'rgba(255,242,196,0.95)', 7);
+      if (state.show.labels) capLabel(ctx, t('dropIncoming'), a.x, a.y - 14, w, h, '#ffe9a8');
     }
 
     // what this droplet does with each order
@@ -5771,6 +5967,7 @@ function createSkyView(canvas) {
     reset: () => {
       profileCache = { key: '', profile: null };
       pickCache = { key: '', pts: [] };
+      bandCache = { key: '', bands: [] };
     },
   };
 }

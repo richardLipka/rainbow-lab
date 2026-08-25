@@ -236,6 +236,98 @@ tempted to anchor the ground to the observer instead: that was tried, and it
 made the ground ride upwards with them, burying the very thing rising is
 supposed to reveal — rain below eye level.
 
+## One bow, drawn as one bow
+
+White light is traced at the six wavelengths in `NAMED_COLORS`, and that is
+right for **rays**: you cannot trace a continuum, and the readout names each
+one. It is wrong for **bands**. The sky view used to draw one circle per
+sampled wavelength, which at full dispersion put six separate rings on screen
+with dark sky between them -- read, correctly, as several rainbows rather than
+one band of colour.
+
+The index model is continuous (`cauchyIndex` covers anything not in the
+table), so `skyView` samples the band at `BOW_SAMPLES` wavelengths across
+400-680 nm instead. Two things make that affordable:
+
+- the ring **directions** are cached against the Sun and the index model, not
+  the camera, so orbiting re-projects the same vectors rather than rebuilding
+  them. This removed more work than the denser sampling added: the sky frame
+  went from **16.0 ms to 8.5 ms** at 804x734 with both bows on.
+- the stroke width is set so neighbouring wavelengths overlap. A band has to
+  read as one bow at every zoom the camera allows, and a gap anywhere is the
+  whole bug coming back.
+
+The same discrete-sampling artefact reached the **single-droplet caption**.
+The eye reported `Delta -> 42.4 deg` at every position, because
+`rainbowPhiDeg` was always `n(650)`'s angle -- so an eye parked at 41.1 deg,
+which is exactly on *blue's* bow, was captioned as being 1.3 deg off "the"
+bow. Under white light there is no single bow angle: there is a band from
+40.65 deg (violet) to 42.37 deg (red), and where you stand inside it decides
+which colour arrives. `computeObservers()` now carries every active colour's
+bow for the order, and the caption names the nearest one -- "on the bow ·
+480 nm" -- so moving the eye reads as one bow changing colour instead of
+several bows appearing in turn.
+
+The badge's tolerance moved with it, from `CAUSTIC_TOLERANCE_DEG` (1.5 deg,
+measured against red) to `BOW_MATCH_DEG` (0.45 deg, measured against the
+nearest colour). The old pair lit "exactly on the bow" across a window wider
+than the entire band, including angles where nothing is concentrated at all.
+The new pair is continuously on-bow across [40.2, 42.8] and off outside it,
+because 0.45 deg is wider than the 0.345 deg gap between adjacent samples --
+check that inequality still holds if you ever change either number.
+
+`reachesEye()` still uses `CAUSTIC_TOLERANCE_DEG`: that asks "is this ray in
+the bright family", which is a property of the ray, not of where the eye
+happens to be. Note that under white light the ray tally peaks near 40.5 deg
+rather than at 42.4 deg, because a 1.5 deg window smears all six wavelengths
+together -- which is exactly why tutorial step 6 pins `wavelength: 650`.
+
+## The Sun is a direction, not a place
+
+Both scenes used to draw the Sun as a small disc a short way from the
+observer -- 70 screen px in the many-droplets view, 1.25 world units in the
+sky. At that range it reads as an object at a distance you could pace out,
+and worse, the (correct) parallel sunlight ray drawn at a droplet visibly
+fails to point at it.
+
+Both now put the marker at the end of the sun-antisolar axis, where it leaves
+the canvas, with an arrow along the direction the light travels.
+
+In the sky view this needs care, because **perspective**: parallel 3-D lines
+are not parallel on screen, they converge on the direction's vanishing point.
+Measured at camDist 3.1, a short sunlight stub at a droplet on the bow left
+at a screen bearing 11 deg off the axis through the observer -- both exactly
+right, and reading as a contradiction. Two changes fix the impression:
+`SUN_FAR = 40` puts the marker essentially at the true vanishing point, and
+the traced beam's incoming ray is drawn the **whole** way (`SUN_LEN =
+SUN_FAR`) so it runs off the same edge the axis does. A stub cannot show
+convergence; a full-length ray does.
+
+The marker is clamped onto the canvas along its own bearing from the centre,
+then pushed clear of `READOUT_H` -- the readout block owns the top-left
+corner and is drawn over everything.
+
+## Rain below the observer, and where the field gets cut
+
+`show.rainBelow` used to narrow the vertical **spread** the field was
+generated with, which is not what it says: droplets still sat below the
+observer and below the ground, the toggle only made them rarer. It is now a
+draw-time cut at `rainFloor()` -- the ground plane always, and the observer's
+own eye level when the toggle is off.
+
+Draw time, not generation time, for a reason: the observer moves, so a limit
+baked into the field would be wrong the moment they walked anywhere -- and
+rising until the rain is below you is precisely what the height control is
+for. The readout reports the count that survives the cut rather than the size
+of the generated field, so raising the observer visibly costs droplets
+instead of silently doing nothing.
+
+`OBS_RANGE.x` tightened from -0.28 to -0.16 at the same time: at the old
+bound the observer projected to x = -104 on an 804 px canvas and simply left
+the scene, taking the thing the reader was dragging with it. `ox` also moved
+from 0.1 to 0.17 of the width so the sunward side has canvas for the Sun
+marker to sit in.
+
 ## Inspecting one droplet, and where those numbers live
 
 `state.selectedDrop` holds the **world position** of a clicked droplet (not
@@ -552,6 +644,12 @@ sits second in `build.mjs`'s `ORDER`.
   worked there was nothing on screen distinguishing a clickable bow from the
   rest of the canvas. "I only see the cursor for the rotations" was the
   report; both halves needed fixing.
+- **A toggle has to do what it says, not something correlated with it.**
+  `show.rainBelow` narrowed the spread the droplet field was generated with,
+  which left droplets below the observer and below the ground -- the exact
+  thing it claims to remove -- while looking plausible because the field did
+  visibly thin out. Reported by the user. When a control names a boundary,
+  cut at the boundary.
 - **A check that reads the DOM has to run after everything that rebuilds
   it, not next to the thing that triggered it.** `applyFocus()` was called
   from the graph branch of the `subscribe()` handler, because closing the
@@ -618,18 +716,23 @@ driving the actual app:
    Screenshots via `computer{action:"screenshot"}` fail outright there —
    capture `canvas.toDataURL('image/jpeg', 0.7)` instead, let the oversized
    tool result auto-save to a file, and decode that file to an image.
-6. **Prefer exact computation to pixel-scanning** when checking geometry.
+6. **Bound a pixel-scan by the thing you are actually asking about.** A scan
+   for "droplets below the observer" that ran to the bottom of the canvas
+   counted the ground gradient, the Sun's glow and the hint text, and
+   reported 1694 stray pixels where the correct answer was 0. Cut the band at
+   the ground line and at the label margins first.
+7. **Prefer exact computation to pixel-scanning** when checking geometry.
    Replicating a formula against `window.RainbowLab.O` gives an answer to
    15 digits; pixel heuristics have already produced noise here. Pixel
    counting is still the right tool for "did the *set* of highlighted things
    change" questions — count saturated pixels and compare centroids.
-7. Full 12-step tutorial script in **both languages** + free-mode sweeps
+8. Full 12-step tutorial script in **both languages** + free-mode sweeps
    (every scene, sky orbit and eye view, zoom extremes, reset) with zero
    thrown errors **and zero console warnings** is the practical regression
    bar. The warnings matter: `applyFocus()` reports tutorial steps whose
    focused controls the current scene does not offer, so a silent console is
    part of the pass, not just an absence of crashes.
-8. Interactions worth driving with synthetic pointer events after any change
+9. Interactions worth driving with synthetic pointer events after any change
    to them: dragging the single-droplet eye (must switch to manual mode and
    set φ from the pointer angle), clicking elsewhere on that canvas (must
    still steer the impact parameter and leave φ alone), the wheel on that

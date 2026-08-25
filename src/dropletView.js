@@ -6,8 +6,8 @@
  * re-runs the trace.
  */
 import * as O from './optics.js';
-import { state, set, indexModel, activeOrders } from './state.js';
-import { buildRays, distanceFromExtremum, colorFor, traceOne } from './rays.js';
+import { state, set, indexModel, activeOrders, activeLambdas } from './state.js';
+import { buildRays, distanceFromExtremum, colorFor, traceOne, BOW_MATCH_DEG } from './rays.js';
 import { t, deg, num } from './i18n.js';
 import { fitCanvas, strokePath, label, arrowHead, angleArc, capture } from './ui.js';
 
@@ -149,15 +149,31 @@ export function createDropletView(canvas) {
     const nRef = idx(650); // red, the same reference wavelength used elsewhere
     const manual = state.observerMode === 'manual';
     const orders = activeOrders().filter((k) => k >= 1);
+    const lambdas = activeLambdas();
     const observers = [];
     for (const kRef of orders) {
       const geo = O.rainbowGeometry(nRef, kRef);
       if (!geo) continue;
       const canonical = traceOne(650, nRef, kRef, geo.impactParameter);
       if (!canonical.path.dirOut) continue;
-      const common = { valid: true, kRef, rainbowPhiDeg: geo.antisolarDeg, manual };
+      // Every active colour's bow for this order. Under white light the bows
+      // are 1.7 deg apart, so "the rainbow is at 42.4 deg" is red's edge of a
+      // band, not the whole band -- an eye parked at 41.1 deg is on the bow
+      // just as truly, it is simply catching blue. Quoting red's angle at
+      // every eye position was the thing that made a single bow read as
+      // several: nothing on screen ever said which colour was arriving.
+      const bows = [];
+      for (const lambda of lambdas) {
+        const g = O.rainbowGeometry(idx(lambda), kRef);
+        if (g) bows.push({ lambda, phi: g.antisolarDeg });
+      }
+      const common = { valid: true, kRef, manual, bows };
       if (!manual) {
-        observers.push({ ...common, dir: canonical.path.dirOut, phiDeg: geo.antisolarDeg });
+        const near = nearestBow(bows, geo.antisolarDeg);
+        observers.push({
+          ...common, dir: canonical.path.dirOut, phiDeg: geo.antisolarDeg,
+          rainbowPhiDeg: geo.antisolarDeg, bowLambda: near ? near.lambda : 650,
+        });
         continue;
       }
       // The exit side flips with every internal reflection (k=1 leaves below
@@ -169,17 +185,33 @@ export function createDropletView(canvas) {
       // and the antisolar direction (+x), so the droplet-to-eye direction is
       // Theta = 180 - phi away from +x.
       const phi = O.clamp(state.observerPhi, 0, 180) * O.RAD;
+      const phiDeg = O.clamp(state.observerPhi, 0, 180);
+      const near = nearestBow(bows, phiDeg);
       observers.push({
         ...common,
         dir: O.vec(-Math.cos(phi), side * Math.sin(phi), 0),
-        phiDeg: O.clamp(state.observerPhi, 0, 180),
+        phiDeg,
+        rainbowPhiDeg: near ? near.phi : geo.antisolarDeg,
+        bowLambda: near ? near.lambda : 650,
       });
     }
     if (!observers.length) {
       const kRef = state.reflections >= 1 ? state.reflections : 0;
-      observers.push({ dir: O.vec(-1, 0, 0), valid: false, kRef, phiDeg: null, rainbowPhiDeg: null, manual });
+      observers.push({
+        dir: O.vec(-1, 0, 0), valid: false, kRef, phiDeg: null,
+        rainbowPhiDeg: null, bowLambda: null, bows: [], manual,
+      });
     }
     return observers;
+  }
+
+  /** Whichever active colour's bow for this order sits closest to phiDeg. */
+  function nearestBow(bows, phiDeg) {
+    let best = null;
+    for (const b of bows) {
+      if (!best || Math.abs(b.phi - phiDeg) < Math.abs(best.phi - phiDeg)) best = b;
+    }
+    return best;
   }
 
   /** Mean screen-space direction of the eyes, for the layout lean. */
@@ -476,6 +508,11 @@ export function createDropletView(canvas) {
     }
 
     if (state.show.labels) {
+      // Name the colour whenever more than one is in play. Without it the
+      // caption reads as one rainbow that moves around, when what actually
+      // moves is which wavelength arrives at the eye.
+      const manyColours = observer.bows && observer.bows.length > 1;
+      const nm = manyColours && observer.bowLambda ? ` · ${observer.bowLambda} ${t('nm')}` : '';
       const belowLine2 = observer.valid
         ? `φ ${observer.manual ? '=' : '≈'} ${deg(observer.phiDeg, 1)}${observer.kRef ? ` · k=${observer.kRef}` : ''}`
         : t('observerNoConcentration');
@@ -508,12 +545,23 @@ export function createDropletView(canvas) {
       // "move it until something happens" is a search with no feedback.
       if (observer.manual && observer.rainbowPhiDeg !== null) {
         const d = observer.phiDeg - observer.rainbowPhiDeg;
-        const onBow = Math.abs(d) <= O.CAUSTIC_TOLERANCE_DEG;
-        centred(onBow ? t('observerOnBow') : `Δ ${d > 0 ? '+' : ''}${num(d, 1)}° → ${deg(observer.rainbowPhiDeg, 1)}`,
+        // Measured against the NEAREST active colour's bow, with the tighter
+        // of the two tolerances. Against red's angle at the caustic
+        // half-width, "on the bow" lit up across a window wider than the
+        // whole band -- including angles where nothing is concentrated at
+        // all -- so the badge stopped meaning anything.
+        const onBow = Math.abs(d) <= BOW_MATCH_DEG;
+        centred(onBow
+          ? `${t('observerOnBow')}${nm}`
+          : `Δ ${d > 0 ? '+' : ''}${num(d, 1)}° → ${deg(observer.rainbowPhiDeg, 1)}${nm}`,
           y1 + 32, {
             color: onBow ? '#6fd3a4' : '#c9905c',
             font: '10px "IBM Plex Mono", ui-monospace, monospace',
           });
+      } else if (observer.valid && nm) {
+        centred(`${t('observerOnBow')}${nm}`, y1 + 32, {
+          color: '#6fd3a4', font: '10px "IBM Plex Mono", ui-monospace, monospace',
+        });
       }
     }
   }
