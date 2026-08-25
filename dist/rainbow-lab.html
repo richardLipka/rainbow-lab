@@ -1666,7 +1666,7 @@ const translations = {
     showSecondary: 'Vedlejší duha',
     showHigherOrder: 'Vyšší řády',
     showSky: 'Obloha',
-    rainBelow: 'Déšť i pod pozorovatelem',
+    rainBelow: 'Déšť i pod úrovní očí',
 
     /* ---- terminology ---- */
     refraction: 'lom',
@@ -1929,7 +1929,8 @@ const translations = {
     skyPickBelowHorizon:
       'Tento směr je pod obzorem, takže tam žádný déšť nevidíte a paprsek se nekreslí. Snižte Slunce nebo zapněte déšť pod úrovní očí.',
     coneAngle: 'Úhel kužele',
-    visibleAbove: 'Nad horizontem',
+    bowVisible: 'Viditelná část duhy',
+    rainSeenBelow: 'Déšť vidíte až do',
     horizonDip: 'Pokles horizontu',
     fullCircle: 'Úplný kruh',
     flyMode: 'Let nad krajinou',
@@ -2068,7 +2069,7 @@ const translations = {
     showSecondary: 'Secondary rainbow',
     showHigherOrder: 'Higher orders',
     showSky: 'Sky',
-    rainBelow: 'Rain below the observer too',
+    rainBelow: 'Rain below eye level too',
 
     /* ---- terminology ---- */
     refraction: 'refraction',
@@ -2333,7 +2334,8 @@ const translations = {
     skyPickBelowHorizon:
       'This direction is below the horizon, so there is no rain to see there and the beam is not drawn. Lower the Sun, or turn on rain below eye level.',
     coneAngle: 'Cone angle',
-    visibleAbove: 'Above the horizon',
+    bowVisible: 'Visible part of the bow',
+    rainSeenBelow: 'Rain seen down to',
     horizonDip: 'Horizon dip',
     fullCircle: 'Full circle',
     flyMode: 'Fly above the ground',
@@ -3591,8 +3593,17 @@ function createDropletView(canvas) {
    * regardless of aspect ratio, since the true distance to an observer is
    * effectively infinite and has no true scale to draw at.
    */
-  function drawObserver(ctx, observer, active) {
+  function drawObserver(ctx, observer, reaching) {
     const { cx, cy, s, w, h, zoom } = layout;
+    // Brass means ONE thing: this eye is standing on the bow. Measured
+    // against the nearest active colour, exactly as the caption below is, so
+    // the glyph and the words can never disagree. It used to follow "some ray
+    // reached me", which under white light was true across a window wider
+    // than the whole band -- the eye was lit almost everywhere and so said
+    // nothing about where the rainbow actually is.
+    const onBow = observer.valid && observer.rainbowPhiDeg !== null &&
+      Math.abs(observer.phiDeg - observer.rainbowPhiDeg) <= BOW_MATCH_DEG;
+    const active = onBow && reaching !== false;
     const screenDir = { x: observer.dir.x, y: -observer.dir.y }; // world -> screen y-flip
     const len = Math.hypot(screenDir.x, screenDir.y) || 1;
     const ux = screenDir.x / len;
@@ -3627,18 +3638,30 @@ function createDropletView(canvas) {
     strokePath(ctx, [{ x, y }, { x: cx, y: cy }],
       active ? 'rgba(224,168,63,0.3)' : 'rgba(147,163,189,0.16)', 1, [2, 4]);
 
+    // A halo the moment the eye is on the bow, so "found it" is visible from
+    // across the room rather than being a shade of line colour.
+    if (active) {
+      const halo = ctx.createRadialGradient(x, y, 2, x, y, 30);
+      halo.addColorStop(0, 'rgba(224,168,63,0.42)');
+      halo.addColorStop(1, 'rgba(224,168,63,0)');
+      ctx.fillStyle = halo;
+      ctx.beginPath();
+      ctx.arc(x, y, 30, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     ctx.translate(x, y);
     ctx.rotate(faceAngle);
     ctx.beginPath();
-    ctx.ellipse(0, 0, 15, 8, 0, 0, Math.PI * 2);
-    ctx.fillStyle = active ? 'rgba(224,168,63,0.14)' : 'rgba(147,163,189,0.08)';
+    ctx.ellipse(0, 0, active ? 16 : 14, active ? 8.6 : 7.4, 0, 0, Math.PI * 2);
+    ctx.fillStyle = active ? 'rgba(224,168,63,0.26)' : 'rgba(147,163,189,0.06)';
     ctx.fill();
-    ctx.strokeStyle = active ? '#e0a83f' : 'rgba(147,163,189,0.7)';
-    ctx.lineWidth = active ? 1.9 : 1.2;
+    ctx.strokeStyle = active ? '#ffcf6a' : 'rgba(147,163,189,0.55)';
+    ctx.lineWidth = active ? 2.4 : 1.1;
     ctx.stroke();
     ctx.beginPath();
-    ctx.arc(0, 0, active ? 4.4 : 3.2, 0, Math.PI * 2);
-    ctx.fillStyle = active ? '#e0a83f' : '#93a3bd';
+    ctx.arc(0, 0, active ? 5 : 2.8, 0, Math.PI * 2);
+    ctx.fillStyle = active ? '#ffcf6a' : 'rgba(147,163,189,0.75)';
     ctx.fill();
     ctx.restore();
 
@@ -4433,6 +4456,9 @@ const PICK_RADIUS = 14;
  */
 const OBS_RANGE = { x: [-0.16, 0.72], y: [-0.1, 0.3] };
 
+/** Where the ground sits, in world units. See groundY(). */
+const GROUND_Y = -0.13;
+
 /** p offset by k world units along the unit direction d. */
 const off = (p, d, k) => ({ x: p.x + d.x * k, y: p.y + d.y * k });
 
@@ -4898,14 +4924,16 @@ function createDropsView(canvas) {
   }
 
   function groundY() {
-    // Observer height in metres, mapped onto the scene purely for legibility.
-    // Anchored in WORLD coordinates, not to the observer: tying it to the
-    // observer made the ground ride upwards with them, which buried the very
-    // thing rising is supposed to reveal -- rain below eye level. The ground
-    // is a fixed plane and the observer moves relative to it, which is also
-    // why OBS_RANGE cannot let them descend past it.
-    const hm = state.observerHeight;
-    return -Math.min(0.55, 0.06 + Math.log10(1 + hm) * 0.16);
+    // A fixed plane, and deliberately not a function of anything.
+    //
+    // It used to be driven by state.observerHeight, which meant this scene
+    // had two controls for the observer's height: observerRise moved the eye
+    // and observerHeight moved the ground under it. Two knobs for one
+    // quantity is a bug this codebase has hit before -- whichever one the
+    // reader was not touching quietly contradicted the other. The eye moves;
+    // the ground stays put, which is also why OBS_RANGE cannot let the
+    // observer descend past it.
+    return GROUND_Y;
   }
 
   function fmt(n) {
@@ -5150,6 +5178,20 @@ const MONO_FONT = '10px "IBM Plex Mono", ui-monospace, monospace';
 /** Height of the readout block in the top-left corner, in CSS pixels. */
 const READOUT_H = 118;
 
+/**
+ * How much rain a downward line of sight has to pass through, in metres,
+ * before a bow can build up along it.
+ *
+ * This is what actually limits the bottom of the circle, and it is NOT the
+ * horizon. Standing in a field you cannot see bow below your feet because the
+ * ground is two metres away, not because of the Earth's curvature: at eye
+ * level the horizon has dipped all of 0.04 deg. From an airliner the same
+ * downward direction has kilometres of rain in front of the ground, so the
+ * circle closes. A shower a couple of kilometres deep is the scale that makes
+ * both of those come out right.
+ */
+const RAIN_PATH_MIN = 2000;
+
 /** Reflection order -> chrome colour, the same convention drawCone() uses. */
 const ORDER_COLOR = {
   1: 'rgba(111,211,164,0.75)',
@@ -5308,12 +5350,12 @@ function createSkyView(canvas) {
     if (state.show.horizon) drawHorizon(ctx, dip);
     if (state.show.sky && state.view === 'orbit') drawSphereGuides(ctx);
 
-    if (state.show.renderedBow) drawRenderedBow(ctx, anti, dip);
-    drawBowCircles(ctx, anti, dip);
-    if (state.show.alexander) drawAlexander(ctx, anti, dip);
+    if (state.show.renderedBow) drawRenderedBow(ctx, anti);
+    drawBowCircles(ctx, anti);
+    if (state.show.alexander) drawAlexander(ctx, anti);
     if (state.show.cone) drawCone(ctx, anti);
 
-    drawPickedBeam(ctx, anti, sun, w, h, dip);
+    drawPickedBeam(ctx, anti, sun, w, h);
 
     drawSunAndAntisolar(ctx, sun, anti, w, h);
     if (state.view === 'orbit') drawObserver(ctx);
@@ -5329,10 +5371,47 @@ function createSkyView(canvas) {
 
   /* ------------------------------------------------------------ elements */
 
-  function visibleDir(d, dip) {
-    if (state.show.rainBelow) return true;
+  /**
+   * How far below eye level the bow can still be seen, in degrees.
+   *
+   * Flat-ground geometry: looking down at elevation e from height h, the
+   * ground arrives after h / sin(e) of slant path, so the bow survives only
+   * while that exceeds RAIN_PATH_MIN. It reaches 90 deg -- the full circle --
+   * at about 1.7 km up, and stays there, which is why an aircraft sees a
+   * closed ring and a hilltop does not.
+   */
+  function rainDownLimitDeg() {
+    return Math.asin(O.clamp(state.observerHeight / RAIN_PATH_MIN, 0, 1)) * O.DEG;
+  }
+
+  /**
+   * Is there rain to see in this direction?
+   *
+   * Two different limits used to be confused into one. `rainBelow` said
+   * "show the whole circle" and did so at any height, which claimed you could
+   * stand in a field and see a closed ring; and everything below the horizon
+   * was cut, which is not a rain limit at all -- from 15 km you look far
+   * below the horizon at ground the whole time, through kilometres of rain on
+   * the way. They are now separate: rainBelow decides whether rain exists
+   * below the eye at all, and the geometry above decides how far down it can
+   * still be seen from this height.
+   */
+  function visibleDir(d) {
     if (!state.show.horizon && !state.show.ground) return true;
-    return Math.asin(O.clamp(d.y, -1, 1)) * O.DEG > -dip;
+    const el = Math.asin(O.clamp(d.y, -1, 1)) * O.DEG;
+    if (el > 0) return true;
+    if (!state.show.rainBelow) return false;
+    return el > -rainDownLimitDeg();
+  }
+
+  /** The fraction of the bow of order k that is actually on screen. */
+  function visibleShare(anti, phiDeg) {
+    let seen = 0;
+    const steps = 720;
+    for (let i = 0; i < steps; i++) {
+      if (visibleDir(O.bowDirection(anti, phiDeg, (i / steps) * 360))) seen++;
+    }
+    return seen / steps;
   }
 
   function drawSkyBackdrop(ctx, w, h, sun) {
@@ -5480,7 +5559,7 @@ function createSkyView(canvas) {
     return bands;
   }
 
-  function drawBowCircles(ctx, anti, dip) {
+  function drawBowCircles(ctx, anti) {
     const idx = indexModel();
     const orders = [];
     if (state.show.primary) orders.push(1);
@@ -5497,7 +5576,7 @@ function createSkyView(canvas) {
         let run = [];
         const runs = [];
         for (const d of ring.pts) {
-          if (visibleDir(d, dip)) run.push(d);
+          if (visibleDir(d)) run.push(d);
           else {
             if (run.length > 1) runs.push(run);
             run = [];
@@ -5536,14 +5615,14 @@ function createSkyView(canvas) {
     return best;
   }
 
-  function drawAlexander(ctx, anti, dip) {
+  function drawAlexander(ctx, anti) {
     if (!state.show.primary || !state.show.secondary) return;
     const band = O.alexandersBand(indexModel());
     if (!(band.outerDeg > band.innerDeg)) return;
     const steps = 8;
     for (let i = 0; i <= steps; i++) {
       const phi = band.innerDeg + ((band.outerDeg - band.innerDeg) * i) / steps;
-      const circle = O.rainbowCircle(anti, phi, 160).filter((d) => visibleDir(d, dip));
+      const circle = O.rainbowCircle(anti, phi, 160).filter((d) => visibleDir(d));
       if (circle.length < 2) continue;
       for (const seg of clipPolyline(cam, circle)) {
         strokePath(ctx, seg, 'rgba(0,0,0,0.22)', 6);
@@ -5551,7 +5630,7 @@ function createSkyView(canvas) {
     }
   }
 
-  function drawRenderedBow(ctx, anti, dip) {
+  function drawRenderedBow(ctx, anti) {
     const prof = bowProfile();
     if (!prof) return;
     const maxR = prof.maxRadiance || 1;
@@ -5567,7 +5646,7 @@ function createSkyView(canvas) {
       let run = [];
       const runs = [];
       for (const d of circle) {
-        if (visibleDir(d, dip)) run.push(d);
+        if (visibleDir(d)) run.push(d);
         else {
           if (run.length > 1) runs.push(run);
           run = [];
@@ -5674,9 +5753,14 @@ function createSkyView(canvas) {
       put(`${t('coneAngle')} (k=2): ${deg(O.rainbowGeometry(idx(650), 2).antisolarDeg, 2)}`, '#9b8cf0');
     }
     put(`${t('bowTopElevation')}: ${deg(vis.topElevationDeg, 1)}`, '#cfe0ff');
-    put(`${t('visibleAbove')}: ${num(vis.fraction * 100, 0)} %`, '#cfe0ff');
+    // The share actually drawn, counted with the same test that draws it --
+    // quoting the fraction above the horizon while the picture shows a closed
+    // ring would be two different numbers for one thing on screen.
+    const share = visibleShare(O.antisolarDirection(state.sunElevation, state.sunAzimuth), geo.antisolarDeg);
+    put(`${t('bowVisible')}: ${num(share * 100, 0)} %`, '#cfe0ff');
+    put(`${t('rainSeenBelow')}: ${state.show.rainBelow ? deg(rainDownLimitDeg(), 1) : '—'}`, '#8ea3c6');
     put(`${t('horizonDip')}: ${deg(dip, 3)}`, '#8ea3c6');
-    if (vis.fraction <= 0) {
+    if (share <= 0) {
       label(ctx, t('bowBelowHorizon'), 12, y + 4, { color: '#ff9a8a' });
     }
   }
@@ -5756,7 +5840,7 @@ function createSkyView(canvas) {
    * rainbowGeometry()'s own scattering angle; the ray that lands in the eye
    * lands there because the numbers put it there (unit-tested to 1e-12).
    */
-  function drawPickedBeam(ctx, anti, sun, w, h, dip) {
+  function drawPickedBeam(ctx, anti, sun, w, h) {
     const pick = resolvePick(anti);
     if (!pick) return;
     // The bow circle is cut by the horizon, so the trace has to be cut with
@@ -5764,7 +5848,7 @@ function createSkyView(canvas) {
     // beam still drawn to a droplet in a direction whose circle has just
     // vanished contradicts the very thing that vanishing is teaching. The
     // pick itself survives, so lowering the Sun brings it back.
-    if (!visibleDir(pick.dir, dip)) return;
+    if (!visibleDir(pick.dir)) return;
     const idx = indexModel();
     const P = O.vmul(pick.dir, DROP_DIST);
     const toEye = O.vneg(pick.dir);
@@ -5866,7 +5950,7 @@ function createSkyView(canvas) {
         for (let i = 0; i < PICK_STEPS; i++) {
           const roll = (i / PICK_STEPS) * 360;
           const d = O.bowDirection(anti, line.phi, roll);
-          if (!visibleDir(d, dip) || cam.depth(d) <= NEAR) continue;
+          if (!visibleDir(d) || cam.depth(d) <= NEAR) continue;
           const p = cam.project(d);
           if (p.x < -40 || p.x > size.w + 40 || p.y < -40 || p.y > size.h + 40) continue;
           pts.push({ x: p.x, y: p.y, k: line.k, lambda: line.lambda, roll });
@@ -6978,7 +7062,10 @@ function buildFooter() {
 
 /* ------------------------------------------------------------- controls -- */
 
-const HEIGHT_STOPS = [1.7, 5, 10, 50, 100, 300, 1000, 3000, 10000];
+// Up to 15 km: from an airliner the rain really is below you, and that is
+// the only way a whole circular bow is ever seen. The stops are the slider's
+// detents, interpolated logarithmically between.
+const HEIGHT_STOPS = [1.7, 5, 10, 50, 100, 300, 1000, 3000, 10000, 15000];
 const ALL = ['droplet', 'drops', 'sky'];
 
 /** Zoom-out range for the single-droplet scene, driven on a log slider. */
@@ -7188,7 +7275,11 @@ function buildControls() {
       c(['drops'], () => chipRow(
         chip('observerRecentre', () => set({ dropsObserverX: 0, dropsObserverY: 0 })))),
 
-      c(['drops', 'sky'], () => slider({
+      // Sky only. The many-droplets scene already places the observer with
+      // observerRise, and a second control that also means "how high am I" --
+      // this one moving the ground instead of the eye -- gave that scene two
+      // observers that could disagree about where the reader was standing.
+      c(['sky'], () => slider({
         labelKey: 'observerHeight', min: 0, max: HEIGHT_STOPS.length - 1, step: 0.01,
         get: () => heightToSlider(state.observerHeight),
         format: (v) => `${num(sliderToHeight(v), sliderToHeight(v) < 10 ? 1 : 0)} ${t('metres')}`,

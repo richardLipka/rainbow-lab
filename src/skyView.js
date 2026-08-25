@@ -94,6 +94,20 @@ const MONO_FONT = '10px "IBM Plex Mono", ui-monospace, monospace';
 /** Height of the readout block in the top-left corner, in CSS pixels. */
 const READOUT_H = 118;
 
+/**
+ * How much rain a downward line of sight has to pass through, in metres,
+ * before a bow can build up along it.
+ *
+ * This is what actually limits the bottom of the circle, and it is NOT the
+ * horizon. Standing in a field you cannot see bow below your feet because the
+ * ground is two metres away, not because of the Earth's curvature: at eye
+ * level the horizon has dipped all of 0.04 deg. From an airliner the same
+ * downward direction has kilometres of rain in front of the ground, so the
+ * circle closes. A shower a couple of kilometres deep is the scale that makes
+ * both of those come out right.
+ */
+const RAIN_PATH_MIN = 2000;
+
 /** Reflection order -> chrome colour, the same convention drawCone() uses. */
 const ORDER_COLOR = {
   1: 'rgba(111,211,164,0.75)',
@@ -252,12 +266,12 @@ export function createSkyView(canvas) {
     if (state.show.horizon) drawHorizon(ctx, dip);
     if (state.show.sky && state.view === 'orbit') drawSphereGuides(ctx);
 
-    if (state.show.renderedBow) drawRenderedBow(ctx, anti, dip);
-    drawBowCircles(ctx, anti, dip);
-    if (state.show.alexander) drawAlexander(ctx, anti, dip);
+    if (state.show.renderedBow) drawRenderedBow(ctx, anti);
+    drawBowCircles(ctx, anti);
+    if (state.show.alexander) drawAlexander(ctx, anti);
     if (state.show.cone) drawCone(ctx, anti);
 
-    drawPickedBeam(ctx, anti, sun, w, h, dip);
+    drawPickedBeam(ctx, anti, sun, w, h);
 
     drawSunAndAntisolar(ctx, sun, anti, w, h);
     if (state.view === 'orbit') drawObserver(ctx);
@@ -273,10 +287,47 @@ export function createSkyView(canvas) {
 
   /* ------------------------------------------------------------ elements */
 
-  function visibleDir(d, dip) {
-    if (state.show.rainBelow) return true;
+  /**
+   * How far below eye level the bow can still be seen, in degrees.
+   *
+   * Flat-ground geometry: looking down at elevation e from height h, the
+   * ground arrives after h / sin(e) of slant path, so the bow survives only
+   * while that exceeds RAIN_PATH_MIN. It reaches 90 deg -- the full circle --
+   * at about 1.7 km up, and stays there, which is why an aircraft sees a
+   * closed ring and a hilltop does not.
+   */
+  function rainDownLimitDeg() {
+    return Math.asin(O.clamp(state.observerHeight / RAIN_PATH_MIN, 0, 1)) * O.DEG;
+  }
+
+  /**
+   * Is there rain to see in this direction?
+   *
+   * Two different limits used to be confused into one. `rainBelow` said
+   * "show the whole circle" and did so at any height, which claimed you could
+   * stand in a field and see a closed ring; and everything below the horizon
+   * was cut, which is not a rain limit at all -- from 15 km you look far
+   * below the horizon at ground the whole time, through kilometres of rain on
+   * the way. They are now separate: rainBelow decides whether rain exists
+   * below the eye at all, and the geometry above decides how far down it can
+   * still be seen from this height.
+   */
+  function visibleDir(d) {
     if (!state.show.horizon && !state.show.ground) return true;
-    return Math.asin(O.clamp(d.y, -1, 1)) * O.DEG > -dip;
+    const el = Math.asin(O.clamp(d.y, -1, 1)) * O.DEG;
+    if (el > 0) return true;
+    if (!state.show.rainBelow) return false;
+    return el > -rainDownLimitDeg();
+  }
+
+  /** The fraction of the bow of order k that is actually on screen. */
+  function visibleShare(anti, phiDeg) {
+    let seen = 0;
+    const steps = 720;
+    for (let i = 0; i < steps; i++) {
+      if (visibleDir(O.bowDirection(anti, phiDeg, (i / steps) * 360))) seen++;
+    }
+    return seen / steps;
   }
 
   function drawSkyBackdrop(ctx, w, h, sun) {
@@ -424,7 +475,7 @@ export function createSkyView(canvas) {
     return bands;
   }
 
-  function drawBowCircles(ctx, anti, dip) {
+  function drawBowCircles(ctx, anti) {
     const idx = indexModel();
     const orders = [];
     if (state.show.primary) orders.push(1);
@@ -441,7 +492,7 @@ export function createSkyView(canvas) {
         let run = [];
         const runs = [];
         for (const d of ring.pts) {
-          if (visibleDir(d, dip)) run.push(d);
+          if (visibleDir(d)) run.push(d);
           else {
             if (run.length > 1) runs.push(run);
             run = [];
@@ -480,14 +531,14 @@ export function createSkyView(canvas) {
     return best;
   }
 
-  function drawAlexander(ctx, anti, dip) {
+  function drawAlexander(ctx, anti) {
     if (!state.show.primary || !state.show.secondary) return;
     const band = O.alexandersBand(indexModel());
     if (!(band.outerDeg > band.innerDeg)) return;
     const steps = 8;
     for (let i = 0; i <= steps; i++) {
       const phi = band.innerDeg + ((band.outerDeg - band.innerDeg) * i) / steps;
-      const circle = O.rainbowCircle(anti, phi, 160).filter((d) => visibleDir(d, dip));
+      const circle = O.rainbowCircle(anti, phi, 160).filter((d) => visibleDir(d));
       if (circle.length < 2) continue;
       for (const seg of clipPolyline(cam, circle)) {
         strokePath(ctx, seg, 'rgba(0,0,0,0.22)', 6);
@@ -495,7 +546,7 @@ export function createSkyView(canvas) {
     }
   }
 
-  function drawRenderedBow(ctx, anti, dip) {
+  function drawRenderedBow(ctx, anti) {
     const prof = bowProfile();
     if (!prof) return;
     const maxR = prof.maxRadiance || 1;
@@ -511,7 +562,7 @@ export function createSkyView(canvas) {
       let run = [];
       const runs = [];
       for (const d of circle) {
-        if (visibleDir(d, dip)) run.push(d);
+        if (visibleDir(d)) run.push(d);
         else {
           if (run.length > 1) runs.push(run);
           run = [];
@@ -618,9 +669,14 @@ export function createSkyView(canvas) {
       put(`${t('coneAngle')} (k=2): ${deg(O.rainbowGeometry(idx(650), 2).antisolarDeg, 2)}`, '#9b8cf0');
     }
     put(`${t('bowTopElevation')}: ${deg(vis.topElevationDeg, 1)}`, '#cfe0ff');
-    put(`${t('visibleAbove')}: ${num(vis.fraction * 100, 0)} %`, '#cfe0ff');
+    // The share actually drawn, counted with the same test that draws it --
+    // quoting the fraction above the horizon while the picture shows a closed
+    // ring would be two different numbers for one thing on screen.
+    const share = visibleShare(O.antisolarDirection(state.sunElevation, state.sunAzimuth), geo.antisolarDeg);
+    put(`${t('bowVisible')}: ${num(share * 100, 0)} %`, '#cfe0ff');
+    put(`${t('rainSeenBelow')}: ${state.show.rainBelow ? deg(rainDownLimitDeg(), 1) : '—'}`, '#8ea3c6');
     put(`${t('horizonDip')}: ${deg(dip, 3)}`, '#8ea3c6');
-    if (vis.fraction <= 0) {
+    if (share <= 0) {
       label(ctx, t('bowBelowHorizon'), 12, y + 4, { color: '#ff9a8a' });
     }
   }
@@ -700,7 +756,7 @@ export function createSkyView(canvas) {
    * rainbowGeometry()'s own scattering angle; the ray that lands in the eye
    * lands there because the numbers put it there (unit-tested to 1e-12).
    */
-  function drawPickedBeam(ctx, anti, sun, w, h, dip) {
+  function drawPickedBeam(ctx, anti, sun, w, h) {
     const pick = resolvePick(anti);
     if (!pick) return;
     // The bow circle is cut by the horizon, so the trace has to be cut with
@@ -708,7 +764,7 @@ export function createSkyView(canvas) {
     // beam still drawn to a droplet in a direction whose circle has just
     // vanished contradicts the very thing that vanishing is teaching. The
     // pick itself survives, so lowering the Sun brings it back.
-    if (!visibleDir(pick.dir, dip)) return;
+    if (!visibleDir(pick.dir)) return;
     const idx = indexModel();
     const P = O.vmul(pick.dir, DROP_DIST);
     const toEye = O.vneg(pick.dir);
@@ -810,7 +866,7 @@ export function createSkyView(canvas) {
         for (let i = 0; i < PICK_STEPS; i++) {
           const roll = (i / PICK_STEPS) * 360;
           const d = O.bowDirection(anti, line.phi, roll);
-          if (!visibleDir(d, dip) || cam.depth(d) <= NEAR) continue;
+          if (!visibleDir(d) || cam.depth(d) <= NEAR) continue;
           const p = cam.project(d);
           if (p.x < -40 || p.x > size.w + 40 || p.y < -40 || p.y > size.h + 40) continue;
           pts.push({ x: p.x, y: p.y, k: line.k, lambda: line.lambda, roll });

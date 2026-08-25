@@ -385,7 +385,10 @@ function buildFooter() {
 
 /* ------------------------------------------------------------- controls -- */
 
-const HEIGHT_STOPS = [1.7, 5, 10, 50, 100, 300, 1000, 3000, 10000];
+// Up to 15 km: from an airliner the rain really is below you, and that is
+// the only way a whole circular bow is ever seen. The stops are the slider's
+// detents, interpolated logarithmically between.
+const HEIGHT_STOPS = [1.7, 5, 10, 50, 100, 300, 1000, 3000, 10000, 15000];
 const ALL = ['droplet', 'drops', 'sky'];
 
 /** Zoom-out range for the single-droplet scene, driven on a log slider. */
@@ -595,7 +598,11 @@ function buildControls() {
       c(['drops'], () => chipRow(
         chip('observerRecentre', () => set({ dropsObserverX: 0, dropsObserverY: 0 })))),
 
-      c(['drops', 'sky'], () => slider({
+      // Sky only. The many-droplets scene already places the observer with
+      // observerRise, and a second control that also means "how high am I" --
+      // this one moving the ground instead of the eye -- gave that scene two
+      // observers that could disagree about where the reader was standing.
+      c(['sky'], () => slider({
         labelKey: 'observerHeight', min: 0, max: HEIGHT_STOPS.length - 1, step: 0.01,
         get: () => heightToSlider(state.observerHeight),
         format: (v) => `${num(sliderToHeight(v), sliderToHeight(v) < 10 ? 1 : 0)} ${t('metres')}`,

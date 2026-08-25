@@ -128,7 +128,7 @@ export const translations = {
     showSecondary: 'Vedlejší duha',
     showHigherOrder: 'Vyšší řády',
     showSky: 'Obloha',
-    rainBelow: 'Déšť i pod pozorovatelem',
+    rainBelow: 'Déšť i pod úrovní očí',
 
     /* ---- terminology ---- */
     refraction: 'lom',
@@ -391,7 +391,8 @@ export const translations = {
     skyPickBelowHorizon:
       'Tento směr je pod obzorem, takže tam žádný déšť nevidíte a paprsek se nekreslí. Snižte Slunce nebo zapněte déšť pod úrovní očí.',
     coneAngle: 'Úhel kužele',
-    visibleAbove: 'Nad horizontem',
+    bowVisible: 'Viditelná část duhy',
+    rainSeenBelow: 'Déšť vidíte až do',
     horizonDip: 'Pokles horizontu',
     fullCircle: 'Úplný kruh',
     flyMode: 'Let nad krajinou',
@@ -530,7 +531,7 @@ export const translations = {
     showSecondary: 'Secondary rainbow',
     showHigherOrder: 'Higher orders',
     showSky: 'Sky',
-    rainBelow: 'Rain below the observer too',
+    rainBelow: 'Rain below eye level too',
 
     /* ---- terminology ---- */
     refraction: 'refraction',
@@ -795,7 +796,8 @@ export const translations = {
     skyPickBelowHorizon:
       'This direction is below the horizon, so there is no rain to see there and the beam is not drawn. Lower the Sun, or turn on rain below eye level.',
     coneAngle: 'Cone angle',
-    visibleAbove: 'Above the horizon',
+    bowVisible: 'Visible part of the bow',
+    rainSeenBelow: 'Rain seen down to',
     horizonDip: 'Horizon dip',
     fullCircle: 'Full circle',
     flyMode: 'Fly above the ground',

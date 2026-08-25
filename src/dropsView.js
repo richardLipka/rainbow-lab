@@ -40,6 +40,9 @@ const PICK_RADIUS = 14;
  */
 export const OBS_RANGE = { x: [-0.16, 0.72], y: [-0.1, 0.3] };
 
+/** Where the ground sits, in world units. See groundY(). */
+const GROUND_Y = -0.13;
+
 /** p offset by k world units along the unit direction d. */
 const off = (p, d, k) => ({ x: p.x + d.x * k, y: p.y + d.y * k });
 
@@ -505,14 +508,16 @@ export function createDropsView(canvas) {
   }
 
   function groundY() {
-    // Observer height in metres, mapped onto the scene purely for legibility.
-    // Anchored in WORLD coordinates, not to the observer: tying it to the
-    // observer made the ground ride upwards with them, which buried the very
-    // thing rising is supposed to reveal -- rain below eye level. The ground
-    // is a fixed plane and the observer moves relative to it, which is also
-    // why OBS_RANGE cannot let them descend past it.
-    const hm = state.observerHeight;
-    return -Math.min(0.55, 0.06 + Math.log10(1 + hm) * 0.16);
+    // A fixed plane, and deliberately not a function of anything.
+    //
+    // It used to be driven by state.observerHeight, which meant this scene
+    // had two controls for the observer's height: observerRise moved the eye
+    // and observerHeight moved the ground under it. Two knobs for one
+    // quantity is a bug this codebase has hit before -- whichever one the
+    // reader was not touching quietly contradicted the other. The eye moves;
+    // the ground stays put, which is also why OBS_RANGE cannot let the
+    // observer descend past it.
+    return GROUND_Y;
   }
 
   function fmt(n) {

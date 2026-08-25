@@ -327,7 +327,8 @@ control that is on screen always does something when you move it.
 - **Single droplet** — drag vertically in the canvas, or use the impact
   parameter slider, to move the incoming ray. Scroll to pull the view back
   from the droplet. Click any ray to classify it.
-  Watch the eye: it lights up brass exactly when the current ray reaches it.
+  Watch the eye: it turns brass and lights a halo exactly when it is standing
+  on the bow, and stays grey everywhere else.
   Drag the eye itself to stand somewhere else and hunt for the angle where
   the rays pile up.
 - **Exit-angle graph** — click anywhere to set the impact parameter; the marker
@@ -342,6 +343,31 @@ control that is on screen always does something when you move it.
 - **Sky 3-D** — drag to orbit, scroll to zoom. Switch to the observer's eye to
   see the circle cut by the horizon. The cursor changes over a bow; click it
   to trace that beam back to the droplet it came from.
+
+## Why you need an aeroplane
+
+Two different things stop you seeing a whole circular rainbow, and the scene
+used to confuse them.
+
+The horizon is not the reason. It dips 0.04° at eye level and only 3.93° from
+15 km — nowhere near enough to matter against a bow 42° in radius. What stops
+you is the **ground**: looking down from a field, your line of sight hits it
+after two metres, and two metres of rain makes no rainbow. From an airliner
+the same downward direction has kilometres of rain in front of the ground, so
+the circle closes.
+
+So *rain below eye level* and *below the horizon* are now separate. The toggle
+says whether it is raining beneath you; your height says how far down that
+rain can still be seen. Standing in a field the toggle changes almost nothing,
+which is the honest answer. The ring closes at about 1.7 km, and the height
+control runs to 15 000 m.
+
+| height | visible part of the bow | horizon dip |
+| --- | --- | --- |
+| 1.7 m | 40 % | 0.04° |
+| 1 km | 66 % | 1.02° |
+| 3 km | 100 % | 1.76° |
+| 15 km | 100 % | 3.93° |
 
 ## One rainbow, not six
 

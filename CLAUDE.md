@@ -268,6 +268,16 @@ bow for the order, and the caption names the nearest one -- "on the bow ·
 480 nm" -- so moving the eye reads as one bow changing colour instead of
 several bows appearing in turn.
 
+The **eye glyph** follows the same test. Brass now means one thing -- this
+eye is standing on the bow -- and it is measured against the nearest active
+colour exactly as the caption is, so the picture and the words cannot
+disagree. It used to follow "some ray reached me", which under white light
+was true across a window wider than the whole band: the eye was lit almost
+everywhere and so said nothing about where the rainbow is. On the bow it also
+gets a halo, because "found it" should be visible from across the room rather
+than being a shade of line colour. Measured: 846 brass pixels on the bow
+against 247 off it.
+
 The badge's tolerance moved with it, from `CAUSTIC_TOLERANCE_DEG` (1.5 deg,
 measured against red) to `BOW_MATCH_DEG` (0.45 deg, measured against the
 nearest colour). The old pair lit "exactly on the bow" across a window wider
@@ -307,6 +317,44 @@ The marker is clamped onto the canvas along its own bearing from the centre,
 then pushed clear of `READOUT_H` -- the readout block owns the top-left
 corner and is drawn over everything.
 
+## Two limits that are not the same limit
+
+The sky view used to cut the bow at the **horizon** and let `show.rainBelow`
+switch that cut off entirely. Both halves were wrong, in opposite directions.
+
+- Cutting at the horizon is not a rain limit. From 15 km you look far below
+  the horizon at the ground for most of the downward hemisphere, through
+  kilometres of rain on the way. The horizon dips 3.93 deg at that height and
+  0.04 deg at eye level; it is nowhere near the thing that closes the circle.
+- Letting the toggle show the whole ring at any height claimed you could
+  stand in a field and see a closed rainbow. You cannot: the ground is two
+  metres away.
+
+They are now separate. `show.rainBelow` says whether rain exists below eye
+level at all; `rainDownLimitDeg()` says how far down it can still be **seen**
+from this height, from the slant path a downward line of sight gets before
+the ground arrives: `asin(h / RAIN_PATH_MIN)`, with `RAIN_PATH_MIN = 2000` m
+of shower to build a bow in. Measured share of the primary circle drawn, sun
+at 15 deg:
+
+| height | rain below off | rain below on | horizon dip |
+| --- | --- | --- | --- |
+| 1.7 m | 40 % | 40 % | 0.04° |
+| 100 m | 40 % | 43 % | 0.32° |
+| 1 km | 40 % | 66 % | 1.02° |
+| 3 km | 40 % | **100 %** | 1.76° |
+| 15 km | 40 % | **100 %** | 3.93° |
+
+The closed ring arrives at about 1.7 km — you need `RAIN_PATH_MIN · sin(57°)`
+of height to reach the bottom of a 42 deg bow under a 15 deg Sun — which is
+why the height slider now runs to 15 000 m: an airliner is the only place
+most people ever see one. The readout reports the share actually drawn,
+counted with the same `visibleDir()` that draws it, plus the down-limit and
+the dip as separate lines, so the two limits are visibly two numbers.
+
+`visibleDir()` no longer takes `dip`. If you reintroduce a horizon cut there,
+re-check the table above first.
+
 ## Rain below the observer, and where the field gets cut
 
 `show.rainBelow` used to narrow the vertical **spread** the field was
@@ -321,6 +369,14 @@ rising until the rain is below you is precisely what the height control is
 for. The readout reports the count that survives the cut rather than the size
 of the generated field, so raising the observer visibly costs droplets
 instead of silently doing nothing.
+
+That scene now has exactly **one** notion of the observer's height.
+`observerHeight` (metres) used to be offered there too, where its only effect
+was to move the ground under the eye -- so `observerRise` moved the observer
+and `observerHeight` moved the world, two knobs for one quantity, and
+whichever one the reader was not touching quietly contradicted the other. It
+is a sky-scene control now (it belongs to the horizon dip), and `groundY()`
+is the constant `GROUND_Y`.
 
 `OBS_RANGE.x` tightened from -0.28 to -0.16 at the same time: at the old
 bound the observer projected to x = -104 on an 804 px canvas and simply left

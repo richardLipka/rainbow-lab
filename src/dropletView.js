@@ -435,8 +435,17 @@ export function createDropletView(canvas) {
    * regardless of aspect ratio, since the true distance to an observer is
    * effectively infinite and has no true scale to draw at.
    */
-  function drawObserver(ctx, observer, active) {
+  function drawObserver(ctx, observer, reaching) {
     const { cx, cy, s, w, h, zoom } = layout;
+    // Brass means ONE thing: this eye is standing on the bow. Measured
+    // against the nearest active colour, exactly as the caption below is, so
+    // the glyph and the words can never disagree. It used to follow "some ray
+    // reached me", which under white light was true across a window wider
+    // than the whole band -- the eye was lit almost everywhere and so said
+    // nothing about where the rainbow actually is.
+    const onBow = observer.valid && observer.rainbowPhiDeg !== null &&
+      Math.abs(observer.phiDeg - observer.rainbowPhiDeg) <= BOW_MATCH_DEG;
+    const active = onBow && reaching !== false;
     const screenDir = { x: observer.dir.x, y: -observer.dir.y }; // world -> screen y-flip
     const len = Math.hypot(screenDir.x, screenDir.y) || 1;
     const ux = screenDir.x / len;
@@ -471,18 +480,30 @@ export function createDropletView(canvas) {
     strokePath(ctx, [{ x, y }, { x: cx, y: cy }],
       active ? 'rgba(224,168,63,0.3)' : 'rgba(147,163,189,0.16)', 1, [2, 4]);
 
+    // A halo the moment the eye is on the bow, so "found it" is visible from
+    // across the room rather than being a shade of line colour.
+    if (active) {
+      const halo = ctx.createRadialGradient(x, y, 2, x, y, 30);
+      halo.addColorStop(0, 'rgba(224,168,63,0.42)');
+      halo.addColorStop(1, 'rgba(224,168,63,0)');
+      ctx.fillStyle = halo;
+      ctx.beginPath();
+      ctx.arc(x, y, 30, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     ctx.translate(x, y);
     ctx.rotate(faceAngle);
     ctx.beginPath();
-    ctx.ellipse(0, 0, 15, 8, 0, 0, Math.PI * 2);
-    ctx.fillStyle = active ? 'rgba(224,168,63,0.14)' : 'rgba(147,163,189,0.08)';
+    ctx.ellipse(0, 0, active ? 16 : 14, active ? 8.6 : 7.4, 0, 0, Math.PI * 2);
+    ctx.fillStyle = active ? 'rgba(224,168,63,0.26)' : 'rgba(147,163,189,0.06)';
     ctx.fill();
-    ctx.strokeStyle = active ? '#e0a83f' : 'rgba(147,163,189,0.7)';
-    ctx.lineWidth = active ? 1.9 : 1.2;
+    ctx.strokeStyle = active ? '#ffcf6a' : 'rgba(147,163,189,0.55)';
+    ctx.lineWidth = active ? 2.4 : 1.1;
     ctx.stroke();
     ctx.beginPath();
-    ctx.arc(0, 0, active ? 4.4 : 3.2, 0, Math.PI * 2);
-    ctx.fillStyle = active ? '#e0a83f' : '#93a3bd';
+    ctx.arc(0, 0, active ? 5 : 2.8, 0, Math.PI * 2);
+    ctx.fillStyle = active ? '#ffcf6a' : 'rgba(147,163,189,0.75)';
     ctx.fill();
     ctx.restore();
 
