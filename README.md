@@ -369,6 +369,12 @@ control runs to 15 000 m.
 | 3 km | 100 % | 1.76° |
 | 15 km | 100 % | 3.93° |
 
+The 3-D scene draws both references and names them: **ground level**, with a
+dashed line down to it from the observer so the height is something you can
+see, and the **observer's horizon** with its dip. From 15 km the floor is far
+beneath you while the horizon has barely moved — which is the whole argument
+in one picture.
+
 ## One rainbow, not six
 
 White light is traced at six sampled wavelengths, which is the only way to

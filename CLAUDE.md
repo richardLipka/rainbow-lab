@@ -355,6 +355,28 @@ the dip as separate lines, so the two limits are visibly two numbers.
 `visibleDir()` no longer takes `dip`. If you reintroduce a horizon cut there,
 re-check the table above first.
 
+Because those are two limits, the scene has to **draw both**: the ground
+plane the observer stands above, and the ring of directions tangent to the
+Earth. Each is named on screen (`groundLevel`, `horizonOfObserver`, the
+latter carrying its dip), and in the orbit view a dashed drop line runs from
+the observer down to the ground so the height is a visible gap rather than
+only a number in a caption. At 15 km that reads directly: the floor is far
+below, the horizon has moved 3.93 deg.
+
+Two details that were wrong and are easy to get wrong again:
+
+- The ground faded to 0.16 alpha whenever rain below eye level was switched
+  on -- exactly the case that needs it most, so at altitude the scene lost
+  its floor entirely.
+- Both captions were drawn with their geometry, which is early, and the first
+  bow to cross them painted over them. `drawLevelLabels()` runs after the
+  bows for that reason. The lines still draw early; they belong behind.
+
+Do not expect the drawn ground disc's far edge to meet the horizon ring: the
+disc is a local patch at a legible depth, the ring is at the true dip, and
+reconciling them would need a ground radius of 157 units at eye level. They
+are two labelled references, not one continuous surface.
+
 ## Rain below the observer, and where the field gets cut
 
 `show.rainBelow` used to narrow the vertical **spread** the field was

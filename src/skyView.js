@@ -273,6 +273,7 @@ export function createSkyView(canvas) {
 
     drawPickedBeam(ctx, anti, sun, w, h);
 
+    drawLevelLabels(ctx, gh, dip);
     drawSunAndAntisolar(ctx, sun, anti, w, h);
     if (state.view === 'orbit') drawObserver(ctx);
     drawReadout(ctx, w, h, dip);
@@ -353,7 +354,10 @@ export function createSkyView(canvas) {
         ctx.fillRect(0, Math.max(0, horizonY), w, h - Math.max(0, horizonY));
       }
     }
-    const col = state.show.rainBelow ? 'rgba(120,170,140,0.16)' : 'rgba(120,170,140,0.3)';
+    // Legible either way. It used to drop to 0.16 alpha whenever rain below
+    // eye level was on, which is exactly the case the reader most needs it in
+    // -- at altitude the ground vanished and the scene lost its floor.
+    const col = state.show.rainBelow ? 'rgba(120,170,140,0.26)' : 'rgba(120,170,140,0.34)';
     for (let r = 0.5; r <= 6.001; r += 0.5) {
       const pts = [];
       for (let i = 0; i <= 96; i++) {
@@ -370,6 +374,34 @@ export function createSkyView(canvas) {
       ];
       for (const run of clipPolyline(cam, pts)) strokePath(ctx, run, col, 0.5);
     }
+
+    if (state.view === 'orbit') {
+      // How far the observer is standing above it, drawn as an actual gap.
+      // "Pozorovatel · 15000 m" is a number; a line down to the floor is the
+      // thing the number is about.
+      for (const run of clipPolyline(cam, [O.vec(0, 0, 0), O.vec(0, y0, 0)])) {
+        strokePath(ctx, run, 'rgba(150,200,170,0.5)', 1, [4, 4]);
+      }
+    }
+  }
+
+  /**
+   * Put a caption on the first point of a world polyline that projects
+   * somewhere useful -- circles drawn around the observer leave the canvas on
+   * two sides, and a fixed index lands off screen as soon as the camera moves.
+   */
+  function labelOnCurve(ctx, pts, text, color) {
+    if (!state.show.labels) return;
+    const { w, h } = size;
+    for (let i = 0; i < pts.length; i++) {
+      const d = pts[i];
+      if (cam.depth(d) <= NEAR) continue;
+      const p = cam.project(d);
+      if (p.x > 90 && p.x < w - 90 && p.y > READOUT_H && p.y < h - 60) {
+        label(ctx, text, p.x, p.y - 10, { align: 'center', color });
+        return;
+      }
+    }
   }
 
   function horizonScreenY() {
@@ -380,6 +412,15 @@ export function createSkyView(canvas) {
     return cam.depth(O.vmul(d, 50)) > NEAR ? p.y : null;
   }
 
+  /**
+   * The observer's horizon: the ring of directions tangent to the Earth,
+   * `dip` below the horizontal.
+   *
+   * A different thing from the ground plane above, and the scene has to show
+   * both. At 15 km the ground is far beneath your feet while the horizon has
+   * moved barely 4 deg -- seeing those two facts at once is what explains why
+   * height closes the circle and the horizon does not.
+   */
   function drawHorizon(ctx, dip) {
     const pts = [];
     for (let i = 0; i <= 180; i++) {
@@ -388,7 +429,34 @@ export function createSkyView(canvas) {
       pts.push(O.vec(Math.cos(el) * Math.cos(a), Math.sin(el), Math.cos(el) * Math.sin(a)));
     }
     for (const run of clipPolyline(cam, pts)) {
-      strokePath(ctx, run, 'rgba(150,200,170,0.55)', 1.3, [7, 4]);
+      strokePath(ctx, run, 'rgba(150,200,170,0.7)', 1.4, [7, 4]);
+    }
+  }
+
+  /**
+   * Name the two levels, after the bows are down.
+   *
+   * They are drawn early -- they belong behind everything -- but a caption
+   * drawn that early is painted over by the first bow that crosses it, and
+   * the whole point of these two is that the reader can tell them apart.
+   */
+  function drawLevelLabels(ctx, gh, dip) {
+    if (!state.show.labels) return;
+    if (state.show.horizon) {
+      const pts = [];
+      for (let i = 0; i <= 180; i++) {
+        const a = (i / 180) * Math.PI * 2;
+        const el = -dip * O.RAD;
+        pts.push(O.vec(Math.cos(el) * Math.cos(a), Math.sin(el), Math.cos(el) * Math.sin(a)));
+      }
+      labelOnCurve(ctx, pts, `${t('horizonOfObserver')} · ${deg(dip, 2)}`, '#9ec9ab');
+    }
+    if (state.show.ground && state.view === 'orbit') {
+      const foot = O.vec(0, -gh, 0);
+      if (cam.depth(foot) > NEAR) {
+        const p = cam.project(foot);
+        label(ctx, t('groundLevel'), p.x, p.y + 15, { align: 'center', color: '#9ec9ab' });
+      }
     }
   }
 
