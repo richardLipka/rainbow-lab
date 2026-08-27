@@ -14,14 +14,12 @@
 import { readFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+// The one list, imported rather than copied: a checker with its own copy of
+// the module order stops covering whichever file was added last.
+import { ORDER } from './build.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-const ORDER = [
-  'optics.js', 'assets.js', 'i18n.js', 'state.js', 'ui.js', 'camera3d.js',
-  'rays.js', 'dropletView.js', 'graphView.js', 'dropsView.js', 'skyView.js',
-  'fieldView.js', 'panels.js', 'app.js',
-];
 
 /** Top-level declarations only: column 0, after `export` is stripped. */
 const DECL = /^(?:export\s+)?(?:const|let|var|function|class)\s+([A-Za-z_$][\w$]*)/gm;

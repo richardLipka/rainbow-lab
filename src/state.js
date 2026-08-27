@@ -119,6 +119,11 @@ export const state = {
      direction is recomputed from the engine every frame. */
   skyPick: null,
 
+  /* The droplet clicked in the 3-D field, as world coordinates. Held as a
+     position rather than an index for the same reason selectedDrop is: the
+     field is regenerated whenever the count changes. */
+  fieldPick: null,
+
   /* The droplet the reader has clicked on in the many-droplets scene, as
      world coordinates ({x, y}), or null. Held as a position rather than an
      index because the droplet field is regenerated whenever the count or the

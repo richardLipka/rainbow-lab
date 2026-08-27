@@ -395,6 +395,11 @@ Switch to the observer's eye and it closes into a ring around the antisolar
 point. Switch to the outside view and the same lit droplets are a cone
 spreading out from where you were standing.
 
+Click any droplet — lit or grey — and its beam is traced: the sunlight
+arriving, where each reflection order sends it, and the angles. A grey one is
+worth opening too; seeing its light leave in three wrong directions is why the
+bow has an angle at all. Click it again to let it go.
+
 ## One rainbow, not six
 
 White light is traced at six sampled wavelengths, which is the only way to

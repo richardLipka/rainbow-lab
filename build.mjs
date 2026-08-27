@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 /** Dependency order matters: a module may only use names defined above it. */
-const ORDER = [
+export const ORDER = [
   'optics.js',
   'assets.js',
   'i18n.js',
@@ -24,6 +24,7 @@ const ORDER = [
   'ui.js',
   'camera3d.js',
   'rays.js',
+  'beam3d.js',
   'dropletView.js',
   'graphView.js',
   'dropsView.js',

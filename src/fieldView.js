@@ -16,7 +16,8 @@ import * as O from './optics.js';
 import { state, set, indexModel } from './state.js';
 import { t, deg, num } from './i18n.js';
 import { fitCanvas, strokePath, label, capture, arrowHead } from './ui.js';
-import { NEAR, SUN_FAR, makeCamera, clipPolyline, clampToCanvas } from './camera3d.js';
+import { NEAR, SUN_FAR, CLICK_SLOP, makeCamera, clipPolyline, clampToCanvas } from './camera3d.js';
+import { drawDropletBeam } from './beam3d.js';
 import { colorFor, bowSpectrum, BOW_MATCH_DEG } from './rays.js';
 
 /** Near and far edge of the rain volume, in world units. */
@@ -39,12 +40,23 @@ const WORLD_SCALE_M = 2000;
 /** Wavelength bucket for batching droplet fills, in nm. */
 const LAMBDA_BUCKET = 5;
 
+/** Screen distance at which a click counts as landing on a droplet. */
+const DROP_PICK_PX = 12;
+
 export function createFieldView(canvas) {
   let drops = [];
   let seedKey = '';
   let cls = { key: '', lambda: null, order: null, lit: 0, shown: 0 };
   let cam = null;
   let size = { w: 0, h: 0 };
+  /* Where each drawn droplet landed on screen last frame, so a click can be
+     tested against exactly what the reader was looking at. Typed arrays
+     refilled in place: sixty thousand fresh objects a frame is the kind of
+     churn that turns a smooth orbit into a stutter. */
+  let hitX = new Float32Array(0);
+  let hitY = new Float32Array(0);
+  let hitI = new Int32Array(0);
+  let hitN = 0;
 
   /* ------------------------------------------------------------ the rain */
 
@@ -58,6 +70,10 @@ export function createFieldView(canvas) {
     while (drops.length < target) drops.push(newDrop());
     seedKey = seed();
     cls.key = ''; // the field changed; every answer is stale
+    // Turning the count down truncates the array, so a picked droplet can
+    // simply cease to exist; leaving the marker behind would trace a beam
+    // through a droplet that is not there.
+    if (state.fieldPick && indexOfPick() < 0) set({ fieldPick: null });
   }
 
   /**
@@ -202,6 +218,7 @@ export function createFieldView(canvas) {
 
     const answers = classify();
     drawDroplets(ctx, answers, w, h);
+    drawPick(ctx, answers, anti, sun, w, h);
 
     drawAxis(ctx, sun, anti, w, h);
     if (state.view === 'orbit') drawObserver(ctx);
@@ -251,6 +268,12 @@ export function createFieldView(canvas) {
     const grey = new Path2D();
     const buckets = new Map();
     const showGrey = state.show.droplets;
+    if (hitX.length < drops.length) {
+      hitX = new Float32Array(drops.length);
+      hitY = new Float32Array(drops.length);
+      hitI = new Int32Array(drops.length);
+    }
+    hitN = 0;
 
     for (let i = 0; i < drops.length; i++) {
       const d = drops[i];
@@ -260,6 +283,10 @@ export function createFieldView(canvas) {
       const p = cam.project(d);
       if (p.x < -8 || p.x > w + 8 || p.y < -8 || p.y > h + 8) continue;
       const r = O.clamp((0.0055 * cam.scale) / z, 0.45, 3.2);
+      hitX[hitN] = p.x;
+      hitY[hitN] = p.y;
+      hitI[hitN] = i;
+      hitN++;
       const lam = answers.lambda[i];
       if (lam > 0) {
         const key = Math.round(lam / LAMBDA_BUCKET) * LAMBDA_BUCKET;
@@ -287,6 +314,37 @@ export function createFieldView(canvas) {
       ctx.fillStyle = colorFor(lam, 0.95);
       ctx.fill(path);
     }
+  }
+
+  /**
+   * The droplet the reader clicked, taken apart.
+   *
+   * Same picture the sky view draws behind a point on a bow -- one shared
+   * tracer, so the two scenes cannot disagree about where order k sends its
+   * light. A droplet that delivers nothing is still worth opening: seeing its
+   * light leave in three wrong directions is why the bow has an angle.
+   */
+  function drawPick(ctx, answers, anti, sun, w, h) {
+    const pick = state.fieldPick;
+    if (!pick) return;
+    const i = indexOfPick();
+    const lam = i >= 0 && answers.lambda[i] > 0 ? answers.lambda[i] : null;
+    const k = i >= 0 && answers.order[i] > 0 ? answers.order[i] : null;
+    drawDropletBeam(ctx, cam, { w, h }, {
+      P: O.vec(pick.x, pick.y, pick.z), anti, sun, lambda: lam, k, idx: indexModel(),
+    });
+  }
+
+  /** Which droplet the stored position refers to, or -1 if it is gone. */
+  function indexOfPick() {
+    const pick = state.fieldPick;
+    if (!pick) return -1;
+    for (let i = 0; i < drops.length; i++) {
+      const d = drops[i];
+      if (Math.abs(d.x - pick.x) < 1e-9 && Math.abs(d.y - pick.y) < 1e-9
+        && Math.abs(d.z - pick.z) < 1e-9) return i;
+    }
+    return -1;
   }
 
   function drawAxis(ctx, sun, anti, w, h) {
@@ -360,8 +418,10 @@ export function createFieldView(canvas) {
     put(`${t('dropsContributing')}: ${fmt(answers.lit)}`, '#6fd3a4');
     put(`${t('fieldNoCircle')}`, '#8ea3c6');
     if (state.show.labels) {
-      label(ctx, t('fieldHint'), 12, h - 14, {
-        color: '#9fd8bd', font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
+      const hintFont = '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif';
+      label(ctx, t('fieldHint'), 12, h - 30, { color: '#9fd8bd', font: hintFont });
+      label(ctx, t(state.fieldPick ? 'fieldClearHint' : 'fieldClickHint'), 12, h - 14, {
+        color: '#cfa9e8', font: hintFont,
       });
     }
   }
@@ -372,14 +432,44 @@ export function createFieldView(canvas) {
 
   /* -------------------------------------------------------- interaction */
 
+  /** The droplet nearest a screen position, from what was last drawn. */
+  function pickAt(px, py) {
+    let best = -1;
+    let bestGap = DROP_PICK_PX;
+    for (let n = 0; n < hitN; n++) {
+      const gap = Math.hypot(hitX[n] - px, hitY[n] - py);
+      if (gap < bestGap) {
+        bestGap = gap;
+        best = hitI[n];
+      }
+    }
+    return best;
+  }
+
   let drag = null;
+  let down = null;
+  let orbiting = false;
   canvas.addEventListener('pointerdown', (e) => {
-    drag = { x: e.clientX, y: e.clientY };
+    down = { x: e.clientX, y: e.clientY };
+    drag = { ...down };
+    orbiting = false;
     capture(canvas, e);
-    canvas.style.cursor = 'grabbing';
   });
   canvas.addEventListener('pointermove', (e) => {
-    if (!drag) return;
+    if (!drag) {
+      const r = canvas.getBoundingClientRect();
+      const want = pickAt(e.clientX - r.left, e.clientY - r.top) >= 0 ? 'pointer' : 'grab';
+      if (canvas.style.cursor !== want) canvas.style.cursor = want;
+      return;
+    }
+    if (!orbiting) {
+      // Held still until the pointer clearly leaves the press point, so an
+      // ordinary click does not also nudge the camera on its way past.
+      if (Math.hypot(e.clientX - down.x, e.clientY - down.y) < CLICK_SLOP) return;
+      orbiting = true;
+      canvas.style.cursor = 'grabbing';
+      drag = { x: e.clientX, y: e.clientY };
+    }
     const dx = e.clientX - drag.x;
     const dy = e.clientY - drag.y;
     drag = { x: e.clientX, y: e.clientY };
@@ -394,9 +484,31 @@ export function createFieldView(canvas) {
   });
   const stop = () => {
     drag = null;
+    down = null;
+    orbiting = false;
     canvas.style.cursor = 'grab';
   };
-  canvas.addEventListener('pointerup', stop);
+  canvas.addEventListener('pointerup', (e) => {
+    // Orbiting is the primary gesture, so a release only counts as a pick
+    // when the pointer never left the press point. Measured as displacement,
+    // never as path length -- a real mouse jitters through several events
+    // during any ordinary click.
+    const wasClick = drag !== null && !orbiting;
+    stop();
+    if (!wasClick) return;
+    const r = canvas.getBoundingClientRect();
+    const i = pickAt(e.clientX - r.left, e.clientY - r.top);
+    // Clicking the same droplet again releases it. There is rain in every
+    // direction here, so "click empty sky to clear" -- which the flat scene
+    // can offer -- has almost nowhere to land: any click finds a droplet.
+    if (i < 0) {
+      if (state.fieldPick) set({ fieldPick: null });
+    } else if (i === indexOfPick()) {
+      set({ fieldPick: null });
+    } else {
+      set({ fieldPick: { ...drops[i] } });
+    }
+  });
   canvas.addEventListener('pointercancel', stop);
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
@@ -414,7 +526,9 @@ export function createFieldView(canvas) {
     reset: () => {
       drops = [];
       seedKey = '';
+      hitN = 0;
       cls = { key: '', lambda: null, order: null, lit: 0, shown: 0 };
+      if (state.fieldPick) set({ fieldPick: null });
     },
   };
 }

@@ -63,7 +63,8 @@ app.js         assembly + render loop
 | `src/dropletView.js` | Mode A — single droplet cross-section, the observer eye(s), ray prominence. |
 | `src/graphView.js` | Exit-angle and angular-distribution plots. |
 | `src/dropsView.js` | Mode B — one droplet to ten thousand, observer-centred; the per-droplet inspector. |
-| `src/camera3d.js` | The hand-written perspective camera, near-plane clipping, `SUN_FAR`. Shared by both 3-D scenes. |
+| `src/camera3d.js` | The hand-written perspective camera, near-plane clipping, `SUN_FAR`, `CLICK_SLOP`. Shared by both 3-D scenes. |
+| `src/beam3d.js` | One droplet's beam traced in 3-D — sunlight in, every order out, Θ and φ. Shared by both 3-D scenes. |
 | `src/skyView.js` | Mode C — 3-D cone/circle/horizon, orbit and eye camera. |
 | `src/fieldView.js` | Mode D — the many-droplets test run on a 3-D volume of rain. |
 | `src/panels.js` | Tutorial script, ray readout, mathematics panel, questions. |
@@ -522,6 +523,31 @@ At the sky view's distance the eye is inside the rain and the lit droplets
 read as scattered dots rather than as the cone they lie on; pulled back, the
 funnel is unmistakable (2 400 lit droplets at 150 000).
 
+## Clicking a droplet in the field, and the shared tracer
+
+`state.fieldPick` holds the clicked droplet's world position, and
+`drawDropletBeam()` in `beam3d.js` draws it -- the same function the sky view
+calls behind a point on a bow. One tracer, because two copies are two chances
+to disagree about where order k sends its light.
+
+Hit-testing reads what was actually drawn: `drawDroplets()` records every
+projected droplet into `hitX`/`hitY`/`hitI` typed arrays, refilled in place
+each frame, and `pickAt()` scans them. Sixty thousand fresh objects a frame is
+the kind of churn that turns a smooth orbit into a stutter, and testing
+against the real projection means only a droplet the reader can see is
+pickable.
+
+Two differences from the sky view's picking, both forced by the scene:
+
+- **A second click on the same droplet clears it.** There is rain in every
+  direction here, so "click empty sky to clear" has almost nowhere to land --
+  any click finds a droplet.
+- **The φ arc is not drawn in the eye view.** There the camera *is* the
+  observer, and an arc `ARC_EYE` from the lens projects across the whole
+  canvas as a line rather than an angle. Nobody sees an angle drawn at their
+  own pupil. Θ at the droplet is unaffected and still drawn in both views.
+  (The sky view had this too, silently, before the tracer was shared.)
+
 ## The bundler puts every module in one scope
 
 `build.mjs` strips `import`/`export` and concatenates, so two files that each
@@ -531,7 +557,10 @@ which is exactly where nobody is looking while writing a view. It shipped
 once: a blank page with `Identifier 'SUN_FAR' has already been declared`.
 
 `build.mjs` now refuses to build on a collision, and
-`tools-check-collisions.mjs` runs the same check on its own. When two scenes
+`tools-check-collisions.mjs` runs the same check on its own -- importing
+`ORDER` from `build.mjs` rather than keeping a copy, since a checker with its
+own module list stops covering whichever file was added last. It has since
+caught seven collisions in one go while `beam3d.js` was being extracted. When two scenes
 genuinely need the same constant, put it in the module they already share
 (`SUN_FAR` moved to `camera3d.js`) rather than renaming one of them.
 
@@ -542,6 +571,16 @@ genuinely need the same constant, put it in the module they already share
 actually **read** that piece of state. `sceneGroup()` drops any group left
 with no visible children, so a scene never shows an empty or single-orphan
 group.
+
+Audited by grepping `state.<field>` / `state.show.<field>` per view file
+against what the column offers. The `show.*` toggles all match. The one
+mismatch found: `reflections` and the family checkboxes were offered in every
+scene, but **neither 3-D view reads them** -- both pick their orders from
+`show.primary`/`secondary`/`higher`. A reader in the sky was handed a
+"0 1 2 3 4" control and four checkboxes that moved nothing, sitting next to
+the toggles that do. They drive the plots, though, so `ORDERS_MATTER` offers
+them when the droplet scene is showing or the plots are open, and
+`controlsKey()` carries `graphOpen` for it.
 
 Those lists are not cosmetic. Showing every control in every scene meant a
 reader in the 3-D sky scrolled past the impact parameter, the fan count and

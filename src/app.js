@@ -446,6 +446,18 @@ function observerPhiNow() {
   return state.observerMode === 'manual' ? state.observerPhi : rainbowPhi(state.reflections);
 }
 
+/**
+ * Where the reflection-order controls do anything.
+ *
+ * dropletView traces activeOrders(); graphView plots them. Neither 3-D scene
+ * reads them at all -- both pick their orders from
+ * show.primary/secondary/higher -- so in those a reader was handed a
+ * "0 1 2 3 4" segmented control and four family checkboxes that moved
+ * nothing, sitting right next to the toggles that do. Offered now only where
+ * a ray or a plot is there to answer them.
+ */
+const ORDERS_MATTER = () => state.scene === 'droplet' || state.graphOpen;
+
 /** Which visualisation toggles each scene actually reads. */
 const VIS_TOGGLES = [
   { scenes: ['drops', 'field', 'sky'], key: 'primary', labelKey: 'showPrimary' },
@@ -462,11 +474,12 @@ const VIS_TOGGLES = [
   // there only once they have -- a toggle with nothing to toggle teaches
   // that the scene is decorative.
   {
-    scenes: ['droplet', 'drops', 'sky'], key: 'angles', labelKey: 'showAngles',
+    scenes: ALL, key: 'angles', labelKey: 'showAngles',
     when: () =>
       state.scene === 'droplet' ||
       (state.scene === 'drops' && !!state.selectedDrop) ||
-      (state.scene === 'sky' && !!state.skyPick),
+      (state.scene === 'sky' && !!state.skyPick) ||
+      (state.scene === 'field' && !!state.fieldPick),
   },
   { scenes: ALL, key: 'labels', labelKey: 'showLabels' },
   { scenes: ['droplet', 'sky'], key: 'wavelengthLabels', labelKey: 'showWavelengthLabels' },
@@ -560,14 +573,14 @@ function buildControls() {
               families: { 0: k === 0, 1: k === 1, 2: k === 2, 3: k >= 3 },
               selectedRay: null,
             });
-          }))),
+          })), ORDERS_MATTER),
       c(ALL, () => el('div', { class: 'ctl', dataset: { ctl: 'showFamilies' } },
         el('span', { class: 'ctl-label' }, t('showFamilies')),
         el('div', { class: 'stack' },
           toggle('family0', () => state.families[0], (v) => set({ families: { 0: v } })),
           toggle('family1', () => state.families[1], (v) => set({ families: { 1: v } })),
           toggle('family2', () => state.families[2], (v) => set({ families: { 2: v } })),
-          toggle('family3', () => state.families[3], (v) => set({ families: { 3: v } }))))),
+          toggle('family3', () => state.families[3], (v) => set({ families: { 3: v } })))), ORDERS_MATTER),
     ]),
 
     /* --- where the observer is standing, in whichever scene we are in --- */
@@ -778,7 +791,7 @@ function resetState() {
     sunElevation: 15, sunAzimuth: 180, observerHeight: 1.7,
     view: 'orbit', camYaw: -35, camPitch: 14, camDist: 3.1,
     eyeAzimuth: 0, eyeElevation: 12, fov: 75,
-    selectedRay: null, selectedDrop: null, skyPick: null,
+    selectedRay: null, selectedDrop: null, skyPick: null, fieldPick: null,
     show: {
       normals: false, angles: true, labels: true, wavelengthLabels: false,
       droplets: true, cone: true, antisolar: true, horizon: true, ground: true,
@@ -834,7 +847,8 @@ function rebuild() {
 function controlsKey() {
   return [
     state.scene, state.view, state.observerMode, state.mode, state.step,
-    state.selectedDrop ? 1 : 0, state.skyPick ? 1 : 0,
+    state.selectedDrop ? 1 : 0, state.skyPick ? 1 : 0, state.fieldPick ? 1 : 0,
+    state.graphOpen ? 1 : 0,
   ].join('|');
 }
 

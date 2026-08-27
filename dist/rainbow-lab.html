@@ -1574,6 +1574,8 @@ const translations = {
       'Každá kapka se ptá na totéž co v plošné scéně: pod jakým úhlem ji vidím a vychází právě tam nějaká vlnová délka? Čím víc kapek, tím zřetelnější kruh — ale kreslí se pořád jen kapky.',
     fieldNoCircle: 'Žádná kružnice se nekreslí — barevné jsou jen kapky, které prošly testem.',
     fieldHint: 'Táhněte myší, kolečkem přiblížíte. Přepněte na pohled okem a duha se uzavře do kruhu.',
+    fieldClickHint: 'Klepněte na kapku — uvidíte, kudy jí prochází světlo a pod jakými úhly.',
+    fieldClearHint: 'Dalším klepnutím na tutéž kapku výběr zrušíte.',
     sceneDropletDesc: 'Řez jednou kulovou kapkou. Paprsek se počítá, nikoli kreslí.',
     sceneDropsDesc: 'Od jedné kapky k tisícům. Pozorovatel je vlevo.',
     sceneSkyDesc: 'Kužel směrů kolem antisolárního bodu a jeho průnik s oblohou.',
@@ -1991,6 +1993,8 @@ const translations = {
       'Every droplet is asked what the flat scene asks it: at what angle do I see it, and does some wavelength come out exactly there? More droplets, a cleaner circle — but only droplets are ever drawn.',
     fieldNoCircle: 'No circle is drawn — the coloured dots are the droplets that passed the test.',
     fieldHint: 'Drag to orbit, scroll to zoom. Switch to the eye view and the bow closes into a ring.',
+    fieldClickHint: 'Click a droplet to see the light passing through it, and at what angles.',
+    fieldClearHint: 'Click the same droplet again to clear the selection.',
     sceneDropletDesc: 'Cross-section of one spherical droplet. The ray is computed, not drawn.',
     sceneDropsDesc: 'From one droplet to thousands. The observer is on the left.',
     sceneSkyDesc: 'The cone of directions around the antisolar point, and where it meets the sky.',
@@ -2562,6 +2566,11 @@ const state = {
      direction is recomputed from the engine every frame. */
   skyPick: null,
 
+  /* The droplet clicked in the 3-D field, as world coordinates. Held as a
+     position rather than an index for the same reason selectedDrop is: the
+     field is regenerated whenever the count changes. */
+  fieldPick: null,
+
   /* The droplet the reader has clicked on in the many-droplets scene, as
      world coordinates ({x, y}), or null. Held as a position rather than an
      index because the droplet field is regenerated whenever the count or the
@@ -2972,6 +2981,17 @@ const NEAR = 0.02;
  */
 const SUN_FAR = 40;
 
+/**
+ * How far the pointer may travel between press and release and still be a
+ * click rather than a drag, in screen pixels.
+ *
+ * Measured as displacement from the press point, never as the length of the
+ * path taken: a physical mouse emits several one-pixel moves during any
+ * ordinary click, and summing them made picking essentially impossible on
+ * real hardware while passing a synthetic test that emitted no moves at all.
+ */
+const CLICK_SLOP = 6;
+
 function makeCamera(eye, forward, fovDeg, w, h) {
   const zA = O.vnorm(O.vneg(forward));
   let upHint = O.vec(0, 1, 0);
@@ -3347,6 +3367,165 @@ function bowSpectrum(idx, k, samples = 96) {
       return null;
     },
   };
+}
+
+/* ============ src/beam3d.js ============ */
+
+/**
+ * beam3d.js -- one droplet's worth of light, drawn in three dimensions.
+ *
+ * Shared by both 3-D scenes: the sky view traces the beam behind a point on a
+ * bow, the droplet-field view traces the beam through a droplet the reader
+ * clicked. It is the same picture and the same physics, and two copies of it
+ * would be two chances to disagree about where order k sends its light.
+ *
+ * Every direction here comes from the engine: `directionAtAngle()` fed with
+ * `rainbowGeometry()`'s own scattering angle. The ray that lands in the eye
+ * lands there because the numbers put it there, not because it was drawn to.
+ */
+
+
+
+
+
+
+/** How far past the observer a missing order runs, in world units. */
+const OUT_LEN = 1.55;
+/** Where along that ray its caption sits. */
+const OUT_LABEL_AT = 0.95;
+/** Where the incoming ray's arrow and caption sit, in world units. */
+const SUN_LABEL_AT = 0.5;
+const ARC_DROP = 0.2;
+const ARC_EYE = 0.36;
+
+const BEAM_FONT = '10px "IBM Plex Mono", ui-monospace, monospace';
+
+/** Reflection order -> chrome colour, the convention both scenes use. */
+const ORDER_COLOR = {
+  1: 'rgba(111,211,164,0.75)',
+  2: 'rgba(155,140,240,0.75)',
+  3: 'rgba(240,136,93,0.7)',
+};
+
+/** A caption clamped onto the canvas -- projected labels land anywhere. */
+function capLabel(ctx, text, x, y, w, h, color) {
+  ctx.save();
+  ctx.font = BEAM_FONT;
+  const half = ctx.measureText(text).width / 2 + 6;
+  ctx.restore();
+  label(ctx, text, O.clamp(x, half + 2, Math.max(half + 2, w - half - 2)),
+    O.clamp(y, 10, Math.max(10, h - 10)), { align: 'center', color, font: BEAM_FONT });
+}
+
+function line3(ctx, cam, pts, color, width, dash) {
+  for (const run of clipPolyline(cam, pts)) strokePath(ctx, run, color, width, dash);
+}
+
+/**
+ * An arc swept by walking the ANGLE through the generator that produced the
+ * direction, so the curve drawn is literally the locus of the angle named on
+ * it -- rather than a circle placed where the angle looks about right.
+ */
+function arc3(ctx, cam, size, at, gen, angleDeg, radius, color, text) {
+  const pts = [];
+  for (let i = 0; i <= 24; i++) pts.push(O.vadd(at, O.vmul(gen((angleDeg * i) / 24), radius)));
+  line3(ctx, cam, pts, color, 1);
+  const mid = O.vadd(at, O.vmul(gen(angleDeg / 2), radius * 1.12));
+  if (text && cam.depth(mid) > NEAR) {
+    const p = cam.project(mid);
+    capLabel(ctx, text, p.x, p.y, size.w, size.h, color);
+  }
+}
+
+/**
+ * Trace the sunlight through one droplet at world position `P`.
+ *
+ * `lambda`/`k` name the order that actually reaches the eye, or are null when
+ * none does -- a droplet that delivers nothing is still worth taking apart,
+ * because seeing where its light goes instead is the whole reason the bow has
+ * an angle at all.
+ *
+ * The other orders are drawn from the SAME droplet, running past the observer
+ * rather than stopping short, so the gap between such a ray and the eye is
+ * the miss angle drawn to scale.
+ */
+function drawDropletBeam(ctx, cam, size, opts) {
+  const { P, anti, sun, lambda, k, idx } = opts;
+  const { w, h } = size;
+  const dist = O.vlen(P);
+  if (dist < 1e-9) return;
+  const dir = O.vmul(P, 1 / dist);
+  const toEye = O.vneg(dir);
+  const phi = O.vangle(dir, anti) * O.DEG;
+  const refLambda = lambda === null || lambda === undefined ? 650 : lambda;
+
+  // sunlight in, the whole way back: perspective converges parallel lines on
+  // a vanishing point, so a stub leaves at a bearing that fights the axis
+  line3(ctx, cam, [O.vadd(P, O.vmul(sun, SUN_FAR)), P], 'rgba(255,242,196,0.9)', 1.6);
+  const nearSun = O.vadd(P, O.vmul(sun, SUN_LABEL_AT));
+  if (cam.depth(nearSun) > NEAR && cam.depth(P) > NEAR) {
+    const a = cam.project(nearSun);
+    arrowHead(ctx, a, cam.project(P), 'rgba(255,242,196,0.95)', 7);
+    if (state.show.labels) capLabel(ctx, t('dropIncoming'), a.x, a.y - 14, w, h, '#ffe9a8');
+  }
+
+  for (const order of DROP_ORDERS) {
+    const geo = O.rainbowGeometry(idx(refLambda), order);
+    if (!geo) continue;
+    const out = O.directionAtAngle(anti, toEye, geo.scatteringDeg);
+    const reaches = order === k;
+    const end = reaches ? O.vec(0, 0, 0) : O.vadd(P, O.vmul(out, OUT_LEN));
+    line3(ctx, cam, [P, end],
+      reaches ? colorFor(refLambda, 0.95) : ORDER_COLOR[order] || ORDER_COLOR[3],
+      reaches ? 2.2 : 1.1, reaches ? null : [4, 4]);
+    if (state.show.labels && !reaches) {
+      const at = O.vadd(P, O.vmul(out, OUT_LEN * OUT_LABEL_AT));
+      if (cam.depth(at) > NEAR) {
+        const p = cam.project(at);
+        capLabel(ctx, `k=${order} · φ ${deg(geo.antisolarDeg, 1)}`, p.x, p.y, w, h,
+          ORDER_COLOR[order] || ORDER_COLOR[3]);
+      }
+    }
+  }
+
+  // Theta at the droplet, phi at the eye -- each at the vertex where it is
+  // actually measured, the same split the many-droplets inspector uses.
+  if (state.show.angles) {
+    arc3(ctx, cam, size, P, (a) => O.directionAtAngle(anti, toEye, a), 180 - phi, ARC_DROP,
+      'rgba(224,168,63,0.85)', `Θ ${deg(180 - phi, 1)}`);
+    // phi is drawn at the eye -- but in the eye view the camera IS the eye,
+    // and an arc a third of a unit from the lens projects across the whole
+    // canvas as a line rather than an angle. Nobody sees an angle drawn at
+    // their own pupil; from outside it is the clearest thing in the picture.
+    // In the eye view phi is already on screen as the angular distance from
+    // the marked antisolar point, which is what the reader is looking at.
+    if (state.view !== 'eye') {
+      arc3(ctx, cam, size, O.vec(0, 0, 0), (a) => O.directionAtAngle(anti, dir, a), phi, ARC_EYE,
+        k ? 'rgba(224,168,63,0.95)' : 'rgba(143,164,200,0.85)', `φ ${deg(phi, 1)}`);
+    }
+  }
+
+  if (cam.depth(P) > NEAR) {
+    const p = cam.project(P);
+    const ring = k ? colorFor(refLambda, 0.9) : 'rgba(207,169,232,0.9)';
+    ctx.save();
+    ctx.fillStyle = k ? colorFor(refLambda, 0.95) : 'rgba(207,169,232,0.95)';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = ring;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    if (state.show.labels) {
+      const cap = k
+        ? `k=${k} · ${Math.round(refLambda)} ${t('nm')}`
+        : t('dropMisses', { angle: deg(phi, 1) });
+      capLabel(ctx, cap, p.x, p.y - 20, w, h, k ? colorFor(refLambda) : '#cfa9e8');
+    }
+  }
 }
 
 /* ============ src/dropletView.js ============ */
@@ -5294,6 +5473,7 @@ function tip(ctx, text, x, y, w, h, opts = {}) {
 
 
 
+
 /**
  * How many wavelengths the bow is drawn from, and how many points per circle.
  *
@@ -5312,45 +5492,9 @@ const BOW_LAMBDA_MAX = 680;
 
 /** Where the traced droplet sits, in the unit-sphere world of this scene. */
 const DROP_DIST = 1;
-/**
- * The traced beam's incoming ray runs the whole way back to the Sun, not a
- * token stub.
- *
- * This is perspective, so parallel lines are NOT parallel on screen -- they
- * converge on the direction's vanishing point, which for the Sun is far off
- * canvas. A short stub at the droplet therefore leaves at a screen bearing
- * ~11 degrees off the sunlight axis drawn through the observer, and the two
- * read as contradicting each other even though both are exactly right. Drawn
- * full length, the ray runs off the same edge the axis does and the eye reads
- * the convergence instead of a mismatch.
- */
-const SUN_LEN = SUN_FAR;
-/** Where along that ray its arrow and caption sit, in world units. */
-const SUN_LABEL_AT = 0.5;
-// The orders that miss run PAST the observer rather than stopping short: the
-// gap between such a ray and the eye is then the miss angle drawn to scale,
-// the ray visibly sails by, and its caption lands clear of the observer's own
-// label instead of on top of it.
-const OUT_LEN = DROP_DIST * 1.55;
-/** Where along a missing ray its caption sits. */
-const OUT_LABEL_AT = 0.95;
-const ARC_DROP = 0.2;
-const ARC_EYE = 0.36;
 
 /** Screen distance at which a click counts as landing on a bow. */
 const PICK_PX = 13;
-/**
- * How far the pointer may travel between press and release and still be a
- * click rather than an orbit.
- *
- * Measured as displacement from where the button went down, NOT as the length
- * of the path it took. Summing the path was a real bug: a physical mouse
- * emits several one-pixel moves during any ordinary click, six of which
- * totalled more than the threshold, so picking a bow essentially never worked
- * on real hardware while passing a synthetic test that dispatched no moves
- * at all.
- */
-const CLICK_SLOP = 6;
 /** Rolls sampled around each bow when hit-testing a click: 1-degree steps. */
 const PICK_STEPS = 360;
 
@@ -5373,22 +5517,7 @@ const READOUT_H = 118;
  */
 const RAIN_PATH_MIN = 2000;
 
-/** Reflection order -> chrome colour, the same convention drawCone() uses. */
-const ORDER_COLOR = {
-  1: 'rgba(111,211,164,0.75)',
-  2: 'rgba(155,140,240,0.75)',
-  3: 'rgba(240,136,93,0.7)',
-};
 
-/** A caption clamped onto the canvas -- projected labels land anywhere. */
-function capLabel(ctx, text, x, y, w, h, color) {
-  ctx.save();
-  ctx.font = MONO_FONT;
-  const half = ctx.measureText(text).width / 2 + 6;
-  ctx.restore();
-  label(ctx, text, O.clamp(x, half + 2, Math.max(half + 2, w - half - 2)),
-    O.clamp(y, 10, Math.max(10, h - 10)), { align: 'center', color, font: MONO_FONT });
-}
 
 /* --------------------------------------------------- cached bow profile -- */
 
@@ -5983,23 +6112,6 @@ function createSkyView(canvas) {
     return { ...pick, geo, phi: geo.antisolarDeg, dir };
   }
 
-  /** A world polyline, drawn through the near-plane clipper. */
-  function line3(ctx, pts, color, width, dash) {
-    for (const run of clipPolyline(cam, pts)) strokePath(ctx, run, color, width, dash);
-  }
-
-  /** A great-circle arc from `axis` out to `angleDeg`, centred on `at`. */
-  function arc3(ctx, at, gen, angleDeg, radius, color, text) {
-    const pts = [];
-    for (let i = 0; i <= 24; i++) pts.push(O.vadd(at, O.vmul(gen((angleDeg * i) / 24), radius)));
-    line3(ctx, pts, color, 1);
-    const mid = O.vadd(at, O.vmul(gen(angleDeg / 2), radius * 1.12));
-    if (text && cam.depth(mid) > NEAR) {
-      const p = cam.project(mid);
-      label(ctx, text, p.x, p.y, { align: 'center', color, font: MONO_FONT });
-    }
-  }
-
   /**
    * One beam, traced from the Sun to the eye through a single droplet sitting
    * in the picked direction -- plus what that same droplet does with the
@@ -6024,66 +6136,10 @@ function createSkyView(canvas) {
     // vanished contradicts the very thing that vanishing is teaching. The
     // pick itself survives, so lowering the Sun brings it back.
     if (!visibleDir(pick.dir)) return;
-    const idx = indexModel();
-    const P = O.vmul(pick.dir, DROP_DIST);
-    const toEye = O.vneg(pick.dir);
-
-    // sunlight in, along the one direction all of it travels
-    line3(ctx, [O.vadd(P, O.vmul(sun, SUN_LEN)), P], 'rgba(255,242,196,0.9)', 1.6);
-    const nearSun = O.vadd(P, O.vmul(sun, SUN_LABEL_AT));
-    if (cam.depth(nearSun) > NEAR && cam.depth(P) > NEAR) {
-      const a = cam.project(nearSun);
-      arrowHead(ctx, a, cam.project(P), 'rgba(255,242,196,0.95)', 7);
-      if (state.show.labels) capLabel(ctx, t('dropIncoming'), a.x, a.y - 14, w, h, '#ffe9a8');
-    }
-
-    // what this droplet does with each order
-    for (const k of DROP_ORDERS) {
-      const geo = O.rainbowGeometry(idx(pick.lambda), k);
-      if (!geo) continue;
-      const out = O.directionAtAngle(anti, toEye, geo.scatteringDeg);
-      const reaches = k === pick.k;
-      const end = reaches ? O.vec(0, 0, 0) : O.vadd(P, O.vmul(out, OUT_LEN));
-      line3(ctx, [P, end], reaches ? colorFor(pick.lambda, 0.95) : ORDER_COLOR[k] || ORDER_COLOR[3],
-        reaches ? 2.2 : 1.1, reaches ? null : [4, 4]);
-      if (state.show.labels && !reaches) {
-        const at = O.vadd(P, O.vmul(out, OUT_LEN * OUT_LABEL_AT));
-        if (cam.depth(at) > NEAR) {
-          const p = cam.project(at);
-          capLabel(ctx, `k=${k} · φ ${deg(geo.antisolarDeg, 1)}`, p.x, p.y, w, h,
-            ORDER_COLOR[k] || ORDER_COLOR[3]);
-        }
-      }
-    }
-
-    // Theta at the droplet, phi at the eye -- each at the vertex where it is
-    // actually measured, the same split the many-droplets inspector uses.
-    if (state.show.angles) {
-      arc3(ctx, P, (a) => O.directionAtAngle(anti, toEye, a), 180 - pick.phi, ARC_DROP,
-        'rgba(224,168,63,0.85)', `Θ ${deg(180 - pick.phi, 1)}`);
-      arc3(ctx, O.vec(0, 0, 0), (a) => O.bowDirection(anti, a, pick.roll), pick.phi, ARC_EYE,
-        'rgba(224,168,63,0.95)', `φ ${deg(pick.phi, 1)}`);
-    }
-
-    // the droplet itself
-    if (cam.depth(P) > NEAR) {
-      const p = cam.project(P);
-      ctx.save();
-      ctx.fillStyle = colorFor(pick.lambda, 0.95);
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = colorFor(pick.lambda, 0.8);
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-      if (state.show.labels) {
-        capLabel(ctx, `k=${pick.k} · ${pick.lambda} ${t('nm')}`, p.x, p.y - 20, w, h,
-          colorFor(pick.lambda));
-      }
-    }
+    drawDropletBeam(ctx, cam, { w, h }, {
+      P: O.vmul(pick.dir, DROP_DIST),
+      anti, sun, lambda: pick.lambda, k: pick.k, idx: indexModel(),
+    });
   }
 
   /* --------------------------------------------------------- interaction */
@@ -6253,6 +6309,7 @@ function createSkyView(canvas) {
 
 
 
+
 /** Near and far edge of the rain volume, in world units. */
 const R_MIN = 0.3;
 const R_MAX = 6;
@@ -6273,12 +6330,23 @@ const WORLD_SCALE_M = 2000;
 /** Wavelength bucket for batching droplet fills, in nm. */
 const LAMBDA_BUCKET = 5;
 
+/** Screen distance at which a click counts as landing on a droplet. */
+const DROP_PICK_PX = 12;
+
 function createFieldView(canvas) {
   let drops = [];
   let seedKey = '';
   let cls = { key: '', lambda: null, order: null, lit: 0, shown: 0 };
   let cam = null;
   let size = { w: 0, h: 0 };
+  /* Where each drawn droplet landed on screen last frame, so a click can be
+     tested against exactly what the reader was looking at. Typed arrays
+     refilled in place: sixty thousand fresh objects a frame is the kind of
+     churn that turns a smooth orbit into a stutter. */
+  let hitX = new Float32Array(0);
+  let hitY = new Float32Array(0);
+  let hitI = new Int32Array(0);
+  let hitN = 0;
 
   /* ------------------------------------------------------------ the rain */
 
@@ -6292,6 +6360,10 @@ function createFieldView(canvas) {
     while (drops.length < target) drops.push(newDrop());
     seedKey = seed();
     cls.key = ''; // the field changed; every answer is stale
+    // Turning the count down truncates the array, so a picked droplet can
+    // simply cease to exist; leaving the marker behind would trace a beam
+    // through a droplet that is not there.
+    if (state.fieldPick && indexOfPick() < 0) set({ fieldPick: null });
   }
 
   /**
@@ -6436,6 +6508,7 @@ function createFieldView(canvas) {
 
     const answers = classify();
     drawDroplets(ctx, answers, w, h);
+    drawPick(ctx, answers, anti, sun, w, h);
 
     drawAxis(ctx, sun, anti, w, h);
     if (state.view === 'orbit') drawObserver(ctx);
@@ -6485,6 +6558,12 @@ function createFieldView(canvas) {
     const grey = new Path2D();
     const buckets = new Map();
     const showGrey = state.show.droplets;
+    if (hitX.length < drops.length) {
+      hitX = new Float32Array(drops.length);
+      hitY = new Float32Array(drops.length);
+      hitI = new Int32Array(drops.length);
+    }
+    hitN = 0;
 
     for (let i = 0; i < drops.length; i++) {
       const d = drops[i];
@@ -6494,6 +6573,10 @@ function createFieldView(canvas) {
       const p = cam.project(d);
       if (p.x < -8 || p.x > w + 8 || p.y < -8 || p.y > h + 8) continue;
       const r = O.clamp((0.0055 * cam.scale) / z, 0.45, 3.2);
+      hitX[hitN] = p.x;
+      hitY[hitN] = p.y;
+      hitI[hitN] = i;
+      hitN++;
       const lam = answers.lambda[i];
       if (lam > 0) {
         const key = Math.round(lam / LAMBDA_BUCKET) * LAMBDA_BUCKET;
@@ -6521,6 +6604,37 @@ function createFieldView(canvas) {
       ctx.fillStyle = colorFor(lam, 0.95);
       ctx.fill(path);
     }
+  }
+
+  /**
+   * The droplet the reader clicked, taken apart.
+   *
+   * Same picture the sky view draws behind a point on a bow -- one shared
+   * tracer, so the two scenes cannot disagree about where order k sends its
+   * light. A droplet that delivers nothing is still worth opening: seeing its
+   * light leave in three wrong directions is why the bow has an angle.
+   */
+  function drawPick(ctx, answers, anti, sun, w, h) {
+    const pick = state.fieldPick;
+    if (!pick) return;
+    const i = indexOfPick();
+    const lam = i >= 0 && answers.lambda[i] > 0 ? answers.lambda[i] : null;
+    const k = i >= 0 && answers.order[i] > 0 ? answers.order[i] : null;
+    drawDropletBeam(ctx, cam, { w, h }, {
+      P: O.vec(pick.x, pick.y, pick.z), anti, sun, lambda: lam, k, idx: indexModel(),
+    });
+  }
+
+  /** Which droplet the stored position refers to, or -1 if it is gone. */
+  function indexOfPick() {
+    const pick = state.fieldPick;
+    if (!pick) return -1;
+    for (let i = 0; i < drops.length; i++) {
+      const d = drops[i];
+      if (Math.abs(d.x - pick.x) < 1e-9 && Math.abs(d.y - pick.y) < 1e-9
+        && Math.abs(d.z - pick.z) < 1e-9) return i;
+    }
+    return -1;
   }
 
   function drawAxis(ctx, sun, anti, w, h) {
@@ -6594,8 +6708,10 @@ function createFieldView(canvas) {
     put(`${t('dropsContributing')}: ${fmt(answers.lit)}`, '#6fd3a4');
     put(`${t('fieldNoCircle')}`, '#8ea3c6');
     if (state.show.labels) {
-      label(ctx, t('fieldHint'), 12, h - 14, {
-        color: '#9fd8bd', font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
+      const hintFont = '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif';
+      label(ctx, t('fieldHint'), 12, h - 30, { color: '#9fd8bd', font: hintFont });
+      label(ctx, t(state.fieldPick ? 'fieldClearHint' : 'fieldClickHint'), 12, h - 14, {
+        color: '#cfa9e8', font: hintFont,
       });
     }
   }
@@ -6606,14 +6722,44 @@ function createFieldView(canvas) {
 
   /* -------------------------------------------------------- interaction */
 
+  /** The droplet nearest a screen position, from what was last drawn. */
+  function pickAt(px, py) {
+    let best = -1;
+    let bestGap = DROP_PICK_PX;
+    for (let n = 0; n < hitN; n++) {
+      const gap = Math.hypot(hitX[n] - px, hitY[n] - py);
+      if (gap < bestGap) {
+        bestGap = gap;
+        best = hitI[n];
+      }
+    }
+    return best;
+  }
+
   let drag = null;
+  let down = null;
+  let orbiting = false;
   canvas.addEventListener('pointerdown', (e) => {
-    drag = { x: e.clientX, y: e.clientY };
+    down = { x: e.clientX, y: e.clientY };
+    drag = { ...down };
+    orbiting = false;
     capture(canvas, e);
-    canvas.style.cursor = 'grabbing';
   });
   canvas.addEventListener('pointermove', (e) => {
-    if (!drag) return;
+    if (!drag) {
+      const r = canvas.getBoundingClientRect();
+      const want = pickAt(e.clientX - r.left, e.clientY - r.top) >= 0 ? 'pointer' : 'grab';
+      if (canvas.style.cursor !== want) canvas.style.cursor = want;
+      return;
+    }
+    if (!orbiting) {
+      // Held still until the pointer clearly leaves the press point, so an
+      // ordinary click does not also nudge the camera on its way past.
+      if (Math.hypot(e.clientX - down.x, e.clientY - down.y) < CLICK_SLOP) return;
+      orbiting = true;
+      canvas.style.cursor = 'grabbing';
+      drag = { x: e.clientX, y: e.clientY };
+    }
     const dx = e.clientX - drag.x;
     const dy = e.clientY - drag.y;
     drag = { x: e.clientX, y: e.clientY };
@@ -6628,9 +6774,31 @@ function createFieldView(canvas) {
   });
   const stop = () => {
     drag = null;
+    down = null;
+    orbiting = false;
     canvas.style.cursor = 'grab';
   };
-  canvas.addEventListener('pointerup', stop);
+  canvas.addEventListener('pointerup', (e) => {
+    // Orbiting is the primary gesture, so a release only counts as a pick
+    // when the pointer never left the press point. Measured as displacement,
+    // never as path length -- a real mouse jitters through several events
+    // during any ordinary click.
+    const wasClick = drag !== null && !orbiting;
+    stop();
+    if (!wasClick) return;
+    const r = canvas.getBoundingClientRect();
+    const i = pickAt(e.clientX - r.left, e.clientY - r.top);
+    // Clicking the same droplet again releases it. There is rain in every
+    // direction here, so "click empty sky to clear" -- which the flat scene
+    // can offer -- has almost nowhere to land: any click finds a droplet.
+    if (i < 0) {
+      if (state.fieldPick) set({ fieldPick: null });
+    } else if (i === indexOfPick()) {
+      set({ fieldPick: null });
+    } else {
+      set({ fieldPick: { ...drops[i] } });
+    }
+  });
   canvas.addEventListener('pointercancel', stop);
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
@@ -6648,7 +6816,9 @@ function createFieldView(canvas) {
     reset: () => {
       drops = [];
       seedKey = '';
+      hitN = 0;
       cls = { key: '', lambda: null, order: null, lit: 0, shown: 0 };
+      if (state.fieldPick) set({ fieldPick: null });
     },
   };
 }
@@ -7745,6 +7915,18 @@ function observerPhiNow() {
   return state.observerMode === 'manual' ? state.observerPhi : rainbowPhi(state.reflections);
 }
 
+/**
+ * Where the reflection-order controls do anything.
+ *
+ * dropletView traces activeOrders(); graphView plots them. Neither 3-D scene
+ * reads them at all -- both pick their orders from
+ * show.primary/secondary/higher -- so in those a reader was handed a
+ * "0 1 2 3 4" segmented control and four family checkboxes that moved
+ * nothing, sitting right next to the toggles that do. Offered now only where
+ * a ray or a plot is there to answer them.
+ */
+const ORDERS_MATTER = () => state.scene === 'droplet' || state.graphOpen;
+
 /** Which visualisation toggles each scene actually reads. */
 const VIS_TOGGLES = [
   { scenes: ['drops', 'field', 'sky'], key: 'primary', labelKey: 'showPrimary' },
@@ -7761,11 +7943,12 @@ const VIS_TOGGLES = [
   // there only once they have -- a toggle with nothing to toggle teaches
   // that the scene is decorative.
   {
-    scenes: ['droplet', 'drops', 'sky'], key: 'angles', labelKey: 'showAngles',
+    scenes: ALL, key: 'angles', labelKey: 'showAngles',
     when: () =>
       state.scene === 'droplet' ||
       (state.scene === 'drops' && !!state.selectedDrop) ||
-      (state.scene === 'sky' && !!state.skyPick),
+      (state.scene === 'sky' && !!state.skyPick) ||
+      (state.scene === 'field' && !!state.fieldPick),
   },
   { scenes: ALL, key: 'labels', labelKey: 'showLabels' },
   { scenes: ['droplet', 'sky'], key: 'wavelengthLabels', labelKey: 'showWavelengthLabels' },
@@ -7859,14 +8042,14 @@ function buildControls() {
               families: { 0: k === 0, 1: k === 1, 2: k === 2, 3: k >= 3 },
               selectedRay: null,
             });
-          }))),
+          })), ORDERS_MATTER),
       c(ALL, () => el('div', { class: 'ctl', dataset: { ctl: 'showFamilies' } },
         el('span', { class: 'ctl-label' }, t('showFamilies')),
         el('div', { class: 'stack' },
           toggle('family0', () => state.families[0], (v) => set({ families: { 0: v } })),
           toggle('family1', () => state.families[1], (v) => set({ families: { 1: v } })),
           toggle('family2', () => state.families[2], (v) => set({ families: { 2: v } })),
-          toggle('family3', () => state.families[3], (v) => set({ families: { 3: v } }))))),
+          toggle('family3', () => state.families[3], (v) => set({ families: { 3: v } })))), ORDERS_MATTER),
     ]),
 
     /* --- where the observer is standing, in whichever scene we are in --- */
@@ -8077,7 +8260,7 @@ function resetState() {
     sunElevation: 15, sunAzimuth: 180, observerHeight: 1.7,
     view: 'orbit', camYaw: -35, camPitch: 14, camDist: 3.1,
     eyeAzimuth: 0, eyeElevation: 12, fov: 75,
-    selectedRay: null, selectedDrop: null, skyPick: null,
+    selectedRay: null, selectedDrop: null, skyPick: null, fieldPick: null,
     show: {
       normals: false, angles: true, labels: true, wavelengthLabels: false,
       droplets: true, cone: true, antisolar: true, horizon: true, ground: true,
@@ -8133,7 +8316,8 @@ function rebuild() {
 function controlsKey() {
   return [
     state.scene, state.view, state.observerMode, state.mode, state.step,
-    state.selectedDrop ? 1 : 0, state.skyPick ? 1 : 0,
+    state.selectedDrop ? 1 : 0, state.skyPick ? 1 : 0, state.fieldPick ? 1 : 0,
+    state.graphOpen ? 1 : 0,
   ].join('|');
 }
 

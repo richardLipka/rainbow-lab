@@ -25,6 +25,17 @@ export const NEAR = 0.02;
  */
 export const SUN_FAR = 40;
 
+/**
+ * How far the pointer may travel between press and release and still be a
+ * click rather than a drag, in screen pixels.
+ *
+ * Measured as displacement from the press point, never as the length of the
+ * path taken: a physical mouse emits several one-pixel moves during any
+ * ordinary click, and summing them made picking essentially impossible on
+ * real hardware while passing a synthetic test that emitted no moves at all.
+ */
+export const CLICK_SLOP = 6;
+
 export function makeCamera(eye, forward, fovDeg, w, h) {
   const zA = O.vnorm(O.vneg(forward));
   let upHint = O.vec(0, 1, 0);
