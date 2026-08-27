@@ -482,6 +482,20 @@ Three things make it work:
   discrete rings in the sky — the identical artefact the sky view had to be
   fixed for. phi(lambda) is monotonic for fixed k, so a table sampled
   uniformly in lambda inverts with one scan.
+- **The band needs a minimum width, or dispersion 0 empties the scene.**
+  `bowSpectrum`'s band is exactly as wide as the dispersion, so at
+  `dispersion: 0` it collapses to a single angle and no finite set of
+  droplets can ever land on it. `lambdaAt()` therefore widens by
+  `BOW_MATCH_DEG` at each end and clamps the angle back into the true band
+  before inverting -- the same finite caustic half-width the flat scene
+  matches droplets with. This shipped: the app opens on tutorial step 1,
+  which sets dispersion to 0, so a reader switching to free mode and
+  clicking the new tab got an empty sky. At dispersion 0 the bow is now a
+  single *white* arc, which is what "every wavelength shares one index"
+  should look like.
+- **A selected single wavelength does not go through the spectrum at all.**
+  There is no band to invert; that colour has one bow angle per order and a
+  droplet matches within `BOW_MATCH_DEG` of it.
 - **The classification is cached against the physics, not the camera.**
   Orbiting re-projects the same answers rather than re-deriving them, which
   is the whole reason 60 000 droplets are affordable: 6.9 ms/frame steady,
@@ -497,6 +511,11 @@ keeps the two scenes telling one story — at 1.7 m the ground sits 0.00085
 units down and there is essentially no rain under the eye, while at 15 km it
 is 7.5 units down, below the whole volume, so nothing is cut and the ring
 closes.
+
+Arriving at this scene from a flat one switches to the **eye view**: that is
+the one place a bow looks like a bow, and the orbit view's cone needs a dense
+field before it reads. Coming from the other 3-D scene keeps the camera the
+reader was already using.
 
 The orbit camera sits at `camDist * 3.8`, deliberately **outside** `R_MAX`.
 At the sky view's distance the eye is inside the rain and the lit droplets

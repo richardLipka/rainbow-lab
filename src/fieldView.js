@@ -17,7 +17,7 @@ import { state, set, indexModel } from './state.js';
 import { t, deg, num } from './i18n.js';
 import { fitCanvas, strokePath, label, capture, arrowHead } from './ui.js';
 import { NEAR, SUN_FAR, makeCamera, clipPolyline, clampToCanvas } from './camera3d.js';
-import { colorFor, bowSpectrum } from './rays.js';
+import { colorFor, bowSpectrum, BOW_MATCH_DEG } from './rays.js';
 
 /** Near and far edge of the rain volume, in world units. */
 const R_MIN = 0.3;
@@ -111,8 +111,18 @@ export function createFieldView(canvas) {
     if (state.show.primary) orders.push(1);
     if (state.show.secondary) orders.push(2);
     if (state.show.higher) orders.push(3);
-    const spectra = orders.map((k) => bowSpectrum(idx, k)).filter(Boolean);
+    // With one colour selected there is no band to invert: that wavelength
+    // has one bow angle per order, and a droplet lights up within the same
+    // tolerance the flat scene matches with.
     const single = state.wavelength === 'white' ? null : state.wavelength;
+    const spectra = single === null ? orders.map((k) => bowSpectrum(idx, k)).filter(Boolean) : [];
+    const mono = [];
+    if (single !== null) {
+      for (const k of orders) {
+        const geo = O.rainbowGeometry(idx(single), k);
+        if (geo) mono.push({ k, phi: geo.antisolarDeg });
+      }
+    }
 
     const anti = O.antisolarDirection(state.sunElevation, state.sunAzimuth);
     const floor = rainFloor();
@@ -130,16 +140,23 @@ export function createFieldView(canvas) {
       // The angle the observer sees this droplet at. This is the whole test:
       // distance appears nowhere, exactly as in the flat scene.
       const phi = Math.acos(O.clamp((d.x * anti.x + d.y * anti.y + d.z * anti.z) / len, -1, 1)) * O.DEG;
-      for (const sp of spectra) {
-        const lam = sp.lambdaAt(phi);
-        if (lam === null) continue;
-        // With one wavelength selected only that colour is in the rain, so a
-        // droplet lights up only where THAT wavelength's caustic lands.
-        if (single !== null && Math.abs(lam - single) > 8) continue;
-        lambda[i] = lam;
-        order[i] = sp.k;
-        lit++;
-        break;
+      if (single !== null) {
+        for (const m of mono) {
+          if (Math.abs(phi - m.phi) > BOW_MATCH_DEG) continue;
+          lambda[i] = single;
+          order[i] = m.k;
+          lit++;
+          break;
+        }
+      } else {
+        for (const sp of spectra) {
+          const lam = sp.lambdaAt(phi);
+          if (lam === null) continue;
+          lambda[i] = lam;
+          order[i] = sp.k;
+          lit++;
+          break;
+        }
       }
     }
     cls = { key, lambda, order, lit, shown };

@@ -3311,9 +3311,22 @@ function bowSpectrum(idx, k, samples = 96) {
     k,
     lo,
     hi,
-    /** The wavelength whose order-k bow sits at this angle, or null. */
-    lambdaAt(phi) {
-      if (phi < lo || phi > hi) return null;
+    /**
+      * The wavelength whose order-k bow sits at this angle, or null.
+      *
+      * The band is widened by BOW_MATCH_DEG at each end and the angle is
+      * clamped back into it before inverting, because a caustic is not
+      * infinitely sharp -- it is the same finite half-width the flat scene
+      * matches droplets with. Without it the band's width is exactly the
+      * dispersion, so at dispersion 0 it collapses to a single angle that no
+      * finite set of droplets can ever land on, and the bow vanishes
+      * entirely. That shipped: the app opens on a tutorial step that sets
+      * dispersion to 0, so the scene was empty on arrival.
+      */
+     lambdaAt(phi) {
+      if (phi < lo - BOW_MATCH_DEG || phi > hi + BOW_MATCH_DEG) return null;
+      if (hi - lo < 1e-9) return pts[Math.floor(pts.length / 2)].lambda;
+      phi = Math.min(hi, Math.max(lo, phi));
       for (let i = 1; i < pts.length; i++) {
         const a = pts[i - 1];
         const b = pts[i];
@@ -6324,8 +6337,18 @@ function createFieldView(canvas) {
     if (state.show.primary) orders.push(1);
     if (state.show.secondary) orders.push(2);
     if (state.show.higher) orders.push(3);
-    const spectra = orders.map((k) => bowSpectrum(idx, k)).filter(Boolean);
+    // With one colour selected there is no band to invert: that wavelength
+    // has one bow angle per order, and a droplet lights up within the same
+    // tolerance the flat scene matches with.
     const single = state.wavelength === 'white' ? null : state.wavelength;
+    const spectra = single === null ? orders.map((k) => bowSpectrum(idx, k)).filter(Boolean) : [];
+    const mono = [];
+    if (single !== null) {
+      for (const k of orders) {
+        const geo = O.rainbowGeometry(idx(single), k);
+        if (geo) mono.push({ k, phi: geo.antisolarDeg });
+      }
+    }
 
     const anti = O.antisolarDirection(state.sunElevation, state.sunAzimuth);
     const floor = rainFloor();
@@ -6343,16 +6366,23 @@ function createFieldView(canvas) {
       // The angle the observer sees this droplet at. This is the whole test:
       // distance appears nowhere, exactly as in the flat scene.
       const phi = Math.acos(O.clamp((d.x * anti.x + d.y * anti.y + d.z * anti.z) / len, -1, 1)) * O.DEG;
-      for (const sp of spectra) {
-        const lam = sp.lambdaAt(phi);
-        if (lam === null) continue;
-        // With one wavelength selected only that colour is in the rain, so a
-        // droplet lights up only where THAT wavelength's caustic lands.
-        if (single !== null && Math.abs(lam - single) > 8) continue;
-        lambda[i] = lam;
-        order[i] = sp.k;
-        lit++;
-        break;
+      if (single !== null) {
+        for (const m of mono) {
+          if (Math.abs(phi - m.phi) > BOW_MATCH_DEG) continue;
+          lambda[i] = single;
+          order[i] = m.k;
+          lit++;
+          break;
+        }
+      } else {
+        for (const sp of spectra) {
+          const lam = sp.lambdaAt(phi);
+          if (lam === null) continue;
+          lambda[i] = lam;
+          order[i] = sp.k;
+          lit++;
+          break;
+        }
       }
     }
     cls = { key, lambda, order, lit, shown };
@@ -7393,7 +7423,10 @@ function buildSceneTabs() {
     { value: 'sky', labelKey: 'sceneSky' },
       ],
       () => state.scene,
-      (v) => set({ scene: v })
+      // Arriving at the droplet field from a flat scene starts in the
+      // observer's own view: that is the one place a bow looks like a bow.
+      // Coming from the other 3-D scene keeps whichever camera was in use.
+      (v) => set(v === 'field' && !SPACE.includes(state.scene) ? { scene: v, view: 'eye' } : { scene: v })
     ),
     exportButton(
       () => sceneCanvases[state.scene],

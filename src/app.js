@@ -132,7 +132,10 @@ function buildSceneTabs() {
     { value: 'sky', labelKey: 'sceneSky' },
       ],
       () => state.scene,
-      (v) => set({ scene: v })
+      // Arriving at the droplet field from a flat scene starts in the
+      // observer's own view: that is the one place a bow looks like a bow.
+      // Coming from the other 3-D scene keeps whichever camera was in use.
+      (v) => set(v === 'field' && !SPACE.includes(state.scene) ? { scene: v, view: 'eye' } : { scene: v })
     ),
     exportButton(
       () => sceneCanvases[state.scene],

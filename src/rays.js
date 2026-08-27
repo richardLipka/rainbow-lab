@@ -271,9 +271,22 @@ export function bowSpectrum(idx, k, samples = 96) {
     k,
     lo,
     hi,
-    /** The wavelength whose order-k bow sits at this angle, or null. */
-    lambdaAt(phi) {
-      if (phi < lo || phi > hi) return null;
+    /**
+      * The wavelength whose order-k bow sits at this angle, or null.
+      *
+      * The band is widened by BOW_MATCH_DEG at each end and the angle is
+      * clamped back into it before inverting, because a caustic is not
+      * infinitely sharp -- it is the same finite half-width the flat scene
+      * matches droplets with. Without it the band's width is exactly the
+      * dispersion, so at dispersion 0 it collapses to a single angle that no
+      * finite set of droplets can ever land on, and the bow vanishes
+      * entirely. That shipped: the app opens on a tutorial step that sets
+      * dispersion to 0, so the scene was empty on arrival.
+      */
+     lambdaAt(phi) {
+      if (phi < lo - BOW_MATCH_DEG || phi > hi + BOW_MATCH_DEG) return null;
+      if (hi - lo < 1e-9) return pts[Math.floor(pts.length / 2)].lambda;
+      phi = Math.min(hi, Math.max(lo, phi));
       for (let i = 1; i < pts.length; i++) {
         const a = pts[i - 1];
         const b = pts[i];
