@@ -29,6 +29,13 @@ export const translations = {
     sceneDroplet: 'Jedna kapka',
     sceneDrops: 'Mnoho kapek',
     sceneSky: 'Obloha 3D',
+    sceneField: 'Kapky v prostoru',
+    sceneFieldDesc: 'Tisíce kapek v prostoru. Duha se poskládá sama, nikdo ji nekreslí.',
+    fieldCount: 'Počet kapek v prostoru',
+    fieldCountHint:
+      'Každá kapka se ptá na totéž co v plošné scéně: pod jakým úhlem ji vidím a vychází právě tam nějaká vlnová délka? Čím víc kapek, tím zřetelnější kruh — ale kreslí se pořád jen kapky.',
+    fieldNoCircle: 'Žádná kružnice se nekreslí — barevné jsou jen kapky, které prošly testem.',
+    fieldHint: 'Táhněte myší, kolečkem přiblížíte. Přepněte na pohled okem a duha se uzavře do kruhu.',
     sceneDropletDesc: 'Řez jednou kulovou kapkou. Paprsek se počítá, nikoli kreslí.',
     sceneDropsDesc: 'Od jedné kapky k tisícům. Pozorovatel je vlevo.',
     sceneSkyDesc: 'Kužel směrů kolem antisolárního bodu a jeho průnik s oblohou.',
@@ -264,14 +271,19 @@ export const translations = {
     s8title: 'Teď přidejte tisíce kapek',
     s8body:
       'Každá kapka dělá totéž. K pozorovateli se dostane světlo jen od těch kapek, které leží ve správném úhlu. Zapněte přidávání kapek.',
-    s10title: 'Proč je to oblouk?',
+    s10title: 'Tytéž kapky, ale v prostoru',
     s10body:
-      'Ve třech rozměrech tvoří všechny takové směry kužel kolem antisolárního bodu. Průnik kužele s oblohou je kružnice. Zapněte horizont a dolní část zmizí.',
-    s11title: 'Odkud jsou barvy?',
+      'Stejná otázka, jen bez řezu: každá kapka kolem vás se ptá, pod jakým úhlem ji vidíte a jestli právě tam nějaká vlnová délka vychází. Žádná kružnice se nekreslí — barevné jsou jen kapky, které prošly testem, a oblouk z nich stejně vyjde.',
+    explFieldAssembles:
+      'Přidejte kapky a oblouk zhoustne, uberte je a rozpadne se na jednotlivé body. Duha není nakreslený tvar, je to statistika: kolik kapek náhodou stojí ve správném směru.',
+    s11title: 'Proč je to oblouk?',
     s11body:
-      'Index lomu vody závisí na vlnové délce. Posuňte disperzi z 0 % na 100 % a sledujte, jak se jediný úhel rozpadne na pás barev — a s ním i graf dole, na jednu křivku pro každou vlnovou délku.',
-    s12title: 'Může být duh víc?',
+      'Ve třech rozměrech tvoří všechny takové směry kužel kolem antisolárního bodu. Průnik kužele s oblohou je kružnice. Zapněte horizont a dolní část zmizí.',
+    s12title: 'Odkud jsou barvy?',
     s12body:
+      'Index lomu vody závisí na vlnové délce. Posuňte disperzi z 0 % na 100 % a sledujte, jak se jediný úhel rozpadne na pás barev — a s ním i graf dole, na jednu křivku pro každou vlnovou délku.',
+    s13title: 'Může být duh víc?',
+    s13body:
       'Nastavte dva vnitřní odrazy. Vznikne slabší duha s větším poloměrem a obráceným pořadím barev. Mezi nimi zůstane Alexandrův temný pás.',
 
 /* ---- controls: the observer ---- */
@@ -434,6 +446,13 @@ export const translations = {
     sceneDroplet: 'Single droplet',
     sceneDrops: 'Many droplets',
     sceneSky: 'Sky 3D',
+    sceneField: 'Droplets in space',
+    sceneFieldDesc: 'Thousands of droplets in space. The bow assembles itself; nothing draws it.',
+    fieldCount: 'Droplets in the volume',
+    fieldCountHint:
+      'Every droplet is asked what the flat scene asks it: at what angle do I see it, and does some wavelength come out exactly there? More droplets, a cleaner circle — but only droplets are ever drawn.',
+    fieldNoCircle: 'No circle is drawn — the coloured dots are the droplets that passed the test.',
+    fieldHint: 'Drag to orbit, scroll to zoom. Switch to the eye view and the bow closes into a ring.',
     sceneDropletDesc: 'Cross-section of one spherical droplet. The ray is computed, not drawn.',
     sceneDropsDesc: 'From one droplet to thousands. The observer is on the left.',
     sceneSkyDesc: 'The cone of directions around the antisolar point, and where it meets the sky.',
@@ -671,14 +690,19 @@ export const translations = {
     s8title: 'Now add thousands of droplets',
     s8body:
       'Every droplet does the same thing. Light reaches the observer only from those droplets that lie at the right angle. Turn on droplet accumulation.',
-    s10title: 'Why does it look like an arc?',
+    s10title: 'The same droplets, now in space',
     s10body:
-      'In three dimensions all those directions form a cone around the antisolar point. The cone meets the sky in a circle. Switch the horizon on and the lower part disappears.',
-    s11title: 'Where do the colors come from?',
+      'The same question with the cross-section removed: every droplet around you is asked what angle you see it at, and whether some wavelength comes out exactly there. No circle is drawn — only the droplets that passed are coloured, and an arc comes out of them anyway.',
+    explFieldAssembles:
+      'Add droplets and the arc thickens; take them away and it breaks back into separate points. A rainbow is not a drawn shape, it is a tally: how many droplets happen to stand in the right direction.',
+    s11title: 'Why does it look like an arc?',
     s11body:
-      "Water's refractive index depends on wavelength. Move dispersion from 0 % to 100 % and watch a single angle split into a band of colours — and the graph below splits with it, one curve per wavelength.",
-    s12title: 'Can there be another rainbow?',
+      'In three dimensions all those directions form a cone around the antisolar point. The cone meets the sky in a circle. Switch the horizon on and the lower part disappears.',
+    s12title: 'Where do the colors come from?',
     s12body:
+      "Water's refractive index depends on wavelength. Move dispersion from 0 % to 100 % and watch a single angle split into a band of colours — and the graph below splits with it, one curve per wavelength.",
+    s13title: 'Can there be another rainbow?',
+    s13body:
       "Set two internal reflections. A fainter bow appears with a larger radius and reversed colour order, with Alexander's dark band between them.",
 
 /* ---- controls: the observer ---- */

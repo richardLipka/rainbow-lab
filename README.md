@@ -79,7 +79,9 @@ app.js         assembly + render loop
 | `src/dropletView.js` | Mode A — cross-section of one droplet, plus the observer eye(s). |
 | `src/graphView.js` | Exit-angle plot and angular-distribution plot. |
 | `src/dropsView.js` | Mode B — one droplet to ten thousand, plus the per-droplet inspector. |
+| `src/camera3d.js` | The perspective camera the two 3-D scenes share. |
 | `src/skyView.js` | Mode C — 3-D cone, horizon, observer's eye view. |
+| `src/fieldView.js` | Mode D — the droplet test, run on a volume of rain. |
 | `src/panels.js` | Tutorial, ray readout, mathematics, questions. |
 | `src/app.js` | Shell, controls, render loop. |
 | `src/assets.js` | Generated — logos inlined as data: URIs. |
@@ -374,6 +376,24 @@ dashed line down to it from the observer so the height is something you can
 see, and the **observer's horizon** with its dip. From 15 km the floor is far
 beneath you while the horizon has barely moved — which is the whole argument
 in one picture.
+
+## The bow that assembles itself
+
+The fourth scene is the many-droplets argument with the cross-section taken
+away. Tens of thousands of droplets fill the space around you, and each one
+is asked exactly what the flat scene asks it: at what angle do I see it, and
+does some wavelength's caustic come out there?
+
+**No circle is drawn.** The coloured dots are simply the droplets that passed
+the test — and an arc comes out of them anyway, because the set of directions
+at a fixed angle from an axis is a circle. Turn the droplet count down and it
+breaks back into separate points; turn it up and it thickens into a bow. A
+rainbow is not a shape someone drew, it is a tally of how many droplets
+happen to stand in the right direction.
+
+Switch to the observer's eye and it closes into a ring around the antisolar
+point. Switch to the outside view and the same lit droplets are a cone
+spreading out from where you were standing.
 
 ## One rainbow, not six
 

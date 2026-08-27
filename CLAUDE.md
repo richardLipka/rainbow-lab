@@ -18,6 +18,7 @@ almost certainly how a bug gets in (see "Lessons from bugs found" below).
 ```bash
 node server.mjs        # dev server on :5178 (or next free port)
 node --test test/optics.test.mjs   # 45 unit tests over the engine
+node tools-check-collisions.mjs    # top-level name clashes across the bundle
 node build.mjs          # writes dist/rainbow-lab.html and dist/artifact.html
 ```
 
@@ -45,7 +46,9 @@ i18n.js        the single translation dictionary (cs / en)
 state.js       one observable store (state, set(), subscribe(), activeOrders())
 ui.js          DOM helpers; every control carries its own sync()
    |
-dropletView.js  graphView.js  dropsView.js  skyView.js   panels.js
+camera3d.js    the perspective camera the two 3-D scenes share
+   |
+dropletView.js  graphView.js  dropsView.js  skyView.js  fieldView.js  panels.js
    |
 app.js         assembly + render loop
 ```
@@ -60,7 +63,9 @@ app.js         assembly + render loop
 | `src/dropletView.js` | Mode A — single droplet cross-section, the observer eye(s), ray prominence. |
 | `src/graphView.js` | Exit-angle and angular-distribution plots. |
 | `src/dropsView.js` | Mode B — one droplet to ten thousand, observer-centred; the per-droplet inspector. |
+| `src/camera3d.js` | The hand-written perspective camera, near-plane clipping, `SUN_FAR`. Shared by both 3-D scenes. |
 | `src/skyView.js` | Mode C — 3-D cone/circle/horizon, orbit and eye camera. |
+| `src/fieldView.js` | Mode D — the many-droplets test run on a 3-D volume of rain. |
 | `src/panels.js` | Tutorial script, ray readout, mathematics panel, questions. |
 | `src/app.js` | Shell, controls, the reactive update pipeline (see below), render loop. |
 | `test/optics.test.mjs` | 45 tests over the engine — ray-sphere, Snell, extremum vs. numeric search, classification, sky geometry. |
@@ -454,6 +459,63 @@ it the last piece of fabricated geometry in the app.
 (a `when` predicate on its `VIS_TOGGLES` entry), which is why `controlsKey()`
 carries `state.selectedDrop`.
 
+## Mode D: the bow that assembles itself
+
+`fieldView.js` is the flat many-droplets scene with the cross-section taken
+away. Tens of thousands of droplets fill a ball around the observer and each
+one is asked the same single question `dropsView` asks: at what angle from
+the antisolar direction do I see it, and does some wavelength's caustic come
+out exactly there?
+
+**Nothing in that scene draws a circle.** The bow is whichever droplets
+answered yes, and it comes out round because the set of directions at a fixed
+angle from an axis *is* a circle. That is the one claim the sky view can only
+make by drawing the very circle it is trying to explain, which is why this
+scene exists at all.
+
+Three things make it work:
+
+- **`bowSpectrum(idx, k)` in `rays.js` inverts the angle back to a
+  wavelength.** `lambdaAt(phi)` answers "which wavelength has its caustic
+  exactly here", so a band of angles gets a band of colour, continuously.
+  Snapping each droplet to the nearest of the six named colours would put six
+  discrete rings in the sky — the identical artefact the sky view had to be
+  fixed for. phi(lambda) is monotonic for fixed k, so a table sampled
+  uniformly in lambda inverts with one scan.
+- **The classification is cached against the physics, not the camera.**
+  Orbiting re-projects the same answers rather than re-deriving them, which
+  is the whole reason 60 000 droplets are affordable: 6.9 ms/frame steady,
+  10.8 ms on the frame that rebuilds, against 15.9 ms at 150 000.
+- **Droplets are batched into one `Path2D` per 5 nm bucket.** Sixty thousand
+  individual `fill()` calls is what makes a field this size unaffordable.
+
+`WORLD_SCALE_M = 2000` fixes what a world unit is worth. The flat scene could
+leave its units abstract; this one cannot, because the observer's height
+decides how much rain is below them and that is a ratio of real lengths.
+Tying it to the same 2 km of shower `skyView` measures `RAIN_PATH_MIN` with
+keeps the two scenes telling one story — at 1.7 m the ground sits 0.00085
+units down and there is essentially no rain under the eye, while at 15 km it
+is 7.5 units down, below the whole volume, so nothing is cut and the ring
+closes.
+
+The orbit camera sits at `camDist * 3.8`, deliberately **outside** `R_MAX`.
+At the sky view's distance the eye is inside the rain and the lit droplets
+read as scattered dots rather than as the cone they lie on; pulled back, the
+funnel is unmistakable (2 400 lit droplets at 150 000).
+
+## The bundler puts every module in one scope
+
+`build.mjs` strips `import`/`export` and concatenates, so two files that each
+declare a top-level `const SUN_FAR` are perfectly good ES modules and a
+`SyntaxError` as a bundle. It fails **only in `dist/`** — dev mode is fine,
+which is exactly where nobody is looking while writing a view. It shipped
+once: a blank page with `Identifier 'SUN_FAR' has already been declared`.
+
+`build.mjs` now refuses to build on a collision, and
+`tools-check-collisions.mjs` runs the same check on its own. When two scenes
+genuinely need the same constant, put it in the module they already share
+(`SUN_FAR` moved to `camera3d.js`) rather than renaming one of them.
+
 ## The control column is scene-filtered, and the scene lists are assertions
 
 `app.js` builds the column from entries of the form
@@ -804,7 +866,7 @@ driving the actual app:
    15 digits; pixel heuristics have already produced noise here. Pixel
    counting is still the right tool for "did the *set* of highlighted things
    change" questions — count saturated pixels and compare centroids.
-8. Full 12-step tutorial script in **both languages** + free-mode sweeps
+8. Full 13-step tutorial script in **both languages** + free-mode sweeps
    (every scene, sky orbit and eye view, zoom extremes, reset) with zero
    thrown errors **and zero console warnings** is the practical regression
    bar. The warnings matter: `applyFocus()` reports tutorial steps whose

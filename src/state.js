@@ -11,7 +11,7 @@ export const state = {
   lang: 'cs',
   mode: 'tutorial', // 'tutorial' | 'free'
   step: 0,
-  scene: 'droplet', // 'droplet' | 'drops' | 'sky'
+  scene: 'droplet', // 'droplet' | 'drops' | 'field' | 'sky'
   graph: 'exit', // 'exit' | 'dist'
 
   /* Whether the plots at the bottom of the page are open. Closed by default:
@@ -62,6 +62,12 @@ export const state = {
   /* many droplets */
   dropCount: 1,
   dropsAnimate: false,
+
+  /* How many droplets fill the three-dimensional rain volume. Large by
+     default: the whole point of that scene is that the bow is not drawn, it
+     is however many droplets happened to answer yes, and a thin field looks
+     like scattered dots rather than an arc. */
+  fieldCount: 60000,
 
   /* Where the observer stands inside the rain, in the same world units the
      droplet field uses: +x points away from the Sun (deeper into the rain),

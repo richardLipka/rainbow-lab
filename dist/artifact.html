@@ -1559,6 +1559,13 @@ const translations = {
     sceneDroplet: 'Jedna kapka',
     sceneDrops: 'Mnoho kapek',
     sceneSky: 'Obloha 3D',
+    sceneField: 'Kapky v prostoru',
+    sceneFieldDesc: 'Tisíce kapek v prostoru. Duha se poskládá sama, nikdo ji nekreslí.',
+    fieldCount: 'Počet kapek v prostoru',
+    fieldCountHint:
+      'Každá kapka se ptá na totéž co v plošné scéně: pod jakým úhlem ji vidím a vychází právě tam nějaká vlnová délka? Čím víc kapek, tím zřetelnější kruh — ale kreslí se pořád jen kapky.',
+    fieldNoCircle: 'Žádná kružnice se nekreslí — barevné jsou jen kapky, které prošly testem.',
+    fieldHint: 'Táhněte myší, kolečkem přiblížíte. Přepněte na pohled okem a duha se uzavře do kruhu.',
     sceneDropletDesc: 'Řez jednou kulovou kapkou. Paprsek se počítá, nikoli kreslí.',
     sceneDropsDesc: 'Od jedné kapky k tisícům. Pozorovatel je vlevo.',
     sceneSkyDesc: 'Kužel směrů kolem antisolárního bodu a jeho průnik s oblohou.',
@@ -1794,14 +1801,19 @@ const translations = {
     s8title: 'Teď přidejte tisíce kapek',
     s8body:
       'Každá kapka dělá totéž. K pozorovateli se dostane světlo jen od těch kapek, které leží ve správném úhlu. Zapněte přidávání kapek.',
-    s10title: 'Proč je to oblouk?',
+    s10title: 'Tytéž kapky, ale v prostoru',
     s10body:
-      'Ve třech rozměrech tvoří všechny takové směry kužel kolem antisolárního bodu. Průnik kužele s oblohou je kružnice. Zapněte horizont a dolní část zmizí.',
-    s11title: 'Odkud jsou barvy?',
+      'Stejná otázka, jen bez řezu: každá kapka kolem vás se ptá, pod jakým úhlem ji vidíte a jestli právě tam nějaká vlnová délka vychází. Žádná kružnice se nekreslí — barevné jsou jen kapky, které prošly testem, a oblouk z nich stejně vyjde.',
+    explFieldAssembles:
+      'Přidejte kapky a oblouk zhoustne, uberte je a rozpadne se na jednotlivé body. Duha není nakreslený tvar, je to statistika: kolik kapek náhodou stojí ve správném směru.',
+    s11title: 'Proč je to oblouk?',
     s11body:
-      'Index lomu vody závisí na vlnové délce. Posuňte disperzi z 0 % na 100 % a sledujte, jak se jediný úhel rozpadne na pás barev — a s ním i graf dole, na jednu křivku pro každou vlnovou délku.',
-    s12title: 'Může být duh víc?',
+      'Ve třech rozměrech tvoří všechny takové směry kužel kolem antisolárního bodu. Průnik kužele s oblohou je kružnice. Zapněte horizont a dolní část zmizí.',
+    s12title: 'Odkud jsou barvy?',
     s12body:
+      'Index lomu vody závisí na vlnové délce. Posuňte disperzi z 0 % na 100 % a sledujte, jak se jediný úhel rozpadne na pás barev — a s ním i graf dole, na jednu křivku pro každou vlnovou délku.',
+    s13title: 'Může být duh víc?',
+    s13body:
       'Nastavte dva vnitřní odrazy. Vznikne slabší duha s větším poloměrem a obráceným pořadím barev. Mezi nimi zůstane Alexandrův temný pás.',
 
 /* ---- controls: the observer ---- */
@@ -1964,6 +1976,13 @@ const translations = {
     sceneDroplet: 'Single droplet',
     sceneDrops: 'Many droplets',
     sceneSky: 'Sky 3D',
+    sceneField: 'Droplets in space',
+    sceneFieldDesc: 'Thousands of droplets in space. The bow assembles itself; nothing draws it.',
+    fieldCount: 'Droplets in the volume',
+    fieldCountHint:
+      'Every droplet is asked what the flat scene asks it: at what angle do I see it, and does some wavelength come out exactly there? More droplets, a cleaner circle — but only droplets are ever drawn.',
+    fieldNoCircle: 'No circle is drawn — the coloured dots are the droplets that passed the test.',
+    fieldHint: 'Drag to orbit, scroll to zoom. Switch to the eye view and the bow closes into a ring.',
     sceneDropletDesc: 'Cross-section of one spherical droplet. The ray is computed, not drawn.',
     sceneDropsDesc: 'From one droplet to thousands. The observer is on the left.',
     sceneSkyDesc: 'The cone of directions around the antisolar point, and where it meets the sky.',
@@ -2201,14 +2220,19 @@ const translations = {
     s8title: 'Now add thousands of droplets',
     s8body:
       'Every droplet does the same thing. Light reaches the observer only from those droplets that lie at the right angle. Turn on droplet accumulation.',
-    s10title: 'Why does it look like an arc?',
+    s10title: 'The same droplets, now in space',
     s10body:
-      'In three dimensions all those directions form a cone around the antisolar point. The cone meets the sky in a circle. Switch the horizon on and the lower part disappears.',
-    s11title: 'Where do the colors come from?',
+      'The same question with the cross-section removed: every droplet around you is asked what angle you see it at, and whether some wavelength comes out exactly there. No circle is drawn — only the droplets that passed are coloured, and an arc comes out of them anyway.',
+    explFieldAssembles:
+      'Add droplets and the arc thickens; take them away and it breaks back into separate points. A rainbow is not a drawn shape, it is a tally: how many droplets happen to stand in the right direction.',
+    s11title: 'Why does it look like an arc?',
     s11body:
-      "Water's refractive index depends on wavelength. Move dispersion from 0 % to 100 % and watch a single angle split into a band of colours — and the graph below splits with it, one curve per wavelength.",
-    s12title: 'Can there be another rainbow?',
+      'In three dimensions all those directions form a cone around the antisolar point. The cone meets the sky in a circle. Switch the horizon on and the lower part disappears.',
+    s12title: 'Where do the colors come from?',
     s12body:
+      "Water's refractive index depends on wavelength. Move dispersion from 0 % to 100 % and watch a single angle split into a band of colours — and the graph below splits with it, one curve per wavelength.",
+    s13title: 'Can there be another rainbow?',
+    s13body:
       "Set two internal reflections. A fainter bow appears with a larger radius and reversed colour order, with Alexander's dark band between them.",
 
 /* ---- controls: the observer ---- */
@@ -2422,7 +2446,7 @@ const state = {
   lang: 'cs',
   mode: 'tutorial', // 'tutorial' | 'free'
   step: 0,
-  scene: 'droplet', // 'droplet' | 'drops' | 'sky'
+  scene: 'droplet', // 'droplet' | 'drops' | 'field' | 'sky'
   graph: 'exit', // 'exit' | 'dist'
 
   /* Whether the plots at the bottom of the page are open. Closed by default:
@@ -2473,6 +2497,12 @@ const state = {
   /* many droplets */
   dropCount: 1,
   dropsAnimate: false,
+
+  /* How many droplets fill the three-dimensional rain volume. Large by
+     default: the whole point of that scene is that the bow is not drawn, it
+     is however many droplets happened to answer yes, and a thin field looks
+     like scattered dots rather than an arc. */
+  fieldCount: 60000,
 
   /* Where the observer stands inside the rain, in the same world units the
      droplet field uses: +x points away from the Sun (deeper into the rain),
@@ -2906,6 +2936,107 @@ function angleArc(ctx, cx, cy, r, a0, a1, color, text) {
   ctx.restore();
 }
 
+/* ============ src/camera3d.js ============ */
+
+/**
+ * camera3d.js -- the small hand-written perspective camera the two 3-D scenes
+ * share.
+ *
+ * Extracted from skyView when the droplet-field scene arrived: two views that
+ * project the same world with two copies of the same projection is exactly how
+ * they end up disagreeing about where a direction is on screen, and both of
+ * them draw the same bow.
+ *
+ * The observer sits at the origin and every direction is a unit vector, so the
+ * "sky" is the unit sphere. No dependencies beyond optics.
+ */
+
+/** Camera-space depth below which a point is behind the lens. */
+const NEAR = 0.02;
+
+/**
+ * How far away the Sun is staged, in world units.
+ *
+ * Far enough that the parallax between the observer and a droplet on the bow
+ * is under a degree, which is what makes a ray drawn parallel to the sunlight
+ * actually point at the Sun on screen. Shared, because both 3-D scenes draw
+ * the same sunlight axis and they must not disagree about where it goes.
+ */
+const SUN_FAR = 40;
+
+function makeCamera(eye, forward, fovDeg, w, h) {
+  const zA = O.vnorm(O.vneg(forward));
+  let upHint = O.vec(0, 1, 0);
+  if (Math.abs(O.vdot(zA, upHint)) > 0.999) upHint = O.vec(0, 0, 1);
+  const xA = O.vnorm(O.vcross(upHint, zA));
+  const yA = O.vcross(zA, xA);
+  const f = 1 / Math.tan((fovDeg * O.RAD) / 2);
+  const scale = (h / 2) * f;
+  return {
+    eye,
+    scale,
+    project(p) {
+      const d = O.vsub(p, eye);
+      const cx = O.vdot(d, xA);
+      const cy = O.vdot(d, yA);
+      const cz = -O.vdot(d, zA);
+      return { x: w / 2 + (cx / cz) * scale, y: h / 2 - (cy / cz) * scale, z: cz };
+    },
+    /** Camera-space depth only, used for near-plane clipping. */
+    depth(p) {
+      return -O.vdot(O.vsub(p, eye), zA);
+    },
+  };
+}
+
+/** Project a world polyline, splitting it wherever it crosses the near plane. */
+function clipPolyline(cam, pts) {
+  const out = [];
+  let run = [];
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    const z = cam.depth(p);
+    if (z > NEAR) {
+      run.push(cam.project(p));
+    } else {
+      if (run.length > 1) out.push(run);
+      run = [];
+      // enter/exit points keep the line touching the edge instead of jumping
+      const prev = pts[i - 1];
+      if (prev && cam.depth(prev) > NEAR) {
+        run.push(cam.project(lerpToNear(cam, prev, p)));
+        out.push(run);
+        run = [];
+      }
+      const next = pts[i + 1];
+      if (next && cam.depth(next) > NEAR) run.push(cam.project(lerpToNear(cam, next, p)));
+    }
+  }
+  if (run.length > 1) out.push(run);
+  return out;
+}
+
+function lerpToNear(cam, inside, outside) {
+  const zi = cam.depth(inside);
+  const zo = cam.depth(outside);
+  const tt = (zi - NEAR) / (zi - zo);
+  return O.vadd(inside, O.vmul(O.vsub(outside, inside), Math.max(0, Math.min(1, tt))));
+}
+
+/** Pull a screen point back onto the canvas, along the line from its centre. */
+function clampToCanvas(p, w, h, margin) {
+  const cx = w / 2;
+  const cy = h / 2;
+  const dx = p.x - cx;
+  const dy = p.y - cy;
+  const len = Math.hypot(dx, dy);
+  if (len < 1e-6) return { x: cx, y: cy };
+  let t = len;
+  if (Math.abs(dx) > 1e-9) t = Math.min(t, ((w / 2 - margin) * len) / Math.abs(dx));
+  if (Math.abs(dy) > 1e-9) t = Math.min(t, ((h / 2 - margin) * len) / Math.abs(dy));
+  return { x: cx + (dx / len) * t, y: cy + (dy / len) * t };
+}
+
 /* ============ src/rays.js ============ */
 
 /**
@@ -3149,6 +3280,52 @@ function dropReport(drop, orders = DROP_ORDERS) {
   const reaching = bands.filter((b) => b.reaches);
   reaching.sort((a, b) => Math.abs(a.delta) - Math.abs(b.delta));
   return { anti, distance, dir, phiSeen, bands, hit: reaching[0] || null };
+}
+
+/**
+ * The bow of order k as a continuous spectrum, invertible.
+ *
+ * `lambdaAt(phi)` answers "which wavelength has ITS caustic exactly here",
+ * which is the question a droplet in space actually poses: it sits at some
+ * antisolar angle, and either some wavelength's bow passes through that angle
+ * or none does. Answering it by snapping to the six named colours puts six
+ * discrete rings in the sky where there is one continuous band -- the same
+ * artefact the sky view had to be fixed for.
+ *
+ * phi(lambda) is monotonic for a fixed k (increasing for k=1, decreasing for
+ * k=2), so a table sampled uniformly in lambda inverts by a single scan.
+ */
+function bowSpectrum(idx, k, samples = 96) {
+  const pts = [];
+  for (let i = 0; i < samples; i++) {
+    const lambda = 400 + (280 * i) / (samples - 1);
+    const geo = O.rainbowGeometry(idx(lambda), k);
+    if (geo) pts.push({ lambda, phi: geo.antisolarDeg });
+  }
+  if (pts.length < 2) return null;
+  const first = pts[0].phi;
+  const last = pts[pts.length - 1].phi;
+  const lo = Math.min(first, last);
+  const hi = Math.max(first, last);
+  return {
+    k,
+    lo,
+    hi,
+    /** The wavelength whose order-k bow sits at this angle, or null. */
+    lambdaAt(phi) {
+      if (phi < lo || phi > hi) return null;
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i - 1];
+        const b = pts[i];
+        if (phi >= Math.min(a.phi, b.phi) && phi <= Math.max(a.phi, b.phi)) {
+          const span = b.phi - a.phi;
+          const t = Math.abs(span) < 1e-12 ? 0 : (phi - a.phi) / span;
+          return a.lambda + t * (b.lambda - a.lambda);
+        }
+      }
+      return null;
+    },
+  };
 }
 
 /* ============ src/dropletView.js ============ */
@@ -5095,19 +5272,6 @@ function tip(ctx, text, x, y, w, h, opts = {}) {
 
 
 
-const NEAR = 0.02;
-
-/**
- * How far away the Sun is drawn, in the unit-sphere world of this scene.
- *
- * Far enough that the parallax between the observer and a droplet on the bow
- * is under a degree, which is what makes a ray drawn parallel to the sunlight
- * actually point at the Sun on screen. It used to sit at 1.25 -- barely
- * outside the bow itself -- and at that range the (correct) parallel ray
- * visibly failed to line up with the (nearby) disc, which reads as a bug in
- * the geometry when it is really a bug in the staging.
- */
-const SUN_FAR = 40;
 
 /**
  * How many wavelengths the bow is drawn from, and how many points per circle.
@@ -5205,66 +5369,6 @@ function capLabel(ctx, text, x, y, w, h, color) {
     O.clamp(y, 10, Math.max(10, h - 10)), { align: 'center', color, font: MONO_FONT });
 }
 
-/* ------------------------------------------------------------- camera ---- */
-
-function makeCamera(eye, forward, fovDeg, w, h) {
-  const zA = O.vnorm(O.vneg(forward));
-  let upHint = O.vec(0, 1, 0);
-  if (Math.abs(O.vdot(zA, upHint)) > 0.999) upHint = O.vec(0, 0, 1);
-  const xA = O.vnorm(O.vcross(upHint, zA));
-  const yA = O.vcross(zA, xA);
-  const f = 1 / Math.tan((fovDeg * O.RAD) / 2);
-  const scale = (h / 2) * f;
-  return {
-    eye,
-    project(p) {
-      const d = O.vsub(p, eye);
-      const cx = O.vdot(d, xA);
-      const cy = O.vdot(d, yA);
-      const cz = -O.vdot(d, zA);
-      return { x: w / 2 + (cx / cz) * scale, y: h / 2 - (cy / cz) * scale, z: cz };
-    },
-    /** Camera-space depth only, used for near-plane clipping. */
-    depth(p) {
-      return -O.vdot(O.vsub(p, eye), zA);
-    },
-  };
-}
-
-/** Project a world polyline, splitting it wherever it crosses the near plane. */
-function clipPolyline(cam, pts) {
-  const out = [];
-  let run = [];
-  for (let i = 0; i < pts.length; i++) {
-    const p = pts[i];
-    const z = cam.depth(p);
-    if (z > NEAR) {
-      run.push(cam.project(p));
-    } else {
-      if (run.length > 1) out.push(run);
-      run = [];
-      // enter/exit points keep the line touching the edge instead of jumping
-      const prev = pts[i - 1];
-      if (prev && cam.depth(prev) > NEAR) {
-        run.push(cam.project(lerpToNear(cam, prev, p)));
-        out.push(run);
-        run = [];
-      }
-      const next = pts[i + 1];
-      if (next && cam.depth(next) > NEAR) run.push(cam.project(lerpToNear(cam, next, p)));
-    }
-  }
-  if (run.length > 1) out.push(run);
-  return out;
-}
-
-function lerpToNear(cam, inside, outside) {
-  const zi = cam.depth(inside);
-  const zo = cam.depth(outside);
-  const tt = (zi - NEAR) / (zi - zo);
-  return O.vadd(inside, O.vmul(O.vsub(outside, inside), Math.max(0, Math.min(1, tt))));
-}
-
 /* --------------------------------------------------- cached bow profile -- */
 
 let profileCache = { key: '', profile: null };
@@ -5287,20 +5391,6 @@ function bowProfile() {
     : null;
   profileCache = { key, profile };
   return profile;
-}
-
-/** Pull a screen point back onto the canvas, along the line from its centre. */
-function clampToCanvas(p, w, h, margin) {
-  const cx = w / 2;
-  const cy = h / 2;
-  const dx = p.x - cx;
-  const dy = p.y - cy;
-  const len = Math.hypot(dx, dy);
-  if (len < 1e-6) return { x: cx, y: cy };
-  let t = len;
-  if (Math.abs(dx) > 1e-9) t = Math.min(t, ((w / 2 - margin) * len) / Math.abs(dx));
-  if (Math.abs(dy) > 1e-9) t = Math.min(t, ((h / 2 - margin) * len) / Math.abs(dy));
-  return { x: cx + (dx / len) * t, y: cy + (dy / len) * t };
 }
 
 /* ------------------------------------------------------------- the view -- */
@@ -6120,6 +6210,411 @@ function createSkyView(canvas) {
   };
 }
 
+/* ============ src/fieldView.js ============ */
+
+/**
+ * fieldView.js -- Mode D: the many-droplets argument, in three dimensions.
+ *
+ * This is the two-dimensional scene with the cross-section taken away. The
+ * observer stands at the origin inside a volume of rain, and every droplet is
+ * asked the same single question the flat scene asks: at what angle from the
+ * antisolar direction does the observer see it, and does some wavelength's
+ * caustic come out at exactly that angle?
+ *
+ * Nothing here draws a circle. The bow is whichever droplets answered yes, and
+ * it comes out round because the set of directions at a fixed angle from an
+ * axis IS a circle -- which is the one claim the sky view could previously
+ * only make by drawing the circle it was trying to explain.
+ */
+
+
+
+
+
+
+/** Near and far edge of the rain volume, in world units. */
+const R_MIN = 0.3;
+const R_MAX = 6;
+
+/**
+ * How many metres one world unit is worth.
+ *
+ * The flat scene could leave its units abstract; this one cannot, because the
+ * observer's height has to decide how much rain is below them and that is a
+ * ratio of real lengths. Tying it to the same 2 km of shower the sky view
+ * measures its down-limit with keeps the two scenes telling one story: at
+ * 1.7 m the ground sits 0.00085 units down and there is essentially no rain
+ * beneath the eye, while at 15 km it is 7.5 units down -- below the whole
+ * volume, so nothing is cut and the ring closes.
+ */
+const WORLD_SCALE_M = 2000;
+
+/** Wavelength bucket for batching droplet fills, in nm. */
+const LAMBDA_BUCKET = 5;
+
+function createFieldView(canvas) {
+  let drops = [];
+  let seedKey = '';
+  let cls = { key: '', lambda: null, order: null, lit: 0, shown: 0 };
+  let cam = null;
+  let size = { w: 0, h: 0 };
+
+  /* ------------------------------------------------------------ the rain */
+
+  function seed() {
+    return String(state.fieldCount);
+  }
+
+  function regenerate() {
+    const target = state.fieldCount;
+    if (drops.length > target) drops.length = target;
+    while (drops.length < target) drops.push(newDrop());
+    seedKey = seed();
+    cls.key = ''; // the field changed; every answer is stale
+  }
+
+  /**
+   * One droplet, uniform in direction and volume-weighted in distance, so the
+   * far shell is not starved the way an evenly-spaced radius would starve it.
+   */
+  function newDrop() {
+    const u = Math.random() * 2 - 1;
+    const a = Math.random() * Math.PI * 2;
+    const s = Math.sqrt(1 - u * u);
+    const r = R_MIN + (R_MAX - R_MIN) * Math.cbrt(Math.random());
+    return { x: Math.cos(a) * s * r, y: u * r, z: Math.sin(a) * s * r };
+  }
+
+  /** Ground level relative to the eye, in world units. */
+  function groundY() {
+    return -state.observerHeight / WORLD_SCALE_M;
+  }
+
+  /** The lowest height that has rain in it. Same rule as the flat scene. */
+  function rainFloor() {
+    return state.show.rainBelow ? groundY() : Math.max(groundY(), 0);
+  }
+
+  /* -------------------------------------------------------- the question */
+
+  function classKey() {
+    return [
+      state.fieldCount, state.sunElevation, state.sunAzimuth, state.wavelength,
+      state.dispersion, state.indexMode, state.indexScale, state.observerHeight,
+      state.show.primary, state.show.secondary, state.show.higher, state.show.rainBelow,
+    ].join('|');
+  }
+
+  /**
+   * Ask every droplet the one question, once.
+   *
+   * Cached against the physics, not the camera: orbiting re-projects the same
+   * answers instead of re-deriving them, which is what makes twenty thousand
+   * droplets affordable. Each answer is a wavelength (or none) and the order
+   * that delivered it -- no tolerance and no snapping to named colours, since
+   * bowSpectrum() inverts the angle straight back to the wavelength whose
+   * caustic is there. A band of angles gets a band of colour, continuously.
+   */
+  function classify() {
+    const key = classKey();
+    if (cls.key === key) return cls;
+
+    const idx = indexModel();
+    const orders = [];
+    if (state.show.primary) orders.push(1);
+    if (state.show.secondary) orders.push(2);
+    if (state.show.higher) orders.push(3);
+    const spectra = orders.map((k) => bowSpectrum(idx, k)).filter(Boolean);
+    const single = state.wavelength === 'white' ? null : state.wavelength;
+
+    const anti = O.antisolarDirection(state.sunElevation, state.sunAzimuth);
+    const floor = rainFloor();
+    const lambda = new Float32Array(drops.length);
+    const order = new Uint8Array(drops.length);
+    let lit = 0;
+    let shown = 0;
+
+    for (let i = 0; i < drops.length; i++) {
+      const d = drops[i];
+      if (d.y < floor) continue; // no rain underground, or below the eye
+      shown++;
+      const len = Math.hypot(d.x, d.y, d.z);
+      if (len < 1e-9) continue;
+      // The angle the observer sees this droplet at. This is the whole test:
+      // distance appears nowhere, exactly as in the flat scene.
+      const phi = Math.acos(O.clamp((d.x * anti.x + d.y * anti.y + d.z * anti.z) / len, -1, 1)) * O.DEG;
+      for (const sp of spectra) {
+        const lam = sp.lambdaAt(phi);
+        if (lam === null) continue;
+        // With one wavelength selected only that colour is in the rain, so a
+        // droplet lights up only where THAT wavelength's caustic lands.
+        if (single !== null && Math.abs(lam - single) > 8) continue;
+        lambda[i] = lam;
+        order[i] = sp.k;
+        lit++;
+        break;
+      }
+    }
+    cls = { key, lambda, order, lit, shown };
+    return cls;
+  }
+
+  /* ------------------------------------------------------------ drawing */
+
+  function draw() {
+    const { ctx, w, h } = fitCanvas(canvas);
+    size = { w, h };
+    if (seedKey !== seed()) regenerate();
+
+    const anti = O.antisolarDirection(state.sunElevation, state.sunAzimuth);
+    const sun = O.sunDirection(state.sunElevation, state.sunAzimuth);
+
+    ctx.clearRect(0, 0, w, h);
+    if (state.view === 'eye') {
+      const az = state.sunAzimuth + 180 + state.eyeAzimuth;
+      cam = makeCamera(O.vec(0, 0, 0), O.sunDirection(state.eyeElevation, az), state.fov, w, h);
+      const g = ctx.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, '#0a1730');
+      g.addColorStop(0.55, '#12294d');
+      g.addColorStop(1, '#1d3a63');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+    } else {
+      // Outside the rain, not inside it. At the sky view's camera distance
+      // the eye sits within R_MAX and the volume fills the frame, so the
+      // lit droplets read as scattered dots instead of as the cone they
+      // actually lie on. Pulled back until the whole volume fits.
+      const eye = O.vmul(O.sunDirection(state.camPitch, state.camYaw), state.camDist * 3.8);
+      cam = makeCamera(eye, O.vnorm(O.vsub(O.vmul(anti, 1.4), eye)), 42, w, h);
+      const g = ctx.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, '#070a12');
+      g.addColorStop(1, '#0c1020');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+    }
+
+    if (state.show.ground) drawGround(ctx);
+    if (state.show.horizon) drawHorizon(ctx);
+
+    const answers = classify();
+    drawDroplets(ctx, answers, w, h);
+
+    drawAxis(ctx, sun, anti, w, h);
+    if (state.view === 'orbit') drawObserver(ctx);
+    drawReadout(ctx, answers, w, h);
+  }
+
+  function drawGround(ctx) {
+    const y0 = groundY();
+    const col = 'rgba(120,170,140,0.26)';
+    for (let r = 1; r <= R_MAX + 0.01; r += 1) {
+      const pts = [];
+      for (let i = 0; i <= 72; i++) {
+        const a = (i / 72) * Math.PI * 2;
+        pts.push(O.vec(Math.cos(a) * r, y0, Math.sin(a) * r));
+      }
+      for (const run of clipPolyline(cam, pts)) strokePath(ctx, run, col, 0.7);
+    }
+    if (state.view === 'orbit') {
+      for (const run of clipPolyline(cam, [O.vec(0, 0, 0), O.vec(0, y0, 0)])) {
+        strokePath(ctx, run, 'rgba(150,200,170,0.5)', 1, [4, 4]);
+      }
+    }
+  }
+
+  function drawHorizon(ctx) {
+    const dip = O.horizonDipDeg(state.observerHeight);
+    const pts = [];
+    for (let i = 0; i <= 180; i++) {
+      const a = (i / 180) * Math.PI * 2;
+      const el = -dip * O.RAD;
+      pts.push(O.vec(Math.cos(el) * Math.cos(a) * R_MAX, Math.sin(el) * R_MAX, Math.cos(el) * Math.sin(a) * R_MAX));
+    }
+    for (const run of clipPolyline(cam, pts)) {
+      strokePath(ctx, run, 'rgba(150,200,170,0.55)', 1.2, [7, 4]);
+    }
+  }
+
+  /**
+   * The droplets, batched by colour.
+   *
+   * One path per wavelength bucket and one per grey pass: twenty thousand
+   * individual fill() calls is what makes a field this size unaffordable, and
+   * the bucket width is far finer than the eye resolves across a 2 deg band.
+   */
+  function drawDroplets(ctx, answers, w, h) {
+    const floor = rainFloor();
+    const grey = new Path2D();
+    const buckets = new Map();
+    const showGrey = state.show.droplets;
+
+    for (let i = 0; i < drops.length; i++) {
+      const d = drops[i];
+      if (d.y < floor) continue;
+      const z = cam.depth(d);
+      if (z <= NEAR) continue;
+      const p = cam.project(d);
+      if (p.x < -8 || p.x > w + 8 || p.y < -8 || p.y > h + 8) continue;
+      const r = O.clamp((0.0055 * cam.scale) / z, 0.45, 3.2);
+      const lam = answers.lambda[i];
+      if (lam > 0) {
+        const key = Math.round(lam / LAMBDA_BUCKET) * LAMBDA_BUCKET;
+        let path = buckets.get(key);
+        if (!path) {
+          path = new Path2D();
+          buckets.set(key, path);
+        }
+        // Drawn larger than a grey one. The lit droplets are a few hundred
+        // out of tens of thousands, and at the grey radius the band they
+        // form is too thin to read as a bow at any honest droplet count.
+        path.moveTo(p.x + r + 1.2, p.y);
+        path.arc(p.x, p.y, r + 1.2, 0, Math.PI * 2);
+      } else if (showGrey) {
+        grey.moveTo(p.x + r, p.y);
+        grey.arc(p.x, p.y, r, 0, Math.PI * 2);
+      }
+    }
+
+    if (showGrey) {
+      ctx.fillStyle = 'rgba(150,175,215,0.22)';
+      ctx.fill(grey);
+    }
+    for (const [lam, path] of buckets) {
+      ctx.fillStyle = colorFor(lam, 0.95);
+      ctx.fill(path);
+    }
+  }
+
+  function drawAxis(ctx, sun, anti, w, h) {
+    for (const run of clipPolyline(cam, [O.vmul(sun, SUN_FAR), O.vmul(anti, SUN_FAR)])) {
+      strokePath(ctx, run, 'rgba(255,225,160,0.2)', 1, [6, 6]);
+    }
+    const far = O.vmul(sun, SUN_FAR);
+    if (cam.depth(far) > NEAR) {
+      const p = clampToCanvas(cam.project(far), w, h, 30);
+      const g = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, 28);
+      g.addColorStop(0, 'rgba(255,240,190,0.85)');
+      g.addColorStop(1, 'rgba(255,215,110,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 28, 0, Math.PI * 2);
+      ctx.fill();
+      const dx = w / 2 - p.x;
+      const dy = h / 2 - p.y;
+      const len = Math.hypot(dx, dy) || 1;
+      arrowHead(ctx, p, { x: p.x + (dx / len) * 16, y: p.y + (dy / len) * 16 }, 'rgba(255,233,168,0.9)', 8);
+      if (state.show.labels) {
+        label(ctx, `${t('sunLabel')} · ${deg(state.sunElevation, 0)}`,
+          O.clamp(p.x - (dx / len) * 34, 52, w - 52),
+          O.clamp(Math.max(p.y - (dy / len) * 34, 120), 14, h - 14),
+          { align: 'center', color: '#ffe9a8' });
+      }
+    }
+    if (state.show.antisolar) {
+      const ap = O.vmul(anti, R_MAX * 0.92);
+      if (cam.depth(ap) > NEAR) {
+        const p = cam.project(ap);
+        ctx.strokeStyle = '#8fd7ff';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 7, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(p.x - 11, p.y);
+        ctx.lineTo(p.x + 11, p.y);
+        ctx.moveTo(p.x, p.y - 11);
+        ctx.lineTo(p.x, p.y + 11);
+        ctx.stroke();
+        if (state.show.labels) {
+          label(ctx, t('antisolarPoint'), p.x, p.y + 22, { align: 'center', color: '#8fd7ff' });
+        }
+      }
+    }
+  }
+
+  function drawObserver(ctx) {
+    const o = O.vec(0, 0, 0);
+    if (cam.depth(o) <= NEAR) return;
+    const p = cam.project(o);
+    ctx.fillStyle = '#e8eefc';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    if (state.show.labels) {
+      label(ctx, `${t('observerLabel')} · ${num(state.observerHeight, state.observerHeight < 10 ? 1 : 0)} ${t('metres')}`,
+        p.x, p.y + 18, { align: 'center', color: '#e8eefc' });
+    }
+  }
+
+  function drawReadout(ctx, answers, w, h) {
+    let y = 16;
+    const put = (s, color) => {
+      label(ctx, s, 12, y, { color });
+      y += 19;
+    };
+    put(`${t('dropCount')}: ${fmt(answers.shown)}`, '#cfe0ff');
+    put(`${t('dropsContributing')}: ${fmt(answers.lit)}`, '#6fd3a4');
+    put(`${t('fieldNoCircle')}`, '#8ea3c6');
+    if (state.show.labels) {
+      label(ctx, t('fieldHint'), 12, h - 14, {
+        color: '#9fd8bd', font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
+      });
+    }
+  }
+
+  function fmt(n) {
+    return n >= 1000 ? `${num(n / 1000, n >= 10000 ? 0 : 1)}k` : String(n);
+  }
+
+  /* -------------------------------------------------------- interaction */
+
+  let drag = null;
+  canvas.addEventListener('pointerdown', (e) => {
+    drag = { x: e.clientX, y: e.clientY };
+    capture(canvas, e);
+    canvas.style.cursor = 'grabbing';
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x;
+    const dy = e.clientY - drag.y;
+    drag = { x: e.clientX, y: e.clientY };
+    if (state.view === 'orbit') {
+      set({ camYaw: state.camYaw + dx * 0.4, camPitch: O.clamp(state.camPitch + dy * 0.3, -85, 85) });
+    } else {
+      set({
+        eyeAzimuth: state.eyeAzimuth - dx * 0.15,
+        eyeElevation: O.clamp(state.eyeElevation + dy * 0.12, -85, 85),
+      });
+    }
+  });
+  const stop = () => {
+    drag = null;
+    canvas.style.cursor = 'grab';
+  };
+  canvas.addEventListener('pointerup', stop);
+  canvas.addEventListener('pointercancel', stop);
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    if (state.view === 'orbit') {
+      set({ camDist: O.clamp(state.camDist * (1 + Math.sign(e.deltaY) * 0.08), 1.2, 9) });
+    } else {
+      set({ fov: O.clamp(state.fov + Math.sign(e.deltaY) * 3, 25, 140) });
+    }
+  }, { passive: false });
+  canvas.style.cursor = 'grab';
+
+  return {
+    draw,
+    tick: () => false,
+    reset: () => {
+      drops = [];
+      seedKey = '';
+      cls = { key: '', lambda: null, order: null, lit: 0, shown: 0 };
+    },
+  };
+}
+
 /* ============ src/panels.js ============ */
 
 /**
@@ -6296,7 +6791,32 @@ const TUTORIAL = [
     note: 'explBowFollowsYou',
   },
   {
+    /* The flat scene's argument, with the cross-section taken away. Nothing
+       here draws a circle: the arc is however many of the droplets around
+       the reader answered yes to the one angular test, which is the claim
+       the sky view can only make by drawing the circle it is explaining. */
     title: 's10title', body: 's10body',
+    apply: {
+      scene: 'field', view: 'eye', eyeAzimuth: 0, eyeElevation: 14, fov: 110,
+      sunElevation: 15, observerHeight: 1.7, fieldCount: 60000, graphOpen: false,
+      wavelength: 'white', dispersion: 1,
+      show: {
+        droplets: true, primary: true, secondary: true, higher: false,
+        ground: true, horizon: true, rainBelow: false, antisolar: true, labels: true,
+      },
+    },
+    focus: ['fieldCount', 'viewMode'],
+    actions: [
+      { labelKey: 'viewEye', patch: { view: 'eye' } },
+      { labelKey: 'viewOrbit', patch: { view: 'orbit' } },
+      { label: '10k', patch: { fieldCount: 10000 } },
+      { label: '60k', patch: { fieldCount: 60000 } },
+      { label: '200k', patch: { fieldCount: 200000 } },
+    ],
+    note: 'explFieldAssembles',
+  },
+  {
+    title: 's11title', body: 's11body',
     apply: {
       scene: 'sky', view: 'orbit', sunElevation: 15, graphOpen: false,
       show: { cone: true, horizon: false, ground: false, antisolar: true, primary: true, secondary: false, renderedBow: false },
@@ -6309,7 +6829,7 @@ const TUTORIAL = [
     ],
   },
   {
-    title: 's11title', body: 's11body',
+    title: 's12title', body: 's12body',
     apply: {
       scene: 'droplet', graph: 'exit', wavelength: 'white', dispersion: 0, reflections: 1,
       fanCount: 0, dropletZoom: 9, observerMode: 'auto', graphOpen: true,
@@ -6325,7 +6845,7 @@ const TUTORIAL = [
     note: 'explDispersionZoom',
   },
   {
-    title: 's12title', body: 's12body',
+    title: 's13title', body: 's13body',
     apply: {
       scene: 'sky', view: 'eye', dispersion: 1, wavelength: 'white', reflections: 2,
       graphOpen: false, families: { 0: false, 1: true, 2: true, 3: false },
@@ -6754,6 +7274,7 @@ function renderPanel(container) {
 
 
 
+
 /* ------------------------------------------------------------ shell DOM -- */
 
 const root = document.getElementById('app');
@@ -6761,6 +7282,7 @@ const root = document.getElementById('app');
 const sceneCanvases = {
   droplet: el('canvas', { class: 'scene-canvas' }),
   drops: el('canvas', { class: 'scene-canvas' }),
+  field: el('canvas', { class: 'scene-canvas' }),
   sky: el('canvas', { class: 'scene-canvas' }),
 };
 const graphCanvas = el('canvas', { class: 'graph-canvas' });
@@ -6791,7 +7313,8 @@ root.append(
       { class: 'col col-scene' },
       sceneTabsEl,
       sceneDescEl,
-      el('div', { class: 'scene-stage' }, sceneCanvases.droplet, sceneCanvases.drops, sceneCanvases.sky)
+      el('div', { class: 'scene-stage' },
+        sceneCanvases.droplet, sceneCanvases.drops, sceneCanvases.field, sceneCanvases.sky)
     ),
     el('aside', { class: 'col col-panel' }, panelEl)
   ),
@@ -6802,6 +7325,7 @@ root.append(
 const views = {
   droplet: createDropletView(sceneCanvases.droplet),
   drops: createDropsView(sceneCanvases.drops),
+  field: createFieldView(sceneCanvases.field),
   sky: createSkyView(sceneCanvases.sky),
 };
 const graph = createGraphView(graphCanvas);
@@ -6865,7 +7389,8 @@ function buildSceneTabs() {
       [
         { value: 'droplet', labelKey: 'sceneDroplet' },
         { value: 'drops', labelKey: 'sceneDrops' },
-        { value: 'sky', labelKey: 'sceneSky' },
+        { value: 'field', labelKey: 'sceneField' },
+    { value: 'sky', labelKey: 'sceneSky' },
       ],
       () => state.scene,
       (v) => set({ scene: v })
@@ -7130,7 +7655,9 @@ function buildFooter() {
 // the only way a whole circular bow is ever seen. The stops are the slider's
 // detents, interpolated logarithmically between.
 const HEIGHT_STOPS = [1.7, 5, 10, 50, 100, 300, 1000, 3000, 10000, 15000];
-const ALL = ['droplet', 'drops', 'sky'];
+const ALL = ['droplet', 'drops', 'field', 'sky'];
+/** The two scenes that project a 3-D world with the shared camera. */
+const SPACE = ['field', 'sky'];
 
 /** Zoom-out range for the single-droplet scene, driven on a log slider. */
 const ZOOM_MAX = ZOOM_RANGE[1];
@@ -7179,14 +7706,14 @@ function observerPhiNow() {
 
 /** Which visualisation toggles each scene actually reads. */
 const VIS_TOGGLES = [
-  { scenes: ['drops', 'sky'], key: 'primary', labelKey: 'showPrimary' },
-  { scenes: ['drops', 'sky'], key: 'secondary', labelKey: 'showSecondary' },
-  { scenes: ['sky'], key: 'higher', labelKey: 'showHigherOrder' },
+  { scenes: ['drops', 'field', 'sky'], key: 'primary', labelKey: 'showPrimary' },
+  { scenes: ['drops', 'field', 'sky'], key: 'secondary', labelKey: 'showSecondary' },
+  { scenes: ['field', 'sky'], key: 'higher', labelKey: 'showHigherOrder' },
   { scenes: ['sky'], key: 'cone', labelKey: 'showCone' },
-  { scenes: ['sky'], key: 'antisolar', labelKey: 'showAntisolar' },
-  { scenes: ['sky'], key: 'horizon', labelKey: 'showHorizon' },
-  { scenes: ['drops', 'sky'], key: 'ground', labelKey: 'showGround' },
-  { scenes: ['drops'], key: 'droplets', labelKey: 'showDroplets' },
+  { scenes: SPACE, key: 'antisolar', labelKey: 'showAntisolar' },
+  { scenes: SPACE, key: 'horizon', labelKey: 'showHorizon' },
+  { scenes: ['drops', 'field', 'sky'], key: 'ground', labelKey: 'showGround' },
+  { scenes: ['drops', 'field'], key: 'droplets', labelKey: 'showDroplets' },
   { scenes: ['droplet'], key: 'normals', labelKey: 'showNormals' },
   // The many-droplets and sky scenes read show.angles only for the
   // phi/Theta arcs of something the reader has clicked on, so it is offered
@@ -7203,7 +7730,7 @@ const VIS_TOGGLES = [
   { scenes: ['droplet', 'sky'], key: 'wavelengthLabels', labelKey: 'showWavelengthLabels' },
   { scenes: ['sky'], key: 'alexander', labelKey: 'showAlexander' },
   { scenes: ['sky'], key: 'sky', labelKey: 'showSky' },
-  { scenes: ['drops', 'sky'], key: 'rainBelow', labelKey: 'rainBelow' },
+  { scenes: ['drops', 'field', 'sky'], key: 'rainBelow', labelKey: 'rainBelow' },
 ];
 
 function buildControls() {
@@ -7343,35 +7870,36 @@ function buildControls() {
       // observerRise, and a second control that also means "how high am I" --
       // this one moving the ground instead of the eye -- gave that scene two
       // observers that could disagree about where the reader was standing.
-      c(['sky'], () => slider({
+      c(SPACE, () => slider({
         labelKey: 'observerHeight', min: 0, max: HEIGHT_STOPS.length - 1, step: 0.01,
         get: () => heightToSlider(state.observerHeight),
         format: (v) => `${num(sliderToHeight(v), sliderToHeight(v) < 10 ? 1 : 0)} ${t('metres')}`,
         onInput: (v) => set({ observerHeight: sliderToHeight(v) }),
       })),
       c(['sky'], () => el('small', { class: 'ctl-hint block' }, t('explObserverHeight'))),
-      c(['sky'], () => el('div', { class: 'ctl', dataset: { ctl: 'viewMode' } },
+      c(SPACE, () => el('div', { class: 'ctl', dataset: { ctl: 'viewMode' } },
         el('span', { class: 'ctl-label' }, t('viewMode')),
         segmented(
           [{ value: 'orbit', labelKey: 'viewOrbit' }, { value: 'eye', labelKey: 'viewEye' }],
           () => state.view,
-          (v) => set({ view: v, scene: 'sky' })))),
+          // Keep whichever 3-D scene is showing; both use this camera.
+          (v) => set({ view: v, scene: SPACE.includes(state.scene) ? state.scene : 'sky' })))),
       // Only the eye view reads these three: in orbit view the camera is
       // driven by dragging, so moving them there looked broken.
-      c(['sky'], () => slider({
+      c(SPACE, () => slider({
         labelKey: 'lookAzimuth', min: -180, max: 180, step: 1,
         get: () => state.eyeAzimuth,
         format: (v) => deg(v, 0),
         onInput: (v) => set({ eyeAzimuth: v }),
       }), () => state.view === 'eye'),
-      c(['sky'], () => slider({
-        labelKey: 'lookElevation', min: -60, max: 85, step: 1,
+      c(SPACE, () => slider({
+        labelKey: 'lookElevation', min: -85, max: 85, step: 1,
         get: () => state.eyeElevation,
         format: (v) => deg(v, 0),
         onInput: (v) => set({ eyeElevation: v }),
       }), () => state.view === 'eye'),
-      c(['sky'], () => slider({
-        labelKey: 'fieldOfView', min: 25, max: 120, step: 1,
+      c(SPACE, () => slider({
+        labelKey: 'fieldOfView', min: 25, max: 140, step: 1,
         get: () => state.fov,
         format: (v) => deg(v, 0),
         onInput: (v) => set({ fov: v }),
@@ -7380,13 +7908,13 @@ function buildControls() {
 
     /* --- the Sun. The single-droplet scene has no sky, so no elevation. --- */
     sceneGroup('sun', [
-      c(['drops', 'sky'], () => slider({
+      c(['drops', 'field', 'sky'], () => slider({
         labelKey: 'sunElevation', min: 0, max: 90, step: 0.5,
         get: () => state.sunElevation,
         format: (v) => deg(v, 1),
         onInput: (v) => set({ sunElevation: v }),
       })),
-      c(['sky'], () => slider({
+      c(SPACE, () => slider({
         labelKey: 'sunAzimuth', min: 0, max: 360, step: 1,
         get: () => state.sunAzimuth,
         format: (v) => deg(v, 0),
@@ -7403,6 +7931,13 @@ function buildControls() {
         onInput: (v) => set({ dropCount: Math.round(Math.pow(10, v)) }),
       })),
       c(['drops'], () => toggle('animateDrops', () => state.dropsAnimate, (v) => set({ dropsAnimate: v }))),
+      c(['field'], () => slider({
+        labelKey: 'fieldCount', min: 3, max: 5.3, step: 0.01,
+        get: () => Math.log10(O.clamp(state.fieldCount, 1000, 200000)),
+        format: (v) => fmtCount(Math.round(Math.pow(10, v))),
+        onInput: (v) => set({ fieldCount: Math.round(Math.pow(10, v)) }),
+        hintKey: 'fieldCountHint',
+      })),
     ]),
 
     /* --- what is drawn --- */
@@ -7410,7 +7945,7 @@ function buildControls() {
       c(ALL, () => el('div', { class: 'grid2' },
         ...VIS_TOGGLES.filter((v) => v.scenes.includes(state.scene) && (!v.when || v.when()))
           .map((v) => showToggle(v.key, v.labelKey)))),
-      c(['drops', 'sky'], () => el('small', { class: 'ctl-hint block' }, t('fullCircleNote'))),
+      c(['drops', 'field', 'sky'], () => el('small', { class: 'ctl-hint block' }, t('fullCircleNote'))),
       c(['sky'], () => toggle('showRenderedBow', () => state.show.renderedBow,
         (v) => set({ show: { renderedBow: v } }), { strong: true })),
       c(['sky'], () => el('small', { class: 'ctl-hint block' }, t('warningNoRender'))),
@@ -7497,7 +8032,7 @@ function resetState() {
     dropsObserverX: 0, dropsObserverY: 0,
     showNonRainbow: false, fanCount: 0, families: { 0: false, 1: true, 2: false, 3: false },
     angleMode: 'antisolar', distRays: 60, distAccumulate: false, graphOpen: false,
-    dropCount: 1, dropsAnimate: false,
+    dropCount: 1, dropsAnimate: false, fieldCount: 60000,
     sunElevation: 15, sunAzimuth: 180, observerHeight: 1.7,
     view: 'orbit', camYaw: -35, camPitch: 14, camDist: 3.1,
     eyeAzimuth: 0, eyeElevation: 12, fov: 75,
@@ -7571,9 +8106,7 @@ function applyVisibility() {
   for (const [name, c] of Object.entries(sceneCanvases)) {
     c.classList.toggle('hidden', name !== state.scene);
   }
-  sceneDescEl.textContent = t(
-    state.scene === 'droplet' ? 'sceneDropletDesc' : state.scene === 'drops' ? 'sceneDropsDesc' : 'sceneSkyDesc'
-  );
+  sceneDescEl.textContent = t(`scene${state.scene[0].toUpperCase()}${state.scene.slice(1)}Desc`);
   document.body.dataset.scene = state.scene;
 }
 

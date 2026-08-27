@@ -241,3 +241,49 @@ export function dropReport(drop, orders = DROP_ORDERS) {
   reaching.sort((a, b) => Math.abs(a.delta) - Math.abs(b.delta));
   return { anti, distance, dir, phiSeen, bands, hit: reaching[0] || null };
 }
+
+/**
+ * The bow of order k as a continuous spectrum, invertible.
+ *
+ * `lambdaAt(phi)` answers "which wavelength has ITS caustic exactly here",
+ * which is the question a droplet in space actually poses: it sits at some
+ * antisolar angle, and either some wavelength's bow passes through that angle
+ * or none does. Answering it by snapping to the six named colours puts six
+ * discrete rings in the sky where there is one continuous band -- the same
+ * artefact the sky view had to be fixed for.
+ *
+ * phi(lambda) is monotonic for a fixed k (increasing for k=1, decreasing for
+ * k=2), so a table sampled uniformly in lambda inverts by a single scan.
+ */
+export function bowSpectrum(idx, k, samples = 96) {
+  const pts = [];
+  for (let i = 0; i < samples; i++) {
+    const lambda = 400 + (280 * i) / (samples - 1);
+    const geo = O.rainbowGeometry(idx(lambda), k);
+    if (geo) pts.push({ lambda, phi: geo.antisolarDeg });
+  }
+  if (pts.length < 2) return null;
+  const first = pts[0].phi;
+  const last = pts[pts.length - 1].phi;
+  const lo = Math.min(first, last);
+  const hi = Math.max(first, last);
+  return {
+    k,
+    lo,
+    hi,
+    /** The wavelength whose order-k bow sits at this angle, or null. */
+    lambdaAt(phi) {
+      if (phi < lo || phi > hi) return null;
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i - 1];
+        const b = pts[i];
+        if (phi >= Math.min(a.phi, b.phi) && phi <= Math.max(a.phi, b.phi)) {
+          const span = b.phi - a.phi;
+          const t = Math.abs(span) < 1e-12 ? 0 : (phi - a.phi) / span;
+          return a.lambda + t * (b.lambda - a.lambda);
+        }
+      }
+      return null;
+    },
+  };
+}

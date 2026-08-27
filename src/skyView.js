@@ -13,21 +13,8 @@ import * as O from './optics.js';
 import { state, set, indexModel } from './state.js';
 import { t, deg, num } from './i18n.js';
 import { fitCanvas, strokePath, label, arrowHead, capture } from './ui.js';
+import { NEAR, SUN_FAR, makeCamera, clipPolyline, clampToCanvas } from './camera3d.js';
 import { colorFor, DROP_ORDERS } from './rays.js';
-
-const NEAR = 0.02;
-
-/**
- * How far away the Sun is drawn, in the unit-sphere world of this scene.
- *
- * Far enough that the parallax between the observer and a droplet on the bow
- * is under a degree, which is what makes a ray drawn parallel to the sunlight
- * actually point at the Sun on screen. It used to sit at 1.25 -- barely
- * outside the bow itself -- and at that range the (correct) parallel ray
- * visibly failed to line up with the (nearby) disc, which reads as a bug in
- * the geometry when it is really a bug in the staging.
- */
-const SUN_FAR = 40;
 
 /**
  * How many wavelengths the bow is drawn from, and how many points per circle.
@@ -125,66 +112,6 @@ function capLabel(ctx, text, x, y, w, h, color) {
     O.clamp(y, 10, Math.max(10, h - 10)), { align: 'center', color, font: MONO_FONT });
 }
 
-/* ------------------------------------------------------------- camera ---- */
-
-function makeCamera(eye, forward, fovDeg, w, h) {
-  const zA = O.vnorm(O.vneg(forward));
-  let upHint = O.vec(0, 1, 0);
-  if (Math.abs(O.vdot(zA, upHint)) > 0.999) upHint = O.vec(0, 0, 1);
-  const xA = O.vnorm(O.vcross(upHint, zA));
-  const yA = O.vcross(zA, xA);
-  const f = 1 / Math.tan((fovDeg * O.RAD) / 2);
-  const scale = (h / 2) * f;
-  return {
-    eye,
-    project(p) {
-      const d = O.vsub(p, eye);
-      const cx = O.vdot(d, xA);
-      const cy = O.vdot(d, yA);
-      const cz = -O.vdot(d, zA);
-      return { x: w / 2 + (cx / cz) * scale, y: h / 2 - (cy / cz) * scale, z: cz };
-    },
-    /** Camera-space depth only, used for near-plane clipping. */
-    depth(p) {
-      return -O.vdot(O.vsub(p, eye), zA);
-    },
-  };
-}
-
-/** Project a world polyline, splitting it wherever it crosses the near plane. */
-function clipPolyline(cam, pts) {
-  const out = [];
-  let run = [];
-  for (let i = 0; i < pts.length; i++) {
-    const p = pts[i];
-    const z = cam.depth(p);
-    if (z > NEAR) {
-      run.push(cam.project(p));
-    } else {
-      if (run.length > 1) out.push(run);
-      run = [];
-      // enter/exit points keep the line touching the edge instead of jumping
-      const prev = pts[i - 1];
-      if (prev && cam.depth(prev) > NEAR) {
-        run.push(cam.project(lerpToNear(cam, prev, p)));
-        out.push(run);
-        run = [];
-      }
-      const next = pts[i + 1];
-      if (next && cam.depth(next) > NEAR) run.push(cam.project(lerpToNear(cam, next, p)));
-    }
-  }
-  if (run.length > 1) out.push(run);
-  return out;
-}
-
-function lerpToNear(cam, inside, outside) {
-  const zi = cam.depth(inside);
-  const zo = cam.depth(outside);
-  const tt = (zi - NEAR) / (zi - zo);
-  return O.vadd(inside, O.vmul(O.vsub(outside, inside), Math.max(0, Math.min(1, tt))));
-}
-
 /* --------------------------------------------------- cached bow profile -- */
 
 let profileCache = { key: '', profile: null };
@@ -207,20 +134,6 @@ function bowProfile() {
     : null;
   profileCache = { key, profile };
   return profile;
-}
-
-/** Pull a screen point back onto the canvas, along the line from its centre. */
-function clampToCanvas(p, w, h, margin) {
-  const cx = w / 2;
-  const cy = h / 2;
-  const dx = p.x - cx;
-  const dy = p.y - cy;
-  const len = Math.hypot(dx, dy);
-  if (len < 1e-6) return { x: cx, y: cy };
-  let t = len;
-  if (Math.abs(dx) > 1e-9) t = Math.min(t, ((w / 2 - margin) * len) / Math.abs(dx));
-  if (Math.abs(dy) > 1e-9) t = Math.min(t, ((h / 2 - margin) * len) / Math.abs(dy));
-  return { x: cx + (dx / len) * t, y: cy + (dy / len) * t };
 }
 
 /* ------------------------------------------------------------- the view -- */

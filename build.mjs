@@ -22,11 +22,13 @@ const ORDER = [
   'i18n.js',
   'state.js',
   'ui.js',
+  'camera3d.js',
   'rays.js',
   'dropletView.js',
   'graphView.js',
   'dropsView.js',
   'skyView.js',
+  'fieldView.js',
   'panels.js',
   'app.js',
 ];
@@ -54,6 +56,7 @@ function strip(source) {
 async function build() {
   const sources = {};
   for (const f of ORDER) sources[f] = await readFile(join(HERE, 'src', f), 'utf8');
+  assertNoCollisions(sources);
 
   const opticsNames = exportedNames(sources['optics.js']);
   if (!opticsNames.includes('traceRay')) throw new Error('optics export scan failed');
@@ -129,3 +132,25 @@ build().catch((e) => {
   console.error(e);
   process.exit(1);
 });
+
+/**
+ * Every module ends up in ONE scope after the concatenation below, so two
+ * files declaring the same top-level name are valid ES modules and a
+ * SyntaxError as a bundle -- a blank dist/ page and nothing wrong in dev.
+ * Cheaper to refuse to build than to find it in the browser.
+ */
+function assertNoCollisions(sources) {
+  const DECL = /^(?:export\s+)?(?:const|let|var|function|class)\s+([A-Za-z_$][\w$]*)/gm;
+  const seen = new Map();
+  const clashes = [];
+  for (const [file, src] of Object.entries(sources)) {
+    for (const m of src.matchAll(DECL)) {
+      const name = m[1];
+      if (seen.has(name)) clashes.push(`${name}: ${seen.get(name)} and ${file}`);
+      else seen.set(name, file);
+    }
+  }
+  if (clashes.length) {
+    throw new Error('bundle-scope collisions: ' + clashes.join('; '));
+  }
+}

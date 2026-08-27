@@ -173,7 +173,32 @@ export const TUTORIAL = [
     note: 'explBowFollowsYou',
   },
   {
+    /* The flat scene's argument, with the cross-section taken away. Nothing
+       here draws a circle: the arc is however many of the droplets around
+       the reader answered yes to the one angular test, which is the claim
+       the sky view can only make by drawing the circle it is explaining. */
     title: 's10title', body: 's10body',
+    apply: {
+      scene: 'field', view: 'eye', eyeAzimuth: 0, eyeElevation: 14, fov: 110,
+      sunElevation: 15, observerHeight: 1.7, fieldCount: 60000, graphOpen: false,
+      wavelength: 'white', dispersion: 1,
+      show: {
+        droplets: true, primary: true, secondary: true, higher: false,
+        ground: true, horizon: true, rainBelow: false, antisolar: true, labels: true,
+      },
+    },
+    focus: ['fieldCount', 'viewMode'],
+    actions: [
+      { labelKey: 'viewEye', patch: { view: 'eye' } },
+      { labelKey: 'viewOrbit', patch: { view: 'orbit' } },
+      { label: '10k', patch: { fieldCount: 10000 } },
+      { label: '60k', patch: { fieldCount: 60000 } },
+      { label: '200k', patch: { fieldCount: 200000 } },
+    ],
+    note: 'explFieldAssembles',
+  },
+  {
+    title: 's11title', body: 's11body',
     apply: {
       scene: 'sky', view: 'orbit', sunElevation: 15, graphOpen: false,
       show: { cone: true, horizon: false, ground: false, antisolar: true, primary: true, secondary: false, renderedBow: false },
@@ -186,7 +211,7 @@ export const TUTORIAL = [
     ],
   },
   {
-    title: 's11title', body: 's11body',
+    title: 's12title', body: 's12body',
     apply: {
       scene: 'droplet', graph: 'exit', wavelength: 'white', dispersion: 0, reflections: 1,
       fanCount: 0, dropletZoom: 9, observerMode: 'auto', graphOpen: true,
@@ -202,7 +227,7 @@ export const TUTORIAL = [
     note: 'explDispersionZoom',
   },
   {
-    title: 's12title', body: 's12body',
+    title: 's13title', body: 's13body',
     apply: {
       scene: 'sky', view: 'eye', dispersion: 1, wavelength: 'white', reflections: 2,
       graphOpen: false, families: { 0: false, 1: true, 2: true, 3: false },

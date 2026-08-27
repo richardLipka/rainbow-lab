@@ -11,6 +11,7 @@ import { createDropletView, ZOOM_RANGE } from './dropletView.js';
 import { createGraphView } from './graphView.js';
 import { createDropsView, OBS_RANGE } from './dropsView.js';
 import { createSkyView } from './skyView.js';
+import { createFieldView } from './fieldView.js';
 import { renderPanel, applyStep, TUTORIAL } from './panels.js';
 
 /* ------------------------------------------------------------ shell DOM -- */
@@ -20,6 +21,7 @@ const root = document.getElementById('app');
 const sceneCanvases = {
   droplet: el('canvas', { class: 'scene-canvas' }),
   drops: el('canvas', { class: 'scene-canvas' }),
+  field: el('canvas', { class: 'scene-canvas' }),
   sky: el('canvas', { class: 'scene-canvas' }),
 };
 const graphCanvas = el('canvas', { class: 'graph-canvas' });
@@ -50,7 +52,8 @@ root.append(
       { class: 'col col-scene' },
       sceneTabsEl,
       sceneDescEl,
-      el('div', { class: 'scene-stage' }, sceneCanvases.droplet, sceneCanvases.drops, sceneCanvases.sky)
+      el('div', { class: 'scene-stage' },
+        sceneCanvases.droplet, sceneCanvases.drops, sceneCanvases.field, sceneCanvases.sky)
     ),
     el('aside', { class: 'col col-panel' }, panelEl)
   ),
@@ -61,6 +64,7 @@ root.append(
 const views = {
   droplet: createDropletView(sceneCanvases.droplet),
   drops: createDropsView(sceneCanvases.drops),
+  field: createFieldView(sceneCanvases.field),
   sky: createSkyView(sceneCanvases.sky),
 };
 const graph = createGraphView(graphCanvas);
@@ -124,7 +128,8 @@ function buildSceneTabs() {
       [
         { value: 'droplet', labelKey: 'sceneDroplet' },
         { value: 'drops', labelKey: 'sceneDrops' },
-        { value: 'sky', labelKey: 'sceneSky' },
+        { value: 'field', labelKey: 'sceneField' },
+    { value: 'sky', labelKey: 'sceneSky' },
       ],
       () => state.scene,
       (v) => set({ scene: v })
@@ -389,7 +394,9 @@ function buildFooter() {
 // the only way a whole circular bow is ever seen. The stops are the slider's
 // detents, interpolated logarithmically between.
 const HEIGHT_STOPS = [1.7, 5, 10, 50, 100, 300, 1000, 3000, 10000, 15000];
-const ALL = ['droplet', 'drops', 'sky'];
+const ALL = ['droplet', 'drops', 'field', 'sky'];
+/** The two scenes that project a 3-D world with the shared camera. */
+const SPACE = ['field', 'sky'];
 
 /** Zoom-out range for the single-droplet scene, driven on a log slider. */
 const ZOOM_MAX = ZOOM_RANGE[1];
@@ -438,14 +445,14 @@ function observerPhiNow() {
 
 /** Which visualisation toggles each scene actually reads. */
 const VIS_TOGGLES = [
-  { scenes: ['drops', 'sky'], key: 'primary', labelKey: 'showPrimary' },
-  { scenes: ['drops', 'sky'], key: 'secondary', labelKey: 'showSecondary' },
-  { scenes: ['sky'], key: 'higher', labelKey: 'showHigherOrder' },
+  { scenes: ['drops', 'field', 'sky'], key: 'primary', labelKey: 'showPrimary' },
+  { scenes: ['drops', 'field', 'sky'], key: 'secondary', labelKey: 'showSecondary' },
+  { scenes: ['field', 'sky'], key: 'higher', labelKey: 'showHigherOrder' },
   { scenes: ['sky'], key: 'cone', labelKey: 'showCone' },
-  { scenes: ['sky'], key: 'antisolar', labelKey: 'showAntisolar' },
-  { scenes: ['sky'], key: 'horizon', labelKey: 'showHorizon' },
-  { scenes: ['drops', 'sky'], key: 'ground', labelKey: 'showGround' },
-  { scenes: ['drops'], key: 'droplets', labelKey: 'showDroplets' },
+  { scenes: SPACE, key: 'antisolar', labelKey: 'showAntisolar' },
+  { scenes: SPACE, key: 'horizon', labelKey: 'showHorizon' },
+  { scenes: ['drops', 'field', 'sky'], key: 'ground', labelKey: 'showGround' },
+  { scenes: ['drops', 'field'], key: 'droplets', labelKey: 'showDroplets' },
   { scenes: ['droplet'], key: 'normals', labelKey: 'showNormals' },
   // The many-droplets and sky scenes read show.angles only for the
   // phi/Theta arcs of something the reader has clicked on, so it is offered
@@ -462,7 +469,7 @@ const VIS_TOGGLES = [
   { scenes: ['droplet', 'sky'], key: 'wavelengthLabels', labelKey: 'showWavelengthLabels' },
   { scenes: ['sky'], key: 'alexander', labelKey: 'showAlexander' },
   { scenes: ['sky'], key: 'sky', labelKey: 'showSky' },
-  { scenes: ['drops', 'sky'], key: 'rainBelow', labelKey: 'rainBelow' },
+  { scenes: ['drops', 'field', 'sky'], key: 'rainBelow', labelKey: 'rainBelow' },
 ];
 
 function buildControls() {
@@ -602,35 +609,36 @@ function buildControls() {
       // observerRise, and a second control that also means "how high am I" --
       // this one moving the ground instead of the eye -- gave that scene two
       // observers that could disagree about where the reader was standing.
-      c(['sky'], () => slider({
+      c(SPACE, () => slider({
         labelKey: 'observerHeight', min: 0, max: HEIGHT_STOPS.length - 1, step: 0.01,
         get: () => heightToSlider(state.observerHeight),
         format: (v) => `${num(sliderToHeight(v), sliderToHeight(v) < 10 ? 1 : 0)} ${t('metres')}`,
         onInput: (v) => set({ observerHeight: sliderToHeight(v) }),
       })),
       c(['sky'], () => el('small', { class: 'ctl-hint block' }, t('explObserverHeight'))),
-      c(['sky'], () => el('div', { class: 'ctl', dataset: { ctl: 'viewMode' } },
+      c(SPACE, () => el('div', { class: 'ctl', dataset: { ctl: 'viewMode' } },
         el('span', { class: 'ctl-label' }, t('viewMode')),
         segmented(
           [{ value: 'orbit', labelKey: 'viewOrbit' }, { value: 'eye', labelKey: 'viewEye' }],
           () => state.view,
-          (v) => set({ view: v, scene: 'sky' })))),
+          // Keep whichever 3-D scene is showing; both use this camera.
+          (v) => set({ view: v, scene: SPACE.includes(state.scene) ? state.scene : 'sky' })))),
       // Only the eye view reads these three: in orbit view the camera is
       // driven by dragging, so moving them there looked broken.
-      c(['sky'], () => slider({
+      c(SPACE, () => slider({
         labelKey: 'lookAzimuth', min: -180, max: 180, step: 1,
         get: () => state.eyeAzimuth,
         format: (v) => deg(v, 0),
         onInput: (v) => set({ eyeAzimuth: v }),
       }), () => state.view === 'eye'),
-      c(['sky'], () => slider({
-        labelKey: 'lookElevation', min: -60, max: 85, step: 1,
+      c(SPACE, () => slider({
+        labelKey: 'lookElevation', min: -85, max: 85, step: 1,
         get: () => state.eyeElevation,
         format: (v) => deg(v, 0),
         onInput: (v) => set({ eyeElevation: v }),
       }), () => state.view === 'eye'),
-      c(['sky'], () => slider({
-        labelKey: 'fieldOfView', min: 25, max: 120, step: 1,
+      c(SPACE, () => slider({
+        labelKey: 'fieldOfView', min: 25, max: 140, step: 1,
         get: () => state.fov,
         format: (v) => deg(v, 0),
         onInput: (v) => set({ fov: v }),
@@ -639,13 +647,13 @@ function buildControls() {
 
     /* --- the Sun. The single-droplet scene has no sky, so no elevation. --- */
     sceneGroup('sun', [
-      c(['drops', 'sky'], () => slider({
+      c(['drops', 'field', 'sky'], () => slider({
         labelKey: 'sunElevation', min: 0, max: 90, step: 0.5,
         get: () => state.sunElevation,
         format: (v) => deg(v, 1),
         onInput: (v) => set({ sunElevation: v }),
       })),
-      c(['sky'], () => slider({
+      c(SPACE, () => slider({
         labelKey: 'sunAzimuth', min: 0, max: 360, step: 1,
         get: () => state.sunAzimuth,
         format: (v) => deg(v, 0),
@@ -662,6 +670,13 @@ function buildControls() {
         onInput: (v) => set({ dropCount: Math.round(Math.pow(10, v)) }),
       })),
       c(['drops'], () => toggle('animateDrops', () => state.dropsAnimate, (v) => set({ dropsAnimate: v }))),
+      c(['field'], () => slider({
+        labelKey: 'fieldCount', min: 3, max: 5.3, step: 0.01,
+        get: () => Math.log10(O.clamp(state.fieldCount, 1000, 200000)),
+        format: (v) => fmtCount(Math.round(Math.pow(10, v))),
+        onInput: (v) => set({ fieldCount: Math.round(Math.pow(10, v)) }),
+        hintKey: 'fieldCountHint',
+      })),
     ]),
 
     /* --- what is drawn --- */
@@ -669,7 +684,7 @@ function buildControls() {
       c(ALL, () => el('div', { class: 'grid2' },
         ...VIS_TOGGLES.filter((v) => v.scenes.includes(state.scene) && (!v.when || v.when()))
           .map((v) => showToggle(v.key, v.labelKey)))),
-      c(['drops', 'sky'], () => el('small', { class: 'ctl-hint block' }, t('fullCircleNote'))),
+      c(['drops', 'field', 'sky'], () => el('small', { class: 'ctl-hint block' }, t('fullCircleNote'))),
       c(['sky'], () => toggle('showRenderedBow', () => state.show.renderedBow,
         (v) => set({ show: { renderedBow: v } }), { strong: true })),
       c(['sky'], () => el('small', { class: 'ctl-hint block' }, t('warningNoRender'))),
@@ -756,7 +771,7 @@ function resetState() {
     dropsObserverX: 0, dropsObserverY: 0,
     showNonRainbow: false, fanCount: 0, families: { 0: false, 1: true, 2: false, 3: false },
     angleMode: 'antisolar', distRays: 60, distAccumulate: false, graphOpen: false,
-    dropCount: 1, dropsAnimate: false,
+    dropCount: 1, dropsAnimate: false, fieldCount: 60000,
     sunElevation: 15, sunAzimuth: 180, observerHeight: 1.7,
     view: 'orbit', camYaw: -35, camPitch: 14, camDist: 3.1,
     eyeAzimuth: 0, eyeElevation: 12, fov: 75,
@@ -830,9 +845,7 @@ function applyVisibility() {
   for (const [name, c] of Object.entries(sceneCanvases)) {
     c.classList.toggle('hidden', name !== state.scene);
   }
-  sceneDescEl.textContent = t(
-    state.scene === 'droplet' ? 'sceneDropletDesc' : state.scene === 'drops' ? 'sceneDropsDesc' : 'sceneSkyDesc'
-  );
+  sceneDescEl.textContent = t(`scene${state.scene[0].toUpperCase()}${state.scene.slice(1)}Desc`);
   document.body.dataset.scene = state.scene;
 }
 
