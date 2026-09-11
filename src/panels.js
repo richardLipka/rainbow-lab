@@ -78,7 +78,12 @@ export const TUTORIAL = [
       graphOpen: false, show: { angles: true },
     },
     focus: ['impactParameter', 'showAngles'],
-    actions: [{ labelKey: 'extremumLabel', patch: { impact: 0.861 } }],
+    actions: [{
+      labelKey: 'extremumLabel',
+      // From the engine, not written down: 0.861 was a literal sitting in
+      // the one file that is supposed to contain none.
+      patch: () => ({ impact: O.rainbowGeometry(indexModel()(650), 1).impactParameter }),
+    }],
     showRay: true,
   },
   {

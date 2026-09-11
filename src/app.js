@@ -4,7 +4,8 @@
  */
 import * as O from './optics.js';
 import { t, setLang, getLang, num, deg, LANGS } from './i18n.js';
-import { state, set, subscribe, indexModel } from './state.js';
+import { state, set, subscribe, indexModel, activeOrders } from './state.js';
+import { bowNameKey } from './rays.js';
 import { el, clear, group, slider, toggle, segmented, select, collectSyncers, setRenderScale } from './ui.js';
 import { FAV_LOGO } from './assets.js';
 import { createDropletView, ZOOM_RANGE } from './dropletView.js';
@@ -528,9 +529,29 @@ function buildControls() {
       c(['droplet'], () => slider({
         labelKey: 'impactParameter', min: -0.999, max: 0.999, step: 0.001,
         get: () => state.impact,
-        format: (v) => num(v, 3),
+        // The angle rides along: on a sphere sin(theta_i) = b/R, so this one
+        // control sets both and the reader should not go hunting for a second.
+        format: (v) => `${num(v, 3)} · θᵢ ${deg(Math.asin(O.clamp(Math.abs(v), 0, 1)) * O.DEG, 1)}`,
         onInput: (v) => set({ impact: v }),
+        hintKey: 'impactParameterHint',
       })),
+      // One chip per bow on screen, each jumping to that bow's own entry
+      // position. Computed from rainbowGeometry, never written down -- and it
+      // is the demonstration that the secondary is a different ray, not a
+      // different droplet: the entry point slides towards the rim and the eye
+      // that lights up changes with it.
+      c(['droplet'], () => el('div', { class: 'ctl', dataset: { ctl: 'bowRays' } },
+        el('span', { class: 'ctl-label' }, t('bowRayChips')),
+        el('div', { class: 'chip-row' },
+          activeOrders().filter((k) => k >= 1).map((k) => {
+            const geo = O.rainbowGeometry(indexModel()(650), k);
+            if (!geo) return null;
+            return el('button', {
+              class: 'chip', type: 'button',
+              onclick: () => set({ impact: geo.impactParameter, selectedRay: null }),
+            }, `${t(bowNameKey(k), { k })} · ${num(geo.impactParameter, 3)}`);
+          }).filter(Boolean))),
+        () => activeOrders().some((k) => k >= 1)),
       c(['droplet'], () => slider({
         labelKey: 'fanCount', min: 0, max: 60, step: 1,
         get: () => state.fanCount,

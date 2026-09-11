@@ -728,6 +728,43 @@ It is also less work, not more. At four orders, six wavelengths and a 60-ray
 fan: 22 segments per wavelength per ray position before, **13 after** -- 8052
 segments down to 4758, 59 % of the drawing.
 
+### Position is angle, and each bow has its own position
+
+Sunlight arrives parallel, so the only thing that differs between one ray and
+the next is **where it lands**. The droplet is curved, so that also fixes the
+angle it meets the surface at: `sin θᵢ = b/R`, exactly. b/R and θᵢ are one
+number in two units, not two controls -- which is why the impact slider and
+the on-canvas handle both print them together. A reader shown only b/R goes
+looking for the control that sets the angle, and there isn't one. (This is
+also why a sphere makes a bow and a flat window does not: on a flat surface
+every parallel ray meets it at the same angle, so there is no spread of exit
+angles and nothing to have a turning point.)
+
+Each order's caustic sits at its own entry position -- 0.862 for the primary,
+0.951 for the secondary, 0.974 for the tertiary -- so `drawBowMarks()` ticks
+them on the impact handle's track, coloured per order and labelled with the
+bow's name, and a row of chips in the control column jumps to each. Both come
+from `rainbowGeometry`, never written down.
+
+That pairing is the demonstration that the secondary needs its own ray, and it
+is checkable: at b = 0.862 the k=1 trace classifies **primary** (φ 42.37) while
+k=2 is **nonCaustic** (φ 56.92); at b = 0.951 they swap -- k=1 **nonCaustic**
+(φ 38.49), k=2 **secondary** (φ 50.37). Clicking between the two chips slides
+the entry point towards the rim, raises θᵢ from 59.5° to 71.9°, and moves which
+eye lights up.
+
+Two layout rules the marks need:
+
+- **Suppressed below `layout.s < 70`.** The primary and secondary sit 0.089
+  apart in b, so at s = 60 their ticks are five pixels apart and the labels
+  are a smear. At zoom 9 and 40 (s = 51 and 24) they do not draw at all.
+- **Labels skip when they would collide** (< 13 px from the one above) and are
+  clamped so a right-aligned label cannot run off the left edge. The tick
+  itself always draws -- it is a thin line and costs nothing.
+
+Step 4's "extremum → rainbow" chip used to carry `impact: 0.861` as a literal,
+in the one file that is supposed to contain no angles. It computes now.
+
 ### The same split, at every scale
 
 `explSameSplitInSky` closes the loop in all three many-droplet readouts (the

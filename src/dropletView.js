@@ -731,9 +731,68 @@ export function createDropletView(canvas) {
       `Θ=${deg(thetaDeg, 1)} → φ=${deg(phiDeg, 1)}`);
   }
 
+  /** Chrome colour per reflection order, shared with the bow caption. */
+  function orderColor(k) {
+    return k === 1 ? '#6fd3a4' : k === 2 ? '#9b8cf0' : '#f0885d';
+  }
+
+  /**
+   * Where each bow's own ray enters.
+   *
+   * Sunlight is parallel, so the only thing that differs between one ray and
+   * the next is where it lands -- and because the droplet is curved, that
+   * fixes the angle it meets the surface at (sin theta_i = b/R). Each order's
+   * caustic therefore sits at its own entry position: 0.86 for the primary,
+   * 0.95 for the secondary. Marking them on the handle's track is what makes
+   * "the secondary needs a different ray" something you can see rather than
+   * something the panel has to assert.
+   */
+  function drawBowMarks(ctx, x) {
+    // Below this the droplet is too small for the marks to separate: the
+    // primary and secondary sit 0.089 apart in b, so at s = 60 their ticks
+    // are five pixels apart and the labels would be a smear.
+    if (layout.s < 70) return;
+    const nRef = indexModel()(650);
+    const marks = [];
+    for (const k of activeOrders()) {
+      if (k < 1) continue;
+      const geo = O.rainbowGeometry(nRef, k);
+      if (!geo) continue;
+      marks.push({ k, b: geo.impactParameter, y: layout.cy - geo.impactParameter * layout.s });
+    }
+    marks.sort((a2, b2) => a2.y - b2.y);
+    let lastLabelY = -1e9;
+    for (const m of marks) {
+      const on = Math.abs(state.impact - m.b) < 0.004;
+      ctx.save();
+      ctx.strokeStyle = orderColor(m.k);
+      ctx.globalAlpha = on ? 1 : 0.55;
+      ctx.lineWidth = on ? 2.4 : 1.4;
+      ctx.beginPath();
+      ctx.moveTo(x - 7, m.y);
+      ctx.lineTo(x + 7, m.y);
+      ctx.stroke();
+      ctx.restore();
+      // A tick is always worth drawing; a label only when it will not land on
+      // the one above it.
+      if (!state.show.labels || m.y - lastLabelY < 13) continue;
+      lastLabelY = m.y;
+      const text = `${t(bowNameKey(m.k), { k: m.k })} · ${num(m.b, 3)}`;
+      ctx.save();
+      ctx.font = '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif';
+      const width = ctx.measureText(text).width;
+      ctx.restore();
+      label(ctx, text, Math.max(width + 8, x - 11), m.y, {
+        align: 'right', color: orderColor(m.k), bg: on,
+        font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
+      });
+    }
+  }
+
   function drawImpactHandle(ctx) {
     const y = layout.cy - state.impact * layout.s;
     const x = layout.cx - layout.s * 1.9;
+    drawBowMarks(ctx, x);
     ctx.save();
     ctx.strokeStyle = hover ? 'rgba(255,255,255,0.75)' : 'rgba(180,200,240,0.45)';
     ctx.lineWidth = 1;
@@ -749,7 +808,12 @@ export function createDropletView(canvas) {
     ctx.fill();
     ctx.restore();
     if (state.show.labels) {
-      label(ctx, `b/R = ${num(state.impact, 3)}`, x, y - 16, { align: 'center', color: '#cfe0ff' });
+      // b/R and theta_i are the same knob: sin(theta_i) = b/R. Printing
+      // only one of them leaves the reader looking for a second control that
+      // sets the angle, and there isn't one.
+      const thetaDeg = Math.asin(O.clamp(Math.abs(state.impact), 0, 1)) * O.DEG;
+      label(ctx, `b/R = ${num(state.impact, 3)} · θᵢ = ${deg(thetaDeg, 1)}`, x, y - 16,
+        { align: 'center', color: '#cfe0ff' });
     }
   }
 

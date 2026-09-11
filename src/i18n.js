@@ -101,6 +101,9 @@ export const translations = {
     dropletZoom: 'Oddálení pohledu',
     dropletZoomHint: 'Oddalte pohled a sledujte, jak se barvy paprsku rozestupují na cestě k oku pozorovatele.',
     impactParameter: 'Parametr dopadu b/R',
+    impactParameterHint:
+      'Sluneční světlo přichází rovnoběžně, takže jediné, čím se paprsky liší, je místo dopadu. A protože je kapka zakřivená, tím je dané i to, pod jakým úhlem na povrch dopadnou: sin θᵢ = b/R. Jeden posuvník, dvě čísla.',
+    bowRayChips: 'Skočit na duhový paprsek',
     reflections: 'Vnitřní odrazy',
     reflectionsHint:
       'Zvolené číslo zapne všechny řády až po něj, aby šly duhy porovnat. Políčka níž je pak můžete jednotlivě vypnout.',
@@ -572,6 +575,9 @@ export const translations = {
     dropletZoom: 'Zoom out',
     dropletZoomHint: 'Zoom out to watch the ray colours spread apart on their way to the eye.',
     impactParameter: 'Impact parameter b/R',
+    impactParameterHint:
+      'Sunlight arrives parallel, so the only thing that differs between rays is where they land. The droplet is curved, so that also fixes the angle they meet the surface at: sin θᵢ = b/R. One slider, two numbers.',
+    bowRayChips: 'Jump to a bow ray',
     reflections: 'Internal reflections',
     reflectionsHint:
       'Picking a number shows every order up to it, so the bows can be compared. The checkboxes below switch individual ones off again.',

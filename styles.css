@@ -412,6 +412,9 @@ select {
   cursor: pointer;
 }
 .chip:hover { color: var(--fg); border-color: var(--accent); }
+/* Chips inside the control column wrap rather than pushing the column wide. */
+.chip-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.chip-row .chip { font-size: 10.5px; padding: 2px 9px; }
 
 /* ------------------------------------------------------------------ panel */
 
