@@ -722,3 +722,58 @@ test('a droplet on a switched-off bow is reported as switched off, not as empty 
 
   state.show.secondary = true; // leave the store as the other tests expect it
 });
+
+
+/* -------------------------------- every family's bow leaves on the same side */
+
+test('all reflection orders are drawn leaving on one side of the axis', async () => {
+  // The cross-section cuts the cone twice, so b and -b are the same physics
+  // and the sign only picks which half of the droplet gets drawn. The exit
+  // side flips with every internal reflection, so drawing every order at
+  // b > 0 put the primary down-left and the secondary up-left: 42.4 + 50.4 =
+  // 92.7 deg apart, a sum where the difference belongs.
+  const { bowSide, traceOne } = await import('../src/rays.js');
+  const n = O.makeIndexModel()(650);
+
+  const sides = [];
+  for (const k of [1, 2, 3, 4]) {
+    const geo = O.rainbowGeometry(n, k);
+    if (!geo) continue;
+    const ray = traceOne(650, n, k, bowSide(n, k) * geo.impactParameter);
+    assert.ok(ray.path.dirOut, `k=${k} has an exit direction`);
+    sides.push({ k, y: ray.path.dirOut.y, phi: ray.path.antisolar * O.DEG });
+  }
+  assert.equal(sides.length, 4);
+  for (const s of sides) {
+    assert.ok(s.y < 0, `k=${s.k} must leave on the common side, got y=${s.y}`);
+  }
+
+  // and with them on one side, the drawn gap between the bows is the real one
+  const gap = sides[1].phi - sides[0].phi;
+  close(gap, O.rainbowGeometry(n, 2).antisolarDeg - O.rainbowGeometry(n, 1).antisolarDeg,
+    1e-9, 'primary to secondary');
+  close(gap, 8.0, 0.2, 'which is about 8 degrees, not 93');
+});
+
+test('bowSide is keyed to the extremum, because k=3 changes sides mid-range', async () => {
+  // A fixed sign per order would be wrong here: the k=3 exit direction really
+  // does cross the axis part way along the impact range, so the side has to
+  // come from the canonical ray -- the one the eye sits on and the one the
+  // bow is actually made of.
+  const { bowSide, traceOne } = await import('../src/rays.js');
+  const n = O.makeIndexModel()(650);
+
+  const sideAt = (k, b) => Math.sign(traceOne(650, n, k, b).path.dirOut.y);
+  let flips = 0;
+  let prev = null;
+  for (let b = 0.02; b < 1; b += 0.02) {
+    const s = sideAt(3, b);
+    if (prev !== null && s !== prev) flips++;
+    prev = s;
+  }
+  assert.ok(flips > 0, 'k=3 is expected to cross the axis somewhere in (0,1)');
+
+  // The extremum still lands on the common side, which is all that is asked.
+  const geo3 = O.rainbowGeometry(n, 3);
+  assert.equal(sideAt(3, bowSide(n, 3) * geo3.impactParameter), -1);
+});

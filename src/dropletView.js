@@ -8,7 +8,7 @@
 import * as O from './optics.js';
 import { state, set, indexModel, activeOrders, activeLambdas } from './state.js';
 import {
-  buildRays, distanceFromExtremum, colorFor, traceOne, BOW_MATCH_DEG, bowNameKey,
+  buildRays, distanceFromExtremum, colorFor, traceOne, BOW_MATCH_DEG, bowNameKey, bowSide,
 } from './rays.js';
 import { t, deg, num } from './i18n.js';
 import { fitCanvas, strokePath, label, arrowHead, angleArc, capture } from './ui.js';
@@ -156,7 +156,7 @@ export function createDropletView(canvas) {
     for (const kRef of orders) {
       const geo = O.rainbowGeometry(nRef, kRef);
       if (!geo) continue;
-      const canonical = traceOne(650, nRef, kRef, geo.impactParameter);
+      const canonical = traceOne(650, nRef, kRef, bowSide(nRef, kRef) * geo.impactParameter);
       if (!canonical.path.dirOut) continue;
       // Every active colour's bow for this order. Under white light the bows
       // are 1.7 deg apart, so "the rainbow is at 42.4 deg" is red's edge of a
@@ -683,7 +683,10 @@ export function createDropletView(canvas) {
   }
 
   function drawImpactHandle(ctx) {
-    const y = layout.cy - state.impact * layout.s;
+    // Follows the half of the droplet the reference family is drawn in, or
+    // the handle sits above the axis pointing at a ray that enters below it.
+    const side = bowSide(indexModel()(650), Math.max(1, state.reflections));
+    const y = layout.cy - side * state.impact * layout.s;
     const x = layout.cx - layout.s * 1.9;
     ctx.save();
     ctx.strokeStyle = hover ? 'rgba(255,255,255,0.75)' : 'rgba(180,200,240,0.45)';
@@ -810,7 +813,10 @@ export function createDropletView(canvas) {
   function impactFromEvent(e) {
     const rect = canvas.getBoundingClientRect();
     const y = e.clientY - rect.top;
-    const b = (layout.cy - y) / layout.s;
+    // Measured in the half of the droplet this family is drawn in, so
+    // dragging towards the rays makes b grow whichever side they are on.
+    const side = bowSide(indexModel()(650), Math.max(1, state.reflections));
+    const b = (side * (layout.cy - y)) / layout.s;
     return Math.max(-0.999, Math.min(0.999, b));
   }
 

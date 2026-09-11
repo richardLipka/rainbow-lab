@@ -1831,6 +1831,11 @@ const translations = {
     fieldLitOfShown: 'Svítí {lit} z {shown} kapek',
     fieldTestLine: 'Test: úhel od antisolárního bodu ±{tol}. Vzdálenost se nepočítá.',
 
+    /* ---- the cross-section cuts a cone, so every family has two rays ---- */
+    coneSliceNote:
+      'Kapka neposílá soustředěné světlo jedním směrem, ale po kuželi kolem osy ke Slunci. Řez ten kužel protne dvakrát, nad osou i pod ní, takže je jedno, kterou polovinu kapky nakreslíme. Záleží na tom víc, než by člověk čekal: strana výstupu se s každým vnitřním odrazem překlápí, takže při kreslení obou řádů v horní polovině míří primární duha dolů a vedlejší nahoru a vypadají {apart} od sebe. To je 42° + 50°, součet tam, kde patří rozdíl. Každý řád se proto kreslí v té polovině, ze které vychází na společnou stranu — a obě oči pak stojí {gap} od sebe, přesně jako na obloze.',
+    coneOtherSide: 'druhá strana kužele',
+
     /* ---- mathematics panel ---- */
     mathematics: 'Matematika',
     mathIntro:
@@ -2287,6 +2292,11 @@ const translations = {
       'The droplet just beside this one is seen at a slightly different angle, so a different wavelength comes out of it — or none does. That is where the coloured ring comes from. Nothing draws it; it is simply every direction that makes the same angle with the axis.',
     fieldLitOfShown: '{lit} of {shown} droplets are lit',
     fieldTestLine: 'The test: angle from the antisolar point, ±{tol}. Distance does not enter it.',
+
+    /* ---- the cross-section cuts a cone, so every family has two rays ---- */
+    coneSliceNote:
+      'A droplet does not send its concentrated light one way. It sends it around a cone about the axis to the Sun, and this slice cuts that cone twice, once above the axis and once below — so which half of the droplet gets drawn is arbitrary. It matters more than it sounds. The exit side flips with every internal reflection, so drawing both orders in the upper half sent the primary down-left and the secondary up-left, about {apart} apart. That is 42° + 50°, a sum where the difference belongs. Each order is now drawn in whichever half puts its light on the common side, and the two eyes sit {gap} apart — which is what the sky shows.',
+    coneOtherSide: 'far side of the cone',
 
     /* ---- mathematics panel ---- */
     mathematics: 'Mathematics',
@@ -3248,7 +3258,9 @@ function buildRays() {
   for (const k of orders) {
     for (const lambda of lambdas) {
       const n = idx(lambda);
-      const r = traceOne(lambda, n, k, state.impact, 1, rayLength);
+      // Which half of the droplet to draw this family in. See bowSide().
+      const side = bowSide(n, k);
+      const r = traceOne(lambda, n, k, side * state.impact, 1, rayLength);
       r.role = 'main';
       out.push(r);
 
@@ -3256,7 +3268,7 @@ function buildRays() {
         for (let i = 0; i < state.fanCount; i++) {
           const b = (i + 0.5) / state.fanCount;
           if (Math.abs(b - state.impact) < 1e-6) continue;
-          const f = traceOne(lambda, n, k, b, 1, rayLength);
+          const f = traceOne(lambda, n, k, side * b, 1, rayLength);
           f.role = 'fan';
           out.push(f);
         }
@@ -3280,6 +3292,35 @@ function buildRays() {
   }
 
   return out;
+}
+
+/**
+ * Which half of the droplet order k should be drawn entering, so that its
+ * concentrated light leaves on the SAME side of the axis as every other
+ * order's.
+ *
+ * The droplet is a sphere lit by parallel light, so b and -b are the same
+ * physics: the sign only picks which half of the cross-section is drawn. The
+ * exit side, though, flips with every internal reflection -- k=1 leaves below
+ * the axis for b > 0, k=2 above. Drawing every family at b > 0 therefore put
+ * the primary's light down-left and the secondary's up-left, so the two bows
+ * appeared about 93 deg apart. That number is 42.4 + 50.4, a sum of two
+ * angles whose DIFFERENCE, 8 deg, is what the sky actually shows.
+ *
+ * Keyed to the family's canonical ray rather than to a fixed sign per order,
+ * because the exit side is not constant across b: k=3 crosses the axis part
+ * way along the range. The extremum is the ray the eye is placed on and the
+ * one the bow is made of, so that is the one that has to land on the common
+ * side.
+ */
+function bowSide(n, k) {
+  const geo = O.rainbowGeometry(n, k);
+  if (!geo) return 1;
+  const canonical = traceOne(650, n, k, geo.impactParameter);
+  if (!canonical.path.dirOut) return 1;
+  // Negative y is the common side: that is where k=1 already went, so the
+  // primary's picture does not move.
+  return canonical.path.dirOut.y > 0 ? -1 : 1;
 }
 
 /** How far (in degrees) this ray sits from the extremum of its own family. */
@@ -3992,7 +4033,7 @@ function createDropletView(canvas) {
     for (const kRef of orders) {
       const geo = O.rainbowGeometry(nRef, kRef);
       if (!geo) continue;
-      const canonical = traceOne(650, nRef, kRef, geo.impactParameter);
+      const canonical = traceOne(650, nRef, kRef, bowSide(nRef, kRef) * geo.impactParameter);
       if (!canonical.path.dirOut) continue;
       // Every active colour's bow for this order. Under white light the bows
       // are 1.7 deg apart, so "the rainbow is at 42.4 deg" is red's edge of a
@@ -4519,7 +4560,10 @@ function createDropletView(canvas) {
   }
 
   function drawImpactHandle(ctx) {
-    const y = layout.cy - state.impact * layout.s;
+    // Follows the half of the droplet the reference family is drawn in, or
+    // the handle sits above the axis pointing at a ray that enters below it.
+    const side = bowSide(indexModel()(650), Math.max(1, state.reflections));
+    const y = layout.cy - side * state.impact * layout.s;
     const x = layout.cx - layout.s * 1.9;
     ctx.save();
     ctx.strokeStyle = hover ? 'rgba(255,255,255,0.75)' : 'rgba(180,200,240,0.45)';
@@ -4646,7 +4690,10 @@ function createDropletView(canvas) {
   function impactFromEvent(e) {
     const rect = canvas.getBoundingClientRect();
     const y = e.clientY - rect.top;
-    const b = (layout.cy - y) / layout.s;
+    // Measured in the half of the droplet this family is drawn in, so
+    // dragging towards the rays makes b grow whichever side they are on.
+    const side = bowSide(indexModel()(650), Math.max(1, state.reflections));
+    const b = (side * (layout.cy - y)) / layout.s;
     return Math.max(-0.999, Math.min(0.999, b));
   }
 
@@ -7514,6 +7561,18 @@ function renderFreeGuide() {
  */
 function noteParams(key, k = state.reflections) {
   const idx = indexModel();
+  if (key === 'coneSliceNote') {
+    const g1 = O.rainbowGeometry(idx(650), 1);
+    const g2 = O.rainbowGeometry(idx(650), 2);
+    if (!g1 || !g2) return null;
+    // Two numbers, both from the engine: what the canvas shows, and what is
+    // true. The first is a sum because the families land on opposite sides of
+    // the axis; the second is the difference, which is the sky.
+    return {
+      apart: deg(g1.antisolarDeg + g2.antisolarDeg, 1),
+      gap: deg(g2.antisolarDeg - g1.antisolarDeg, 2),
+    };
+  }
   if (key === 'explWhyFainter') {
     const [first, second] = orderLedger(idx);
     if (!first || !second) return null;
@@ -7593,6 +7652,9 @@ function rayInfoNodes(opts = {}) {
     nodes.push(el('p', { class: 'note' }, t('explNotOneReflection')));
   }
   if (!opts.compact) {
+    // Only once a second family is on screen: with one bow there are no two
+    // eyes to misread as being 93 degrees apart.
+    if (activeOrders().filter((o) => o >= 1).length > 1) nodes.push(noteNode('coneSliceNote'));
     // Quoting the critical angle next to k = 0 would describe a bounce the
     // ray never makes.
     if (k >= 1) nodes.push(noteNode('explReflectionIsWeak', k));

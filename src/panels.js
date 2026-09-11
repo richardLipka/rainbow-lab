@@ -3,7 +3,7 @@
  * and the question set. All text comes from i18n.
  */
 import * as O from './optics.js';
-import { state, set, indexModel, activeLambdas } from './state.js';
+import { state, set, indexModel, activeLambdas, activeOrders } from './state.js';
 import { t, deg, num, CLASS_KEY, CLASS_EXPLAIN } from './i18n.js';
 import { el, row, segmented } from './ui.js';
 import {
@@ -343,6 +343,18 @@ function renderFreeGuide() {
  */
 function noteParams(key, k = state.reflections) {
   const idx = indexModel();
+  if (key === 'coneSliceNote') {
+    const g1 = O.rainbowGeometry(idx(650), 1);
+    const g2 = O.rainbowGeometry(idx(650), 2);
+    if (!g1 || !g2) return null;
+    // Two numbers, both from the engine: what the canvas shows, and what is
+    // true. The first is a sum because the families land on opposite sides of
+    // the axis; the second is the difference, which is the sky.
+    return {
+      apart: deg(g1.antisolarDeg + g2.antisolarDeg, 1),
+      gap: deg(g2.antisolarDeg - g1.antisolarDeg, 2),
+    };
+  }
   if (key === 'explWhyFainter') {
     const [first, second] = orderLedger(idx);
     if (!first || !second) return null;
@@ -422,6 +434,9 @@ function rayInfoNodes(opts = {}) {
     nodes.push(el('p', { class: 'note' }, t('explNotOneReflection')));
   }
   if (!opts.compact) {
+    // Only once a second family is on screen: with one bow there are no two
+    // eyes to misread as being 93 degrees apart.
+    if (activeOrders().filter((o) => o >= 1).length > 1) nodes.push(noteNode('coneSliceNote'));
     // Quoting the critical angle next to k = 0 would describe a bounce the
     // ray never makes.
     if (k >= 1) nodes.push(noteNode('explReflectionIsWeak', k));

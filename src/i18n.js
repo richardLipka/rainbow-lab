@@ -244,6 +244,11 @@ export const translations = {
     fieldLitOfShown: 'Svítí {lit} z {shown} kapek',
     fieldTestLine: 'Test: úhel od antisolárního bodu ±{tol}. Vzdálenost se nepočítá.',
 
+    /* ---- the cross-section cuts a cone, so every family has two rays ---- */
+    coneSliceNote:
+      'Kapka neposílá soustředěné světlo jedním směrem, ale po kuželi kolem osy ke Slunci. Řez ten kužel protne dvakrát, nad osou i pod ní, takže je jedno, kterou polovinu kapky nakreslíme. Záleží na tom víc, než by člověk čekal: strana výstupu se s každým vnitřním odrazem překlápí, takže při kreslení obou řádů v horní polovině míří primární duha dolů a vedlejší nahoru a vypadají {apart} od sebe. To je 42° + 50°, součet tam, kde patří rozdíl. Každý řád se proto kreslí v té polovině, ze které vychází na společnou stranu — a obě oči pak stojí {gap} od sebe, přesně jako na obloze.',
+    coneOtherSide: 'druhá strana kužele',
+
     /* ---- mathematics panel ---- */
     mathematics: 'Matematika',
     mathIntro:
@@ -700,6 +705,11 @@ export const translations = {
       'The droplet just beside this one is seen at a slightly different angle, so a different wavelength comes out of it — or none does. That is where the coloured ring comes from. Nothing draws it; it is simply every direction that makes the same angle with the axis.',
     fieldLitOfShown: '{lit} of {shown} droplets are lit',
     fieldTestLine: 'The test: angle from the antisolar point, ±{tol}. Distance does not enter it.',
+
+    /* ---- the cross-section cuts a cone, so every family has two rays ---- */
+    coneSliceNote:
+      'A droplet does not send its concentrated light one way. It sends it around a cone about the axis to the Sun, and this slice cuts that cone twice, once above the axis and once below — so which half of the droplet gets drawn is arbitrary. It matters more than it sounds. The exit side flips with every internal reflection, so drawing both orders in the upper half sent the primary down-left and the secondary up-left, about {apart} apart. That is 42° + 50°, a sum where the difference belongs. Each order is now drawn in whichever half puts its light on the common side, and the two eyes sit {gap} apart — which is what the sky shows.',
+    coneOtherSide: 'far side of the cone',
 
     /* ---- mathematics panel ---- */
     mathematics: 'Mathematics',

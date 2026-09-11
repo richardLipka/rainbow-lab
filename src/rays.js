@@ -56,7 +56,9 @@ export function buildRays() {
   for (const k of orders) {
     for (const lambda of lambdas) {
       const n = idx(lambda);
-      const r = traceOne(lambda, n, k, state.impact, 1, rayLength);
+      // Which half of the droplet to draw this family in. See bowSide().
+      const side = bowSide(n, k);
+      const r = traceOne(lambda, n, k, side * state.impact, 1, rayLength);
       r.role = 'main';
       out.push(r);
 
@@ -64,7 +66,7 @@ export function buildRays() {
         for (let i = 0; i < state.fanCount; i++) {
           const b = (i + 0.5) / state.fanCount;
           if (Math.abs(b - state.impact) < 1e-6) continue;
-          const f = traceOne(lambda, n, k, b, 1, rayLength);
+          const f = traceOne(lambda, n, k, side * b, 1, rayLength);
           f.role = 'fan';
           out.push(f);
         }
@@ -88,6 +90,35 @@ export function buildRays() {
   }
 
   return out;
+}
+
+/**
+ * Which half of the droplet order k should be drawn entering, so that its
+ * concentrated light leaves on the SAME side of the axis as every other
+ * order's.
+ *
+ * The droplet is a sphere lit by parallel light, so b and -b are the same
+ * physics: the sign only picks which half of the cross-section is drawn. The
+ * exit side, though, flips with every internal reflection -- k=1 leaves below
+ * the axis for b > 0, k=2 above. Drawing every family at b > 0 therefore put
+ * the primary's light down-left and the secondary's up-left, so the two bows
+ * appeared about 93 deg apart. That number is 42.4 + 50.4, a sum of two
+ * angles whose DIFFERENCE, 8 deg, is what the sky actually shows.
+ *
+ * Keyed to the family's canonical ray rather than to a fixed sign per order,
+ * because the exit side is not constant across b: k=3 crosses the axis part
+ * way along the range. The extremum is the ray the eye is placed on and the
+ * one the bow is made of, so that is the one that has to land on the common
+ * side.
+ */
+export function bowSide(n, k) {
+  const geo = O.rainbowGeometry(n, k);
+  if (!geo) return 1;
+  const canonical = traceOne(650, n, k, geo.impactParameter);
+  if (!canonical.path.dirOut) return 1;
+  // Negative y is the common side: that is where k=1 already went, so the
+  // primary's picture does not move.
+  return canonical.path.dirOut.y > 0 ? -1 : 1;
 }
 
 /** How far (in degrees) this ray sits from the extremum of its own family. */

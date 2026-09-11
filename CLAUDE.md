@@ -17,7 +17,7 @@ almost certainly how a bug gets in (see "Lessons from bugs found" below).
 
 ```bash
 node server.mjs        # dev server on :5178 (or next free port)
-node --test test/optics.test.mjs   # 51 unit tests over the engine
+node --test test/optics.test.mjs   # 53 unit tests over the engine
 node tools-check-collisions.mjs    # top-level name clashes across the bundle
 node build.mjs          # writes dist/rainbow-lab.html and dist/artifact.html
 ```
@@ -69,7 +69,7 @@ app.js         assembly + render loop
 | `src/fieldView.js` | Mode D — the many-droplets test run on a 3-D volume of rain. |
 | `src/panels.js` | Tutorial script, ray readout, mathematics panel, questions. |
 | `src/app.js` | Shell, controls, the reactive update pipeline (see below), render loop. |
-| `test/optics.test.mjs` | 51 tests over the engine — ray-sphere, Snell, extremum vs. numeric search, classification, sky geometry, the Fresnel budget per reflection order, the droplet-field test. |
+| `test/optics.test.mjs` | 53 tests over the engine — ray-sphere, Snell, extremum vs. numeric search, classification, sky geometry, the Fresnel budget per reflection order, the droplet-field test, the drawn side of each bow. |
 
 ## Angle conventions — read this before changing any angle-related code
 
@@ -681,6 +681,51 @@ that passed the test" without ever saying what the test was. `fieldTestLine`
 does: *angle from the antisolar point, +/- BOW_MATCH_DEG, distance does not
 enter it*. The tolerance is interpolated from the constant, not typed in.
 
+## Which half of the droplet each family is drawn in
+
+Reported by the user: in the single-droplet scene the secondary bow sat high
+above the sunbeam line, about 90 degrees from the primary, instead of just
+outside it.
+
+The maths was right and the picture was not. A droplet concentrates order k
+onto a **cone** about the axis to the Sun; a cross-section cuts that cone
+twice, once above the axis and once below, so which half of the droplet gets
+drawn is arbitrary. It is not harmless, though, because **the exit side flips
+with every internal reflection**: at b > 0, k=1 leaves below the axis and k=2
+above. Drawing every family at b > 0 therefore sent the primary down-left and
+the secondary up-left, and the two eyes landed 42.37 + 50.37 = **92.73 deg**
+apart -- a sum where the difference, 8.00 deg, belongs.
+
+`bowSide(n, k)` in `rays.js` picks the sign of b that puts each family's
+light on the common side (negative y, where k=1 already went, so the primary's
+picture does not move). `buildRays()` applies it to the main ray and the whole
+fan; `computeObservers()` traces its canonical ray through the same helper, so
+the eye and the rays cannot disagree about which half they live in.
+
+Measured after: the drawn gap between the k=1 and k=2 eyes is 8.00 deg, equal
+to the true difference in antisolar angle. Before it was 92.73 deg.
+
+Three things to keep:
+
+- **It is keyed to the canonical ray, not to a fixed sign per order.** The
+  exit side is not constant across b -- k=3 crosses the axis part way along
+  the range (measured: one sign flip in b ∈ (0,1), none for k=1 or k=2). The
+  extremum is the ray the eye sits on and the one the bow is made of, so that
+  is the ray whose side has to be normalised. A per-order constant would be
+  right for k=1 and k=2 and quietly wrong for k=3.
+- **The impact handle and the drag go through the same helper.** `b` is a
+  magnitude in physics and a choice of half in the drawing, so
+  `impactFromEvent()` measures the pointer in the family's own half and
+  `drawImpactHandle()` draws it there. Verified by dragging: at k=1 pulling up
+  raises b, at k=2 pulling down does, and the handle tracks the pointer in
+  both.
+- **A mirror ray was tried first and removed.** Tracing each family at -b as
+  well showed that the cone has two elements, which is true, but it cost a
+  line per family and never delivered the 8 deg -- the fan is not mirrored, so
+  the concentration that makes the gap visible only ever appeared on one side.
+  The note (`coneSliceNote`) says the same thing in two sentences and quotes
+  both numbers from the engine.
+
 ## The bundler puts every module in one scope
 
 `build.mjs` strips `import`/`export` and concatenates, so two files that each
@@ -1020,7 +1065,7 @@ Snell's law (scalar and vector forms agree), Fresnel limits, the analytic
 extremum against an independent numeric (golden-section) search, the
 headline 42°/51° values, classification for every ray family, sky/horizon
 geometry, the bow-direction and scattering-angle constructors, and more —
-51 tests, all should stay green.
+53 tests, all should stay green.
 
 View/rendering changes: there is no visual regression suite, so verify by
 driving the actual app:

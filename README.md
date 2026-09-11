@@ -85,7 +85,7 @@ app.js         assembly + render loop
 | `src/panels.js` | Tutorial, ray readout, mathematics, questions. |
 | `src/app.js` | Shell, controls, render loop. |
 | `src/assets.js` | Generated — logos inlined as data: URIs. |
-| `test/optics.test.mjs` | 51 tests over the engine. |
+| `test/optics.test.mjs` | 53 tests over the engine. |
 
 The control column is filtered per scene: every control declares which
 scenes read its state, and groups left empty are dropped. Tutorial steps
