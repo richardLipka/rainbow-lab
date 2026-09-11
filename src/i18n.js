@@ -248,8 +248,15 @@ export const translations = {
 
     /* ---- the cross-section cuts a cone, so every family has two rays ---- */
     coneSliceNote:
-      'Kapka neposílá soustředěné světlo jedním směrem, ale po kuželi kolem osy ke Slunci. Řez ten kužel protne dvakrát, nad osou i pod ní, takže je jedno, kterou polovinu kapky nakreslíme. Záleží na tom víc, než by člověk čekal: strana výstupu se s každým vnitřním odrazem překlápí, takže při kreslení obou řádů v horní polovině míří primární duha dolů a vedlejší nahoru a vypadají {apart} od sebe. To je 42° + 50°, součet tam, kde patří rozdíl. Každý řád se proto kreslí v té polovině, ze které vychází na společnou stranu — a obě oči pak stojí {gap} od sebe, přesně jako na obloze.',
+      'Všechno tohle dělá jediný paprsek. Co se na první stěně lomem dostane ven, je primární duha. Co zůstane uvnitř a doletí na další stěnu, je vedlejší. Co zůstane znovu, je třetí řád. Jeden paprsek, jeden vstupní bod — řády se z něj odlupují stěnu po stěně a každý si bere zlomek toho, co předchozí nechal být. Tohle je příčina vedlejší duhy a na nic z toho není potřeba druhý paprsek.',
     coneOtherSide: 'druhá strana kužele',
+    entryHalvesNote:
+      'Obě oči stojí na opačných stranách, protože se strana výstupu s každým odrazem překlápí — z jednoho vstupního bodu se primární a vedlejší duha rozejdou pokaždé, při každém parametru dopadu. Neměřte úhel mezi očima. Čtěte u každého oka jeho vlastní φ od čárkované antisolární přímky: {phi1} a {phi2}, tedy {gap} od sebe. Ten rozdíl je to, co vidíte na obloze.',
+
+    explBowNeedsOwnRay:
+      'Jeden paprsek ukazuje, jak vedlejší duha vzniká. Neukazuje ji samotnou. Duha je nahromadění paprsků a každý řád se hromadí u svého vlastního parametru dopadu — {b1} pro primární, {b2} pro vedlejší. Přetáhněte posuvník mezi nimi a dívejte se, které oko se rozsvítí. Vždycky jen jedno.',
+    explSameSplitInSky:
+      'Tentýž rozpad, jenže venku. Každá kapka dělá to co ta jediná v řezu: všechny řády naráz, každý jinam. Který z nich dorazí k vám, rozhoduje jedině to, kde kapka stojí — takže kapka, ze které máte primární duhu, vám tu vedlejší udělat nemůže. Ta je z úplně jiných kapek.',
 
     /* ---- mathematics panel ---- */
     mathematics: 'Matematika',
@@ -712,8 +719,15 @@ export const translations = {
 
     /* ---- the cross-section cuts a cone, so every family has two rays ---- */
     coneSliceNote:
-      'A droplet does not send its concentrated light one way. It sends it around a cone about the axis to the Sun, and this slice cuts that cone twice, once above the axis and once below — so which half of the droplet gets drawn is arbitrary. It matters more than it sounds. The exit side flips with every internal reflection, so drawing both orders in the upper half sent the primary down-left and the secondary up-left, about {apart} apart. That is 42° + 50°, a sum where the difference belongs. Each order is now drawn in whichever half puts its light on the common side, and the two eyes sit {gap} apart — which is what the sky shows.',
+      'One ray does all of this. The light that refracts out at the first wall is the primary. What stays inside and carries on to the next wall is the secondary, what stays again is the third order. Same ray, same entry point — the orders peel off it one wall at a time, each taking a fraction of what the one before it left behind. That is the cause of the secondary bow, and seeing it costs no second ray.',
     coneOtherSide: 'far side of the cone',
+    entryHalvesNote:
+      'The two eyes sit on opposite sides because the exit side flips with every bounce — from one entry point the primary and the secondary part company every time, at every impact parameter. So do not read the angle between the eyes. Read each eye\'s own φ against the dashed antisolar line: {phi1} and {phi2}, which is {gap} apart. That difference is what the sky shows.',
+
+    explBowNeedsOwnRay:
+      "One ray shows how the secondary happens. It does not show the secondary bow. A bow is a pile-up, and each order piles up at its own impact parameter — {b1} for the primary, {b2} for the secondary. Drag the slider between them and watch which eye lights up. Only ever one at a time.",
+    explSameSplitInSky:
+      "The same split, out here. Every droplet does what the single one did: every order at once, each leaving in its own direction. Which one reaches you depends only on where the droplet sits — so the droplet giving you the primary cannot also give you the secondary. That one comes from entirely different droplets.",
 
     /* ---- mathematics panel ---- */
     mathematics: 'Mathematics',

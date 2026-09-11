@@ -681,50 +681,68 @@ that passed the test" without ever saying what the test was. `fieldTestLine`
 does: *angle from the antisolar point, +/- BOW_MATCH_DEG, distance does not
 enter it*. The tolerance is interpolated from the constant, not typed in.
 
-## Which half of the droplet each family is drawn in
+## One ray, and the orders that peel off it
 
-Reported by the user: in the single-droplet scene the secondary bow sat high
-above the sunbeam line, about 90 degrees from the primary, instead of just
-outside it.
+The single-droplet scene's job is the **mechanism**: one ray enters, and the
+light that fails to refract out at each wall carries on to the next. The
+primary is what leaves after one bounce, the secondary what stayed inside and
+left after two. Same ray, same entry point -- unit-tested to 1e-15, segment
+for segment, up to the wall where each order departs.
 
-The maths was right and the picture was not. A droplet concentrates order k
-onto a **cone** about the axis to the Sun; a cross-section cuts that cone
-twice, once above the axis and once below, so which half of the droplet gets
-drawn is arbitrary. It is not harmless, though, because **the exit side flips
-with every internal reflection**: at b > 0, k=1 leaves below the axis and k=2
-above. Drawing every family at b > 0 therefore sent the primary down-left and
-the secondary up-left, and the two eyes landed 42.37 + 50.37 = **92.73 deg**
-apart -- a sum where the difference, 8.00 deg, belongs.
+That claim was lost for two commits. Chasing a report that the secondary bow
+sat 90 degrees from the primary, `bowSide()` entered each order through
+whichever half of the droplet put its light on the common side. It worked --
+the two eyes came to 8.00 deg apart, matching the sky -- and it cost the thing
+the scene exists for: two rays then hit the droplet, and one ray splitting
+into every order was no longer on screen. Reported by the user, again.
 
-`bowSide(n, k)` in `rays.js` picks the sign of b that puts each family's
-light on the common side (negative y, where k=1 already went, so the primary's
-picture does not move). `buildRays()` applies it to the main ray and the whole
-fan; `computeObservers()` traces its canonical ray through the same helper, so
-the eye and the rays cannot disagree about which half they live in.
+**The trade is forced, and measured.** From a single entry point the primary
+and the secondary leave on opposite sides at *every* impact parameter -- 1999
+of them checked, never once the same. So it is either one entry point with
+the eyes 93 deg apart, or the eyes 8 deg apart with two entry points. There is
+no third picture.
 
-Measured after: the drawn gap between the k=1 and k=2 eyes is 8.00 deg, equal
-to the true difference in antisolar angle. Before it was 92.73 deg.
+One entry point wins, because the angle is recoverable and the mechanism is
+not: **each eye already carries its own φ arc**, swept from the dashed
+antisolar reference at that eye. Two eyes, two arcs, both measured against the
+same line -- so 42.4 and 50.4 are read against one reference instead of
+against each other. `entryHalvesNote` says exactly that, with both values and
+the 8.00 deg difference from the engine.
 
-Three things to keep:
+`bowSide()` is gone. `bowExitSide()` keeps its knowledge as a statement of
+fact rather than a layout rule, and the opposite-sides sweep is a test.
 
-- **It is keyed to the canonical ray, not to a fixed sign per order.** The
-  exit side is not constant across b -- k=3 crosses the axis part way along
-  the range (measured: one sign flip in b ∈ (0,1), none for k=1 or k=2). The
-  extremum is the ray the eye sits on and the one the bow is made of, so that
-  is the ray whose side has to be normalised. A per-order constant would be
-  right for k=1 and k=2 and quietly wrong for k=3.
-- **The impact handle and the drag go through the same helper.** `b` is a
-  magnitude in physics and a choice of half in the drawing, so
-  `impactFromEvent()` measures the pointer in the family's own half and
-  `drawImpactHandle()` draws it there. Verified by dragging: at k=1 pulling up
-  raises b, at k=2 pulling down does, and the handle tracks the pointer in
-  both.
-- **A mirror ray was tried first and removed.** Tracing each family at -b as
-  well showed that the cone has two elements, which is true, but it cost a
-  line per family and never delivered the 8 deg -- the fan is not mirrored, so
-  the concentration that makes the gap visible only ever appeared on one side.
-  The note (`coneSliceNote`) says the same thing in two sentences and quotes
-  both numbers from the engine.
+### Drawing the split so it reads as a split
+
+Every order's traced path contains the full prefix, so drawing them all
+independently overdrew the shared trunk once per order -- it looked like
+several rays that happened to overlap, not one ray dividing.
+
+`sharedPrefix(k, lowest)` gives the number of leading segments order k shares
+with the lowest order on screen: the incident segment plus the first
+`lowest + 1` internals, which is the same light right up to the wall where the
+lower order refracted out. The lowest order draws the trunk; every higher one
+starts where it diverges.
+
+It is also less work, not more. At four orders, six wavelengths and a 60-ray
+fan: 22 segments per wavelength per ray position before, **13 after** -- 8052
+segments down to 4758, 59 % of the drawing.
+
+### The same split, at every scale
+
+`explSameSplitInSky` closes the loop in all three many-droplet readouts (the
+flat scene's inspector, the 3-D field's, the sky's traced beam): every droplet
+does what the single one did, all orders at once, each leaving in its own
+direction -- and which one reaches you depends only on where the droplet sits,
+so the droplet feeding your primary cannot also feed your secondary.
+
+`explBowNeedsOwnRay` draws the other half of the distinction, which is easy to
+miss: one ray shows how the secondary *happens*, not where the secondary *bow*
+is. A bow is a pile-up, and each order piles up at its own impact parameter --
+0.862 for the primary, 0.951 for the secondary. The primary's own ray does
+bounce twice, but that second-order light leaves at 56.9 deg carrying 0.29 %,
+nowhere near the bow and six times fainter than the secondary's own rainbow
+ray.
 
 ## Checked against Nussenzveig
 

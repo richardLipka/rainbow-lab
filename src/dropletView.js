@@ -8,7 +8,7 @@
 import * as O from './optics.js';
 import { state, set, indexModel, activeOrders, activeLambdas } from './state.js';
 import {
-  buildRays, distanceFromExtremum, colorFor, traceOne, BOW_MATCH_DEG, bowNameKey, bowSide,
+  buildRays, distanceFromExtremum, colorFor, traceOne, BOW_MATCH_DEG, bowNameKey, sharedPrefix,
 } from './rays.js';
 import { t, deg, num } from './i18n.js';
 import { fitCanvas, strokePath, label, arrowHead, angleArc, capture } from './ui.js';
@@ -94,12 +94,18 @@ export function createDropletView(canvas) {
       return ra !== rb ? ra - rb : order[a.role] - order[b.role];
     });
     const reachingKs = new Set(rays.filter(reachesEye).map((r) => r.k));
+    // The lowest order on screen draws the shared trunk; every higher order
+    // starts at the wall where it carried on instead of refracting out. One
+    // ray enters, and the orders peel off it -- which is the cause of the
+    // secondary bow, and was invisible while each order redrew the whole
+    // path on top of the others.
+    const lowest = Math.min(...rays.filter((r) => r.role === 'main' || r.role === 'fan').map((r) => r.k));
     // Fan segments are batched by stroke style into one Path2D each and
     // stroked once per group. Every other ray keeps its own path, because it
     // carries decorations -- arrowheads, vertex dots, the reaches-the-eye
     // glow -- that a shared path cannot.
     const batch = new Map();
-    for (const ray of rays) drawRay(ctx, ray, batch);
+    for (const ray of rays) drawRay(ctx, ray, batch, lowest);
     flushBatch(ctx, batch);
 
     const main = rays.filter((r) => r.role === 'main');
@@ -162,7 +168,7 @@ export function createDropletView(canvas) {
     for (const kRef of orders) {
       const geo = O.rainbowGeometry(nRef, kRef);
       if (!geo) continue;
-      const canonical = traceOne(650, nRef, kRef, bowSide(nRef, kRef) * geo.impactParameter);
+      const canonical = traceOne(650, nRef, kRef, geo.impactParameter);
       if (!canonical.path.dirOut) continue;
       // Every active colour's bow for this order. Under white light the bows
       // are 1.7 deg apart, so "the rainbow is at 42.4 deg" is red's edge of a
@@ -371,9 +377,11 @@ export function createDropletView(canvas) {
    * thousand segments, and a stroke call each put the frame at 54 ms.
    * Grouped by style and width there are a couple of dozen strokes instead.
    */
-  function drawRay(ctx, ray, batch) {
+  function drawRay(ctx, ray, batch, lowest = 0) {
     const p = ray.path;
     if (!p.hit && !p.miss) return;
+    // Where this order stops being the same light as the lowest one drawn.
+    const from = ray.role === 'main' || ray.role === 'fan' ? sharedPrefix(ray.k, lowest) : 0;
     const { alpha: a, width: baseWidth, greyMix, reaches } = rayStyle(ray);
     const selected =
       state.selectedRay &&
@@ -387,12 +395,14 @@ export function createDropletView(canvas) {
     // A glow under the exit segment for any ray that actually reaches the
     // observer -- the visual cue that ties "this ray" to "that eye", not
     // just a brighter version of the same colour.
-    if (reaches && p.segments.length) {
+    if (reaches && p.segments.length > from) {
       const exitSeg = p.segments[p.segments.length - 1];
       strokePath(ctx, [project(exitSeg.a), project(exitSeg.b)], 'rgba(224,168,63,0.35)', baseWidth + 5);
     }
 
-    for (const seg of p.segments) {
+    for (let si = 0; si < p.segments.length; si++) {
+      if (si < from) continue;
+      const seg = p.segments[si];
       const A = project(seg.a);
       const B = project(seg.b);
       let width = baseWidth;
@@ -722,10 +732,7 @@ export function createDropletView(canvas) {
   }
 
   function drawImpactHandle(ctx) {
-    // Follows the half of the droplet the reference family is drawn in, or
-    // the handle sits above the axis pointing at a ray that enters below it.
-    const side = bowSide(indexModel()(650), Math.max(1, state.reflections));
-    const y = layout.cy - side * state.impact * layout.s;
+    const y = layout.cy - state.impact * layout.s;
     const x = layout.cx - layout.s * 1.9;
     ctx.save();
     ctx.strokeStyle = hover ? 'rgba(255,255,255,0.75)' : 'rgba(180,200,240,0.45)';
@@ -852,10 +859,7 @@ export function createDropletView(canvas) {
   function impactFromEvent(e) {
     const rect = canvas.getBoundingClientRect();
     const y = e.clientY - rect.top;
-    // Measured in the half of the droplet this family is drawn in, so
-    // dragging towards the rays makes b grow whichever side they are on.
-    const side = bowSide(indexModel()(650), Math.max(1, state.reflections));
-    const b = (side * (layout.cy - y)) / layout.s;
+    const b = (layout.cy - y) / layout.s;
     return Math.max(-0.999, Math.min(0.999, b));
   }
 

@@ -1827,8 +1827,15 @@ const translations = {
 
     /* ---- the cross-section cuts a cone, so every family has two rays ---- */
     coneSliceNote:
-      'Kapka neposílá soustředěné světlo jedním směrem, ale po kuželi kolem osy ke Slunci. Řez ten kužel protne dvakrát, nad osou i pod ní, takže je jedno, kterou polovinu kapky nakreslíme. Záleží na tom víc, než by člověk čekal: strana výstupu se s každým vnitřním odrazem překlápí, takže při kreslení obou řádů v horní polovině míří primární duha dolů a vedlejší nahoru a vypadají {apart} od sebe. To je 42° + 50°, součet tam, kde patří rozdíl. Každý řád se proto kreslí v té polovině, ze které vychází na společnou stranu — a obě oči pak stojí {gap} od sebe, přesně jako na obloze.',
+      'Všechno tohle dělá jediný paprsek. Co se na první stěně lomem dostane ven, je primární duha. Co zůstane uvnitř a doletí na další stěnu, je vedlejší. Co zůstane znovu, je třetí řád. Jeden paprsek, jeden vstupní bod — řády se z něj odlupují stěnu po stěně a každý si bere zlomek toho, co předchozí nechal být. Tohle je příčina vedlejší duhy a na nic z toho není potřeba druhý paprsek.',
     coneOtherSide: 'druhá strana kužele',
+    entryHalvesNote:
+      'Obě oči stojí na opačných stranách, protože se strana výstupu s každým odrazem překlápí — z jednoho vstupního bodu se primární a vedlejší duha rozejdou pokaždé, při každém parametru dopadu. Neměřte úhel mezi očima. Čtěte u každého oka jeho vlastní φ od čárkované antisolární přímky: {phi1} a {phi2}, tedy {gap} od sebe. Ten rozdíl je to, co vidíte na obloze.',
+
+    explBowNeedsOwnRay:
+      'Jeden paprsek ukazuje, jak vedlejší duha vzniká. Neukazuje ji samotnou. Duha je nahromadění paprsků a každý řád se hromadí u svého vlastního parametru dopadu — {b1} pro primární, {b2} pro vedlejší. Přetáhněte posuvník mezi nimi a dívejte se, které oko se rozsvítí. Vždycky jen jedno.',
+    explSameSplitInSky:
+      'Tentýž rozpad, jenže venku. Každá kapka dělá to co ta jediná v řezu: všechny řády naráz, každý jinam. Který z nich dorazí k vám, rozhoduje jedině to, kde kapka stojí — takže kapka, ze které máte primární duhu, vám tu vedlejší udělat nemůže. Ta je z úplně jiných kapek.',
 
     /* ---- mathematics panel ---- */
     mathematics: 'Matematika',
@@ -2291,8 +2298,15 @@ const translations = {
 
     /* ---- the cross-section cuts a cone, so every family has two rays ---- */
     coneSliceNote:
-      'A droplet does not send its concentrated light one way. It sends it around a cone about the axis to the Sun, and this slice cuts that cone twice, once above the axis and once below — so which half of the droplet gets drawn is arbitrary. It matters more than it sounds. The exit side flips with every internal reflection, so drawing both orders in the upper half sent the primary down-left and the secondary up-left, about {apart} apart. That is 42° + 50°, a sum where the difference belongs. Each order is now drawn in whichever half puts its light on the common side, and the two eyes sit {gap} apart — which is what the sky shows.',
+      'One ray does all of this. The light that refracts out at the first wall is the primary. What stays inside and carries on to the next wall is the secondary, what stays again is the third order. Same ray, same entry point — the orders peel off it one wall at a time, each taking a fraction of what the one before it left behind. That is the cause of the secondary bow, and seeing it costs no second ray.',
     coneOtherSide: 'far side of the cone',
+    entryHalvesNote:
+      'The two eyes sit on opposite sides because the exit side flips with every bounce — from one entry point the primary and the secondary part company every time, at every impact parameter. So do not read the angle between the eyes. Read each eye\'s own φ against the dashed antisolar line: {phi1} and {phi2}, which is {gap} apart. That difference is what the sky shows.',
+
+    explBowNeedsOwnRay:
+      "One ray shows how the secondary happens. It does not show the secondary bow. A bow is a pile-up, and each order piles up at its own impact parameter — {b1} for the primary, {b2} for the secondary. Drag the slider between them and watch which eye lights up. Only ever one at a time.",
+    explSameSplitInSky:
+      "The same split, out here. Every droplet does what the single one did: every order at once, each leaving in its own direction. Which one reaches you depends only on where the droplet sits — so the droplet giving you the primary cannot also give you the secondary. That one comes from entirely different droplets.",
 
     /* ---- mathematics panel ---- */
     mathematics: 'Mathematics',
@@ -3259,9 +3273,7 @@ function buildRays() {
   for (const k of orders) {
     for (const lambda of lambdas) {
       const n = idx(lambda);
-      // Which half of the droplet to draw this family in. See bowSide().
-      const side = bowSide(n, k);
-      const r = traceOne(lambda, n, k, side * state.impact, 1, rayLength);
+      const r = traceOne(lambda, n, k, state.impact, 1, rayLength);
       r.role = 'main';
       out.push(r);
 
@@ -3269,7 +3281,7 @@ function buildRays() {
         for (let i = 0; i < state.fanCount; i++) {
           const b = (i + 0.5) / state.fanCount;
           if (Math.abs(b - state.impact) < 1e-6) continue;
-          const f = traceOne(lambda, n, k, side * b, 1, rayLength);
+          const f = traceOne(lambda, n, k, b, 1, rayLength);
           f.role = 'fan';
           out.push(f);
         }
@@ -3296,32 +3308,43 @@ function buildRays() {
 }
 
 /**
- * Which half of the droplet order k should be drawn entering, so that its
- * concentrated light leaves on the SAME side of the axis as every other
- * order's.
+ * Which side of the axis order k's concentrated light leaves on, for a ray
+ * entering the upper half of the droplet.
  *
- * The droplet is a sphere lit by parallel light, so b and -b are the same
- * physics: the sign only picks which half of the cross-section is drawn. The
- * exit side, though, flips with every internal reflection -- k=1 leaves below
- * the axis for b > 0, k=2 above. Drawing every family at b > 0 therefore put
- * the primary's light down-left and the secondary's up-left, so the two bows
- * appeared about 93 deg apart. That number is 42.4 + 50.4, a sum of two
- * angles whose DIFFERENCE, 8 deg, is what the sky actually shows.
+ * The exit side flips with every internal reflection -- k=1 leaves below the
+ * axis, k=2 above -- and from a single entry point the primary and the
+ * secondary are on opposite sides at EVERY impact parameter, never once the
+ * same. That is measured, not assumed, and it is the reason the two eyes in
+ * this scene end up on opposite sides of the picture.
  *
- * Keyed to the family's canonical ray rather than to a fixed sign per order,
- * because the exit side is not constant across b: k=3 crosses the axis part
- * way along the range. The extremum is the ray the eye is placed on and the
- * one the bow is made of, so that is the one that has to land on the common
- * side.
+ * Entering the other half was tried as a way to bring them together, and it
+ * worked, at the cost of the thing the scene is for: two rays then hit the
+ * droplet, and one ray splitting into every order -- the actual cause of the
+ * secondary bow -- could no longer be seen. The angles are read at each eye
+ * instead, both from the antisolar axis, so 42.4 and 50.4 are compared
+ * against one reference rather than against each other.
  */
-function bowSide(n, k) {
+function bowExitSide(n, k) {
   const geo = O.rainbowGeometry(n, k);
   if (!geo) return 1;
   const canonical = traceOne(650, n, k, geo.impactParameter);
   if (!canonical.path.dirOut) return 1;
-  // Negative y is the common side: that is where k=1 already went, so the
-  // primary's picture does not move.
-  return canonical.path.dirOut.y > 0 ? -1 : 1;
+  return canonical.path.dirOut.y > 0 ? 1 : -1;
+}
+
+/**
+ * How many leading segments order k shares with the lowest order on screen.
+ *
+ * `traceRay` emits one incident segment, k+1 internal ones and one exit, so
+ * order k and order m (m < k) run together for the incident segment plus the
+ * first m+1 internals: they are the same light until the wall where the lower
+ * order refracted out and the higher one carried on. Drawing that prefix once
+ * instead of once per order is what makes the split visible -- overdrawn, the
+ * shared trunk just looks like several rays that happen to overlap.
+ */
+function sharedPrefix(k, lowest) {
+  if (lowest >= k) return 0;
+  return lowest + 2;
 }
 
 /** How far (in degrees) this ray sits from the extremum of its own family. */
@@ -4000,12 +4023,18 @@ function createDropletView(canvas) {
       return ra !== rb ? ra - rb : order[a.role] - order[b.role];
     });
     const reachingKs = new Set(rays.filter(reachesEye).map((r) => r.k));
+    // The lowest order on screen draws the shared trunk; every higher order
+    // starts at the wall where it carried on instead of refracting out. One
+    // ray enters, and the orders peel off it -- which is the cause of the
+    // secondary bow, and was invisible while each order redrew the whole
+    // path on top of the others.
+    const lowest = Math.min(...rays.filter((r) => r.role === 'main' || r.role === 'fan').map((r) => r.k));
     // Fan segments are batched by stroke style into one Path2D each and
     // stroked once per group. Every other ray keeps its own path, because it
     // carries decorations -- arrowheads, vertex dots, the reaches-the-eye
     // glow -- that a shared path cannot.
     const batch = new Map();
-    for (const ray of rays) drawRay(ctx, ray, batch);
+    for (const ray of rays) drawRay(ctx, ray, batch, lowest);
     flushBatch(ctx, batch);
 
     const main = rays.filter((r) => r.role === 'main');
@@ -4068,7 +4097,7 @@ function createDropletView(canvas) {
     for (const kRef of orders) {
       const geo = O.rainbowGeometry(nRef, kRef);
       if (!geo) continue;
-      const canonical = traceOne(650, nRef, kRef, bowSide(nRef, kRef) * geo.impactParameter);
+      const canonical = traceOne(650, nRef, kRef, geo.impactParameter);
       if (!canonical.path.dirOut) continue;
       // Every active colour's bow for this order. Under white light the bows
       // are 1.7 deg apart, so "the rainbow is at 42.4 deg" is red's edge of a
@@ -4277,9 +4306,11 @@ function createDropletView(canvas) {
    * thousand segments, and a stroke call each put the frame at 54 ms.
    * Grouped by style and width there are a couple of dozen strokes instead.
    */
-  function drawRay(ctx, ray, batch) {
+  function drawRay(ctx, ray, batch, lowest = 0) {
     const p = ray.path;
     if (!p.hit && !p.miss) return;
+    // Where this order stops being the same light as the lowest one drawn.
+    const from = ray.role === 'main' || ray.role === 'fan' ? sharedPrefix(ray.k, lowest) : 0;
     const { alpha: a, width: baseWidth, greyMix, reaches } = rayStyle(ray);
     const selected =
       state.selectedRay &&
@@ -4293,12 +4324,14 @@ function createDropletView(canvas) {
     // A glow under the exit segment for any ray that actually reaches the
     // observer -- the visual cue that ties "this ray" to "that eye", not
     // just a brighter version of the same colour.
-    if (reaches && p.segments.length) {
+    if (reaches && p.segments.length > from) {
       const exitSeg = p.segments[p.segments.length - 1];
       strokePath(ctx, [project(exitSeg.a), project(exitSeg.b)], 'rgba(224,168,63,0.35)', baseWidth + 5);
     }
 
-    for (const seg of p.segments) {
+    for (let si = 0; si < p.segments.length; si++) {
+      if (si < from) continue;
+      const seg = p.segments[si];
       const A = project(seg.a);
       const B = project(seg.b);
       let width = baseWidth;
@@ -4628,10 +4661,7 @@ function createDropletView(canvas) {
   }
 
   function drawImpactHandle(ctx) {
-    // Follows the half of the droplet the reference family is drawn in, or
-    // the handle sits above the axis pointing at a ray that enters below it.
-    const side = bowSide(indexModel()(650), Math.max(1, state.reflections));
-    const y = layout.cy - side * state.impact * layout.s;
+    const y = layout.cy - state.impact * layout.s;
     const x = layout.cx - layout.s * 1.9;
     ctx.save();
     ctx.strokeStyle = hover ? 'rgba(255,255,255,0.75)' : 'rgba(180,200,240,0.45)';
@@ -4758,10 +4788,7 @@ function createDropletView(canvas) {
   function impactFromEvent(e) {
     const rect = canvas.getBoundingClientRect();
     const y = e.clientY - rect.top;
-    // Measured in the half of the droplet this family is drawn in, so
-    // dragging towards the rays makes b grow whichever side they are on.
-    const side = bowSide(indexModel()(650), Math.max(1, state.reflections));
-    const b = (side * (layout.cy - y)) / layout.s;
+    const b = (layout.cy - y) / layout.s;
     return Math.max(-0.999, Math.min(0.999, b));
   }
 
@@ -7646,6 +7673,21 @@ function noteParams(key, k = state.reflections) {
     if (!first || !second) return null;
     return { r1: `${num(first.R * 100, 1)} %`, rel2: `${num(second.relative * 100, 0)} %` };
   }
+  if (key === 'entryHalvesNote') {
+    const g1 = O.rainbowGeometry(idx(650), 1);
+    const g2 = O.rainbowGeometry(idx(650), 2);
+    if (!g1 || !g2) return null;
+    return {
+      phi1: deg(g1.antisolarDeg, 1), phi2: deg(g2.antisolarDeg, 1),
+      gap: deg(g2.antisolarDeg - g1.antisolarDeg, 2),
+    };
+  }
+  if (key === 'explBowNeedsOwnRay') {
+    const g1 = O.rainbowGeometry(idx(650), 1);
+    const g2 = O.rainbowGeometry(idx(650), 2);
+    if (!g1 || !g2) return null;
+    return { b1: num(g1.impactParameter, 3), b2: num(g2.impactParameter, 3) };
+  }
   if (key === 'explReflectionIsWeak') {
     const light = O.bowBrightness(idx(650), Math.max(1, k));
     if (!light || light.criticalDeg === null) return null;
@@ -7726,7 +7768,13 @@ function rayInfoNodes(opts = {}) {
   if (!opts.compact) {
     // Only once a second family is on screen: with one bow there are no two
     // eyes to misread as being 93 degrees apart.
-    if (activeOrders().filter((o) => o >= 1).length > 1) nodes.push(noteNode('coneSliceNote'));
+    if (activeOrders().filter((o) => o >= 1).length > 1) {
+      // Three claims, in the order they have to be understood: one ray makes
+      // every order, the eyes are apart because the exit side flips, and a
+      // bow still needs its own impact parameter.
+      nodes.push(noteNode('coneSliceNote'), noteNode('entryHalvesNote'),
+        noteNode('explBowNeedsOwnRay'));
+    }
     // Quoting the critical angle next to k = 0 would describe a bounce the
     // ray never makes.
     if (k >= 1) nodes.push(noteNode('explReflectionIsWeak', k));
@@ -7789,6 +7837,7 @@ function dropInfoNodes() {
         : t('dropDeliversNone', { delta: missBy === null ? '—' : deg(missBy, 2) })),
 
     el('p', { class: 'note' }, t('dropPhiThetaNote')),
+    noteNode('explSameSplitInSky'),
     thirdRef
       ? el('p', { class: 'note' }, t('dropHigherNote', {
           phi: deg(thirdRef.phi, 1), fromSun: deg(180 - thirdRef.phi, 1),
@@ -7857,6 +7906,7 @@ function fieldPickNodes() {
           t('fieldHiddenOrder', { bow: t(bowNameKey(rep.hidden.k), { k: rep.hidden.k }) }))
       : null,
     el('p', { class: 'note' }, t('fieldWhyNote')),
+    noteNode('explSameSplitInSky'),
     el('button', {
       class: 'btn wide', type: 'button',
       onclick: () => set({ fieldPick: null, panel: 'guide' }),
@@ -7919,6 +7969,7 @@ function skyPickNodes() {
           el('td', {}, r.k === pick.k ? t('skyPickReaches') : t('skyPickMiss', { delta: deg(r.miss, 2) }))))))
     ,
     el('p', { class: 'note' }, t('skyPickNote', { k: pick.k })),
+    noteNode('explSameSplitInSky'),
     // Same test the scene uses to cut the bow at the horizon, so the panel
     // says why the beam stopped being drawn instead of leaving it a mystery.
     !state.show.rainBelow &&

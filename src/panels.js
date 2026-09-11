@@ -360,6 +360,21 @@ function noteParams(key, k = state.reflections) {
     if (!first || !second) return null;
     return { r1: `${num(first.R * 100, 1)} %`, rel2: `${num(second.relative * 100, 0)} %` };
   }
+  if (key === 'entryHalvesNote') {
+    const g1 = O.rainbowGeometry(idx(650), 1);
+    const g2 = O.rainbowGeometry(idx(650), 2);
+    if (!g1 || !g2) return null;
+    return {
+      phi1: deg(g1.antisolarDeg, 1), phi2: deg(g2.antisolarDeg, 1),
+      gap: deg(g2.antisolarDeg - g1.antisolarDeg, 2),
+    };
+  }
+  if (key === 'explBowNeedsOwnRay') {
+    const g1 = O.rainbowGeometry(idx(650), 1);
+    const g2 = O.rainbowGeometry(idx(650), 2);
+    if (!g1 || !g2) return null;
+    return { b1: num(g1.impactParameter, 3), b2: num(g2.impactParameter, 3) };
+  }
   if (key === 'explReflectionIsWeak') {
     const light = O.bowBrightness(idx(650), Math.max(1, k));
     if (!light || light.criticalDeg === null) return null;
@@ -440,7 +455,13 @@ function rayInfoNodes(opts = {}) {
   if (!opts.compact) {
     // Only once a second family is on screen: with one bow there are no two
     // eyes to misread as being 93 degrees apart.
-    if (activeOrders().filter((o) => o >= 1).length > 1) nodes.push(noteNode('coneSliceNote'));
+    if (activeOrders().filter((o) => o >= 1).length > 1) {
+      // Three claims, in the order they have to be understood: one ray makes
+      // every order, the eyes are apart because the exit side flips, and a
+      // bow still needs its own impact parameter.
+      nodes.push(noteNode('coneSliceNote'), noteNode('entryHalvesNote'),
+        noteNode('explBowNeedsOwnRay'));
+    }
     // Quoting the critical angle next to k = 0 would describe a bounce the
     // ray never makes.
     if (k >= 1) nodes.push(noteNode('explReflectionIsWeak', k));
@@ -503,6 +524,7 @@ function dropInfoNodes() {
         : t('dropDeliversNone', { delta: missBy === null ? '—' : deg(missBy, 2) })),
 
     el('p', { class: 'note' }, t('dropPhiThetaNote')),
+    noteNode('explSameSplitInSky'),
     thirdRef
       ? el('p', { class: 'note' }, t('dropHigherNote', {
           phi: deg(thirdRef.phi, 1), fromSun: deg(180 - thirdRef.phi, 1),
@@ -571,6 +593,7 @@ function fieldPickNodes() {
           t('fieldHiddenOrder', { bow: t(bowNameKey(rep.hidden.k), { k: rep.hidden.k }) }))
       : null,
     el('p', { class: 'note' }, t('fieldWhyNote')),
+    noteNode('explSameSplitInSky'),
     el('button', {
       class: 'btn wide', type: 'button',
       onclick: () => set({ fieldPick: null, panel: 'guide' }),
@@ -633,6 +656,7 @@ function skyPickNodes() {
           el('td', {}, r.k === pick.k ? t('skyPickReaches') : t('skyPickMiss', { delta: deg(r.miss, 2) }))))))
     ,
     el('p', { class: 'note' }, t('skyPickNote', { k: pick.k })),
+    noteNode('explSameSplitInSky'),
     // Same test the scene uses to cut the bow at the horizon, so the panel
     // says why the beam stopped being drawn instead of leaving it a mystery.
     !state.show.rainBelow &&

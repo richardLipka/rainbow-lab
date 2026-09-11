@@ -56,9 +56,7 @@ export function buildRays() {
   for (const k of orders) {
     for (const lambda of lambdas) {
       const n = idx(lambda);
-      // Which half of the droplet to draw this family in. See bowSide().
-      const side = bowSide(n, k);
-      const r = traceOne(lambda, n, k, side * state.impact, 1, rayLength);
+      const r = traceOne(lambda, n, k, state.impact, 1, rayLength);
       r.role = 'main';
       out.push(r);
 
@@ -66,7 +64,7 @@ export function buildRays() {
         for (let i = 0; i < state.fanCount; i++) {
           const b = (i + 0.5) / state.fanCount;
           if (Math.abs(b - state.impact) < 1e-6) continue;
-          const f = traceOne(lambda, n, k, side * b, 1, rayLength);
+          const f = traceOne(lambda, n, k, b, 1, rayLength);
           f.role = 'fan';
           out.push(f);
         }
@@ -93,32 +91,43 @@ export function buildRays() {
 }
 
 /**
- * Which half of the droplet order k should be drawn entering, so that its
- * concentrated light leaves on the SAME side of the axis as every other
- * order's.
+ * Which side of the axis order k's concentrated light leaves on, for a ray
+ * entering the upper half of the droplet.
  *
- * The droplet is a sphere lit by parallel light, so b and -b are the same
- * physics: the sign only picks which half of the cross-section is drawn. The
- * exit side, though, flips with every internal reflection -- k=1 leaves below
- * the axis for b > 0, k=2 above. Drawing every family at b > 0 therefore put
- * the primary's light down-left and the secondary's up-left, so the two bows
- * appeared about 93 deg apart. That number is 42.4 + 50.4, a sum of two
- * angles whose DIFFERENCE, 8 deg, is what the sky actually shows.
+ * The exit side flips with every internal reflection -- k=1 leaves below the
+ * axis, k=2 above -- and from a single entry point the primary and the
+ * secondary are on opposite sides at EVERY impact parameter, never once the
+ * same. That is measured, not assumed, and it is the reason the two eyes in
+ * this scene end up on opposite sides of the picture.
  *
- * Keyed to the family's canonical ray rather than to a fixed sign per order,
- * because the exit side is not constant across b: k=3 crosses the axis part
- * way along the range. The extremum is the ray the eye is placed on and the
- * one the bow is made of, so that is the one that has to land on the common
- * side.
+ * Entering the other half was tried as a way to bring them together, and it
+ * worked, at the cost of the thing the scene is for: two rays then hit the
+ * droplet, and one ray splitting into every order -- the actual cause of the
+ * secondary bow -- could no longer be seen. The angles are read at each eye
+ * instead, both from the antisolar axis, so 42.4 and 50.4 are compared
+ * against one reference rather than against each other.
  */
-export function bowSide(n, k) {
+export function bowExitSide(n, k) {
   const geo = O.rainbowGeometry(n, k);
   if (!geo) return 1;
   const canonical = traceOne(650, n, k, geo.impactParameter);
   if (!canonical.path.dirOut) return 1;
-  // Negative y is the common side: that is where k=1 already went, so the
-  // primary's picture does not move.
-  return canonical.path.dirOut.y > 0 ? -1 : 1;
+  return canonical.path.dirOut.y > 0 ? 1 : -1;
+}
+
+/**
+ * How many leading segments order k shares with the lowest order on screen.
+ *
+ * `traceRay` emits one incident segment, k+1 internal ones and one exit, so
+ * order k and order m (m < k) run together for the incident segment plus the
+ * first m+1 internals: they are the same light until the wall where the lower
+ * order refracted out and the higher one carried on. Drawing that prefix once
+ * instead of once per order is what makes the split visible -- overdrawn, the
+ * shared trunk just looks like several rays that happen to overlap.
+ */
+export function sharedPrefix(k, lowest) {
+  if (lowest >= k) return 0;
+  return lowest + 2;
 }
 
 /** How far (in degrees) this ray sits from the extremum of its own family. */
