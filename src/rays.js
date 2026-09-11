@@ -138,10 +138,38 @@ export function distanceFromExtremum(ray) {
  * which is the honest visual statement that the colours of a rainbow exist
  * only because n depends on wavelength.
  */
+/**
+ * Memo for colorFor().
+ *
+ * The droplet scene strokes each ray segment by segment, so a 60-ray fan over
+ * four orders and six wavelengths asks for a colour about seven thousand
+ * times a frame -- and every call ran the piecewise spectrum fit and a
+ * Math.pow for gamma before building a string. Measured: 50 ms of a 62 ms
+ * frame was drawing, and this was most of it.
+ *
+ * Keyed on everything the function reads, state included, so a change to the
+ * wavelength mode or the dispersion cannot serve a stale colour. Bounded
+ * because the droplet field inverts angles to continuous wavelengths and
+ * would otherwise grow one entry per droplet.
+ */
+const COLOR_MEMO = new Map();
+const COLOR_MEMO_MAX = 8192;
+
 export function colorFor(lambda, alpha = 1, greyMix = 0) {
+  const white = state.wavelength === 'white';
+  const key = `${lambda}|${alpha}|${greyMix}|${white ? state.dispersion : 'x'}`;
+  const memo = COLOR_MEMO.get(key);
+  if (memo !== undefined) return memo;
+  const out = computeColorFor(lambda, alpha, greyMix, white);
+  if (COLOR_MEMO.size >= COLOR_MEMO_MAX) COLOR_MEMO.clear();
+  COLOR_MEMO.set(key, out);
+  return out;
+}
+
+function computeColorFor(lambda, alpha, greyMix, white) {
   const c = O.wavelengthToRGB(lambda);
   let { r, g, b } = c;
-  if (state.wavelength === 'white') {
+  if (white) {
     const m = Math.min(1, state.dispersion * 2.5);
     r = Math.round(r * m + 255 * (1 - m));
     g = Math.round(g * m + 255 * (1 - m));

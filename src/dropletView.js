@@ -94,7 +94,13 @@ export function createDropletView(canvas) {
       return ra !== rb ? ra - rb : order[a.role] - order[b.role];
     });
     const reachingKs = new Set(rays.filter(reachesEye).map((r) => r.k));
-    for (const ray of rays) drawRay(ctx, ray);
+    // Fan segments are batched by stroke style into one Path2D each and
+    // stroked once per group. Every other ray keeps its own path, because it
+    // carries decorations -- arrowheads, vertex dots, the reaches-the-eye
+    // glow -- that a shared path cannot.
+    const batch = new Map();
+    for (const ray of rays) drawRay(ctx, ray, batch);
+    flushBatch(ctx, batch);
 
     const main = rays.filter((r) => r.role === 'main');
     if (main.length) {
@@ -357,7 +363,15 @@ export function createDropletView(canvas) {
     return { alpha: reaches ? 1 : 0.62, width: reaches ? 2.4 : 1.3, greyMix: reaches ? 0 : 0.72, reaches };
   }
 
-  function drawRay(ctx, ray) {
+  /**
+   * One ray.
+   *
+   * `batch` collects fan-ray segments instead of stroking them: with four
+   * orders, six wavelengths and a sixty-ray fan the scene has about seven
+   * thousand segments, and a stroke call each put the frame at 54 ms.
+   * Grouped by style and width there are a couple of dozen strokes instead.
+   */
+  function drawRay(ctx, ray, batch) {
     const p = ray.path;
     if (!p.hit && !p.miss) return;
     const { alpha: a, width: baseWidth, greyMix, reaches } = rayStyle(ray);
@@ -393,6 +407,18 @@ export function createDropletView(canvas) {
         // ray that will miss the observer still reads as greyed out
         style = reaches && state.wavelength === 'white' ? `rgba(255,246,214,${a})` : base;
       }
+      // A selected fan ray is drawn on its own: it is thicker than its group.
+      if (batch && ray.role === 'fan' && !selected) {
+        const key = `${style}|${width}`;
+        let path = batch.get(key);
+        if (!path) {
+          path = { path: new Path2D(), style, width };
+          batch.set(key, path);
+        }
+        path.path.moveTo(A.x, A.y);
+        path.path.lineTo(B.x, B.y);
+        continue;
+      }
       strokePath(ctx, [A, B], style, width, dashed && seg.kind !== 'internal' ? [5, 4] : null);
     }
 
@@ -424,6 +450,19 @@ export function createDropletView(canvas) {
         align: 'right', color: '#c3b6ff', font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
       });
     }
+  }
+
+  function flushBatch(ctx, batch) {
+    if (!batch.size) return;
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    for (const g of batch.values()) {
+      ctx.strokeStyle = g.style;
+      ctx.lineWidth = g.width;
+      ctx.stroke(g.path);
+    }
+    ctx.restore();
   }
 
   /**

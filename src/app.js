@@ -567,16 +567,21 @@ function buildControls() {
           [0, 1, 2, 3, 4].map((k) => ({ value: k, label: String(k) })),
           () => state.reflections,
           (v) => {
-            // Solo-select: picking a value here shows exactly that one family,
-            // clearing any others left on from the checkboxes below so this
-            // control always visibly drives the scene by itself.
+            // Cumulative: picking k shows every order UP TO k, because every
+            // comparison worth making needs more than one bow on screen at
+            // once -- the 8 deg between the primary and the secondary, the
+            // dark band between them, the light each extra bounce throws
+            // away. Solo-select hid the reference the moment you went looking
+            // for a higher order. k=0 stays alone: no internal reflection is
+            // a different thing, not a smaller bow.
             const k = Number(v);
             set({
               reflections: k,
-              families: { 0: k === 0, 1: k === 1, 2: k === 2, 3: k >= 3 },
+              families: { 0: k === 0, 1: k >= 1, 2: k >= 2, 3: k >= 3 },
               selectedRay: null,
             });
-          })), ORDERS_MATTER),
+          }),
+        el('small', { class: 'ctl-hint' }, t('reflectionsHint'))), ORDERS_MATTER),
       c(ALL, () => el('div', { class: 'ctl', dataset: { ctl: 'showFamilies' } },
         el('span', { class: 'ctl-label' }, t('showFamilies')),
         el('div', { class: 'stack' },

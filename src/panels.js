@@ -381,7 +381,11 @@ const noteNode = (key, k) => el('p', { class: 'note' }, t(key, noteParams(key, k
  * has dropped to a third.
  */
 function bowLedgerNodes() {
-  const rows = orderLedger(indexModel());
+  // Covers whatever the reflections control can reach, since the ledger is
+  // there to explain that control. DROP_ORDERS stays at three for the scene
+  // inspectors, which answer a different question.
+  const top = Math.max(3, state.reflections);
+  const rows = orderLedger(indexModel(), Array.from({ length: top }, (_, i) => i + 1));
   if (!rows.length) return [];
   return [
     el('h3', {}, t('bowLedgerTitle')),

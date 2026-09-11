@@ -163,7 +163,12 @@ export function activeOrders() {
   if (state.families[0]) out.push(0);
   if (state.families[1]) out.push(1);
   if (state.families[2]) out.push(2);
-  if (state.families[3]) out.push(Math.max(3, state.reflections));
+  // The "3+" checkbox means every order from three up to whatever the
+  // reflections control is showing -- not just the highest one. Pushing only
+  // max(3, reflections) skipped the tertiary whenever the control sat on 4.
+  if (state.families[3]) {
+    for (let k = 3; k <= Math.max(3, state.reflections); k++) out.push(k);
+  }
   if (state.showNonRainbow && !out.includes(0)) out.push(0);
   if (!out.length) out.push(state.reflections);
   return [...new Set(out)].sort((a, b) => a - b);

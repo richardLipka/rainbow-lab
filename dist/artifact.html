@@ -1681,6 +1681,8 @@ const translations = {
     dropletZoomHint: 'Oddalte pohled a sledujte, jak se barvy paprsku rozestupují na cestě k oku pozorovatele.',
     impactParameter: 'Parametr dopadu b/R',
     reflections: 'Vnitřní odrazy',
+    reflectionsHint:
+      'Zvolené číslo zapne všechny řády až po něj, aby šly duhy porovnat. Políčka níž je pak můžete jednotlivě vypnout.',
     refractiveIndex: 'Index lomu',
     indexModel: 'Model indexu lomu',
     indexTable: 'tabulka (6 barev)',
@@ -2143,6 +2145,8 @@ const translations = {
     dropletZoomHint: 'Zoom out to watch the ray colours spread apart on their way to the eye.',
     impactParameter: 'Impact parameter b/R',
     reflections: 'Internal reflections',
+    reflectionsHint:
+      'Picking a number shows every order up to it, so the bows can be compared. The checkboxes below switch individual ones off again.',
     refractiveIndex: 'Refractive index',
     indexModel: 'Refractive-index model',
     indexTable: 'table (6 colours)',
@@ -2736,7 +2740,12 @@ function activeOrders() {
   if (state.families[0]) out.push(0);
   if (state.families[1]) out.push(1);
   if (state.families[2]) out.push(2);
-  if (state.families[3]) out.push(Math.max(3, state.reflections));
+  // The "3+" checkbox means every order from three up to whatever the
+  // reflections control is showing -- not just the highest one. Pushing only
+  // max(3, reflections) skipped the tertiary whenever the control sat on 4.
+  if (state.families[3]) {
+    for (let k = 3; k <= Math.max(3, state.reflections); k++) out.push(k);
+  }
   if (state.showNonRainbow && !out.includes(0)) out.push(0);
   if (!out.length) out.push(state.reflections);
   return [...new Set(out)].sort((a, b) => a - b);
@@ -3332,10 +3341,38 @@ function distanceFromExtremum(ray) {
  * which is the honest visual statement that the colours of a rainbow exist
  * only because n depends on wavelength.
  */
+/**
+ * Memo for colorFor().
+ *
+ * The droplet scene strokes each ray segment by segment, so a 60-ray fan over
+ * four orders and six wavelengths asks for a colour about seven thousand
+ * times a frame -- and every call ran the piecewise spectrum fit and a
+ * Math.pow for gamma before building a string. Measured: 50 ms of a 62 ms
+ * frame was drawing, and this was most of it.
+ *
+ * Keyed on everything the function reads, state included, so a change to the
+ * wavelength mode or the dispersion cannot serve a stale colour. Bounded
+ * because the droplet field inverts angles to continuous wavelengths and
+ * would otherwise grow one entry per droplet.
+ */
+const COLOR_MEMO = new Map();
+const COLOR_MEMO_MAX = 8192;
+
 function colorFor(lambda, alpha = 1, greyMix = 0) {
+  const white = state.wavelength === 'white';
+  const key = `${lambda}|${alpha}|${greyMix}|${white ? state.dispersion : 'x'}`;
+  const memo = COLOR_MEMO.get(key);
+  if (memo !== undefined) return memo;
+  const out = computeColorFor(lambda, alpha, greyMix, white);
+  if (COLOR_MEMO.size >= COLOR_MEMO_MAX) COLOR_MEMO.clear();
+  COLOR_MEMO.set(key, out);
+  return out;
+}
+
+function computeColorFor(lambda, alpha, greyMix, white) {
   const c = O.wavelengthToRGB(lambda);
   let { r, g, b } = c;
-  if (state.wavelength === 'white') {
+  if (white) {
     const m = Math.min(1, state.dispersion * 2.5);
     r = Math.round(r * m + 255 * (1 - m));
     g = Math.round(g * m + 255 * (1 - m));
@@ -3963,7 +4000,13 @@ function createDropletView(canvas) {
       return ra !== rb ? ra - rb : order[a.role] - order[b.role];
     });
     const reachingKs = new Set(rays.filter(reachesEye).map((r) => r.k));
-    for (const ray of rays) drawRay(ctx, ray);
+    // Fan segments are batched by stroke style into one Path2D each and
+    // stroked once per group. Every other ray keeps its own path, because it
+    // carries decorations -- arrowheads, vertex dots, the reaches-the-eye
+    // glow -- that a shared path cannot.
+    const batch = new Map();
+    for (const ray of rays) drawRay(ctx, ray, batch);
+    flushBatch(ctx, batch);
 
     const main = rays.filter((r) => r.role === 'main');
     if (main.length) {
@@ -4226,7 +4269,15 @@ function createDropletView(canvas) {
     return { alpha: reaches ? 1 : 0.62, width: reaches ? 2.4 : 1.3, greyMix: reaches ? 0 : 0.72, reaches };
   }
 
-  function drawRay(ctx, ray) {
+  /**
+   * One ray.
+   *
+   * `batch` collects fan-ray segments instead of stroking them: with four
+   * orders, six wavelengths and a sixty-ray fan the scene has about seven
+   * thousand segments, and a stroke call each put the frame at 54 ms.
+   * Grouped by style and width there are a couple of dozen strokes instead.
+   */
+  function drawRay(ctx, ray, batch) {
     const p = ray.path;
     if (!p.hit && !p.miss) return;
     const { alpha: a, width: baseWidth, greyMix, reaches } = rayStyle(ray);
@@ -4262,6 +4313,18 @@ function createDropletView(canvas) {
         // ray that will miss the observer still reads as greyed out
         style = reaches && state.wavelength === 'white' ? `rgba(255,246,214,${a})` : base;
       }
+      // A selected fan ray is drawn on its own: it is thicker than its group.
+      if (batch && ray.role === 'fan' && !selected) {
+        const key = `${style}|${width}`;
+        let path = batch.get(key);
+        if (!path) {
+          path = { path: new Path2D(), style, width };
+          batch.set(key, path);
+        }
+        path.path.moveTo(A.x, A.y);
+        path.path.lineTo(B.x, B.y);
+        continue;
+      }
       strokePath(ctx, [A, B], style, width, dashed && seg.kind !== 'internal' ? [5, 4] : null);
     }
 
@@ -4293,6 +4356,19 @@ function createDropletView(canvas) {
         align: 'right', color: '#c3b6ff', font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
       });
     }
+  }
+
+  function flushBatch(ctx, batch) {
+    if (!batch.size) return;
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    for (const g of batch.values()) {
+      ctx.strokeStyle = g.style;
+      ctx.lineWidth = g.width;
+      ctx.stroke(g.path);
+    }
+    ctx.restore();
   }
 
   /**
@@ -7591,7 +7667,11 @@ const noteNode = (key, k) => el('p', { class: 'note' }, t(key, noteParams(key, k
  * has dropped to a third.
  */
 function bowLedgerNodes() {
-  const rows = orderLedger(indexModel());
+  // Covers whatever the reflections control can reach, since the ledger is
+  // there to explain that control. DROP_ORDERS stays at three for the scene
+  // inspectors, which answer a different question.
+  const top = Math.max(3, state.reflections);
+  const rows = orderLedger(indexModel(), Array.from({ length: top }, (_, i) => i + 1));
   if (!rows.length) return [];
   return [
     el('h3', {}, t('bowLedgerTitle')),
@@ -8581,16 +8661,21 @@ function buildControls() {
           [0, 1, 2, 3, 4].map((k) => ({ value: k, label: String(k) })),
           () => state.reflections,
           (v) => {
-            // Solo-select: picking a value here shows exactly that one family,
-            // clearing any others left on from the checkboxes below so this
-            // control always visibly drives the scene by itself.
+            // Cumulative: picking k shows every order UP TO k, because every
+            // comparison worth making needs more than one bow on screen at
+            // once -- the 8 deg between the primary and the secondary, the
+            // dark band between them, the light each extra bounce throws
+            // away. Solo-select hid the reference the moment you went looking
+            // for a higher order. k=0 stays alone: no internal reflection is
+            // a different thing, not a smaller bow.
             const k = Number(v);
             set({
               reflections: k,
-              families: { 0: k === 0, 1: k === 1, 2: k === 2, 3: k >= 3 },
+              families: { 0: k === 0, 1: k >= 1, 2: k >= 2, 3: k >= 3 },
               selectedRay: null,
             });
-          })), ORDERS_MATTER),
+          }),
+        el('small', { class: 'ctl-hint' }, t('reflectionsHint'))), ORDERS_MATTER),
       c(ALL, () => el('div', { class: 'ctl', dataset: { ctl: 'showFamilies' } },
         el('span', { class: 'ctl-label' }, t('showFamilies')),
         el('div', { class: 'stack' },

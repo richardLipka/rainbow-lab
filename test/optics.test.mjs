@@ -777,3 +777,105 @@ test('bowSide is keyed to the extremum, because k=3 changes sides mid-range', as
   const geo3 = O.rainbowGeometry(n, 3);
   assert.equal(sideAt(3, bowSide(n, 3) * geo3.impactParameter), -1);
 });
+
+
+/* ------------------------------------- against Nussenzveig, Sci.Am. 1977 */
+
+test("the ray classes behave as 'The Theory of the Rainbow' describes them", () => {
+  // Nussenzveig's Class 3 is one internal reflection (the primary) and Class 4
+  // is two (the secondary). The paper states four things about them that the
+  // engine has to reproduce, and one of them is a sign: the primary sits at a
+  // MINIMUM of the scattering angle, the secondary at a MAXIMUM.
+  const n = O.makeIndexModel()(589); // sodium D, the line round figures assume
+
+  const sweep = (k, steps = 20000) => {
+    let atZero = null;
+    let min = Infinity;
+    let minB = 0;
+    let max = -Infinity;
+    let maxB = 0;
+    for (let i = 0; i <= steps; i++) {
+      const b = i / steps;
+      const D = O.deviation(Math.asin(Math.min(1, b)), n, k);
+      if (D === null) continue;
+      const theta = O.foldToScattering(D) * O.DEG;
+      if (i === 0) atZero = theta;
+      if (theta < min) { min = theta; minB = b; }
+      if (theta > max) { max = theta; maxB = b; }
+    }
+    return { atZero, min, minB, max, maxB };
+  };
+
+  // "When the impact parameter is zero, the scattering angle for a ray of
+  //  Class 3 is 180 degrees; the ray ... is reflected by the far surface
+  //  straight back at the sun."
+  const c3 = sweep(1);
+  close(c3.atZero, 180, 1e-6, 'Class 3 goes straight back at b = 0');
+
+  // "The minimum deflection is about 138 degrees" at an impact parameter
+  // "about seven-eighths of the radius of the droplet."
+  close(c3.min, 138, 0.3, 'Class 3 minimum scattering angle');
+  close(c3.minB, 7 / 8, 0.03, 'Class 3 rainbow ray at about 7/8 R');
+  close(c3.min, O.rainbowGeometry(n, 1).scatteringDeg, 0.01, 'swept minimum is the analytic extremum');
+
+  // "For rays of Class 4 the scattering angle is zero when the impact
+  //  parameter is zero ... The Class 4 rays have a MAXIMUM scattering angle
+  //  of 130 degrees."
+  const c4 = sweep(2);
+  close(c4.atZero, 0, 1e-6, 'Class 4 carries straight on at b = 0');
+  close(c4.max, 130, 1.5, 'Class 4 maximum scattering angle');
+  close(c4.max, O.rainbowGeometry(n, 2).scatteringDeg, 0.01, 'swept maximum is the analytic extremum');
+
+  // The sign of each extremum, stated separately because getting it backwards
+  // would still land on roughly the right angle.
+  assert.ok(c3.min < c3.atZero, 'Class 3 turns at a minimum');
+  assert.ok(c4.max > c4.atZero, 'Class 4 turns at a maximum');
+
+  // "no rays of Class 3 or Class 4 are scattered into the angular region
+  //  between 130 and 138 degrees" -- Alexander's dark band.
+  const band = O.alexandersBand(O.makeIndexModel());
+  close(180 - band.outerDeg, 130, 1.0, "Alexander's band, inner edge as a scattering angle");
+  close(180 - band.innerDeg, 138, 1.0, "Alexander's band, outer edge as a scattering angle");
+
+  // "the secondary bow is about eight degrees higher in the sky"
+  close(band.outerDeg - band.innerDeg, 8, 0.5, 'the gap between the two bows');
+});
+
+test('the vector trace really performs k reflections, and agrees with the formula', () => {
+  // The scene draws the polyline the vector tracer produced, so "is this
+  // picture of two internal reflections actually two internal reflections"
+  // is a question about the trace, not about the deviation formula.
+  const n = O.makeIndexModel()(589);
+  let worst = 0;
+  for (const k of [0, 1, 2, 3, 4, 5]) {
+    for (let i = 1; i < 100; i++) {
+      const b = i / 100;
+      const p = O.traceRay({
+        origin: O.vec(-6, b, 0), dir: O.vec(1, 0, 0), center: O.vec(0, 0, 0),
+        radius: 1, n, reflections: k, exitLength: 6,
+      });
+      if (!p.dirOut) continue;
+      assert.equal(p.actualReflections, k, `k=${k} b=${b} bounced the right number of times`);
+      const refl = p.vertices.filter((v) => v.type === 'reflection').length;
+      const refr = p.vertices.filter((v) => v.type === 'refraction').length;
+      assert.equal(refl, k, `k=${k} b=${b} reflection vertices`);
+      assert.equal(refr, 2, `k=${k} b=${b} refraction vertices: one in, one out`);
+      const analytic = O.foldToScattering(O.deviation(Math.asin(b), n, k)) * O.DEG;
+      worst = Math.max(worst, Math.abs(analytic - p.scattering * O.DEG));
+    }
+  }
+  assert.ok(worst < 1e-9, `vector trace vs analytic deviation, worst ${worst} deg`);
+
+  // Reversibility: the internal angle is the same at every wall, which is the
+  // assumption the Fresnel budget (1-R)^2 R^k rests on.
+  const geo = O.rainbowGeometry(n, 3);
+  const p = O.traceRay({
+    origin: O.vec(-6, geo.impactParameter, 0), dir: O.vec(1, 0, 0), center: O.vec(0, 0, 0),
+    radius: 1, n, reflections: 3, exitLength: 6,
+  });
+  for (const v of p.vertices.filter((x) => x.type === 'reflection')) {
+    close(v.thetaIn * O.DEG, geo.thetaRDeg, 1e-9, 'every bounce meets the wall at theta_r');
+    close(v.thetaOut * O.DEG, v.thetaIn * O.DEG, 1e-12, 'reflection is specular');
+  }
+  close(Math.sin(p.thetaI) / Math.sin(p.thetaR), n, 1e-12, "Snell's law at the entry surface");
+});

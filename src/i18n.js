@@ -102,6 +102,8 @@ export const translations = {
     dropletZoomHint: 'Oddalte pohled a sledujte, jak se barvy paprsku rozestupují na cestě k oku pozorovatele.',
     impactParameter: 'Parametr dopadu b/R',
     reflections: 'Vnitřní odrazy',
+    reflectionsHint:
+      'Zvolené číslo zapne všechny řády až po něj, aby šly duhy porovnat. Políčka níž je pak můžete jednotlivě vypnout.',
     refractiveIndex: 'Index lomu',
     indexModel: 'Model indexu lomu',
     indexTable: 'tabulka (6 barev)',
@@ -564,6 +566,8 @@ export const translations = {
     dropletZoomHint: 'Zoom out to watch the ray colours spread apart on their way to the eye.',
     impactParameter: 'Impact parameter b/R',
     reflections: 'Internal reflections',
+    reflectionsHint:
+      'Picking a number shows every order up to it, so the bows can be compared. The checkboxes below switch individual ones off again.',
     refractiveIndex: 'Refractive index',
     indexModel: 'Refractive-index model',
     indexTable: 'table (6 colours)',

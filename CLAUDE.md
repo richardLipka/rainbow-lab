@@ -17,7 +17,7 @@ almost certainly how a bug gets in (see "Lessons from bugs found" below).
 
 ```bash
 node server.mjs        # dev server on :5178 (or next free port)
-node --test test/optics.test.mjs   # 53 unit tests over the engine
+node --test test/optics.test.mjs   # 55 unit tests over the engine
 node tools-check-collisions.mjs    # top-level name clashes across the bundle
 node build.mjs          # writes dist/rainbow-lab.html and dist/artifact.html
 ```
@@ -69,7 +69,7 @@ app.js         assembly + render loop
 | `src/fieldView.js` | Mode D — the many-droplets test run on a 3-D volume of rain. |
 | `src/panels.js` | Tutorial script, ray readout, mathematics panel, questions. |
 | `src/app.js` | Shell, controls, the reactive update pipeline (see below), render loop. |
-| `test/optics.test.mjs` | 53 tests over the engine — ray-sphere, Snell, extremum vs. numeric search, classification, sky geometry, the Fresnel budget per reflection order, the droplet-field test, the drawn side of each bow. |
+| `test/optics.test.mjs` | 55 tests over the engine — ray-sphere, Snell, extremum vs. numeric search, classification, sky geometry, the Fresnel budget per reflection order, the droplet-field test, the drawn side of each bow, and the ray classes checked against Nussenzveig. |
 
 ## Angle conventions — read this before changing any angle-related code
 
@@ -726,6 +726,83 @@ Three things to keep:
   The note (`coneSliceNote`) says the same thing in two sentences and quotes
   both numbers from the engine.
 
+## Checked against Nussenzveig
+
+H. M. Nussenzveig, "The Theory of the Rainbow", *Scientific American* 236(4),
+1977, is the reference the engine is now pinned to. His ray classes number
+the interactions, not the reflections: **Class 3 is one internal reflection**
+(the primary) and **Class 4 is two** (the secondary), so his Class p maps to
+this codebase's `k = p - 2`.
+
+Five statements from the paper are unit tests:
+
+| Paper | Engine |
+| --- | --- |
+| Class 3 scatters at 180° when b = 0 — "reflected by the far surface straight back at the sun" | 180.00° |
+| Class 3 falls to a **minimum** of about 138° | 138.07° |
+| that minimum sits at b ≈ 7/8 R | 0.860 R |
+| Class 4 scatters at 0° when b = 0 | 0.00° |
+| Class 4 rises to a **maximum** of about 130° | 128.84° |
+| no Class 3 or 4 light between 130° and 138° (Alexander's band) | 129.63°–137.63° |
+| "the secondary bow is about eight degrees higher in the sky" | 8.00° |
+
+The **sign of each extremum is asserted separately**, because a minimum and a
+maximum land on roughly the same angle and getting them the wrong way round
+would still look right: k=1 turns at a minimum of the scattering angle, k=2 at
+a maximum. That is also why k=3 crosses the axis mid-range — its scattering
+angle passes through zero at b ≈ 0.765 — which is what `bowSide()` has to be
+keyed to the extremum for.
+
+The **trace itself** is tested separately from the deviation formula, since
+the scene draws the polyline the vector tracer produced rather than the
+formula's answer: for k = 0…5 across the impact range, `actualReflections`
+equals k, the vertex list is exactly one refraction in, k reflections and one
+refraction out, every bounce meets the wall at θᵣ, and the traced scattering
+angle matches `deviation()` to better than 1e-9°. Snell holds at entry to
+1e-12.
+
+## The reflections control is cumulative
+
+Picking k on the "internal reflections" segmented control shows every order
+**up to** k, rather than solo-selecting k. Every comparison the app is built
+around needs more than one bow on screen at once — the 8° between the primary
+and the secondary, Alexander's band between them, the light each extra bounce
+throws away — and solo-select hid the reference the moment a reader went
+looking for a higher order. k=0 stays alone: no internal reflection is a
+different thing, not a smaller bow. The family checkboxes still switch
+individual orders back off.
+
+Two things had to move with it:
+
+- `activeOrders()` now pushes **every** order from 3 up to
+  `state.reflections` when the "3+" checkbox is on. It used to push only
+  `max(3, reflections)`, which silently skipped the tertiary whenever the
+  control sat on 4.
+- The ledger covers `1…max(3, state.reflections)` rather than `DROP_ORDERS`,
+  so k=4 highlights a row instead of highlighting nothing. `DROP_ORDERS`
+  stays at three for the scene inspectors, which answer a different question.
+
+### What that cost, and how it was paid back
+
+Four orders × six wavelengths × a 60-ray fan is about 1 440 rays and 7 200
+segments. Measured at 802×732: **62 ms a frame**, of which 50 ms was drawing
+and 12 ms tracing.
+
+Two fixes, both in the drawing:
+
+- **`colorFor()` is memoised.** It ran the piecewise spectrum fit and a
+  `Math.pow` for gamma on every call, once per segment. The key carries
+  everything the function reads, `state.wavelength` and `state.dispersion`
+  included, so a stale colour cannot be served; the map is bounded because
+  the droplet field inverts angles to continuous wavelengths.
+- **Fan segments are batched** into one `Path2D` per style-and-width and
+  stroked once per group — a couple of dozen strokes instead of seven
+  thousand. Only fan rays: every other ray carries arrowheads, vertex dots or
+  the reaches-the-eye glow that a shared path cannot.
+
+Worst case is now **6.7 ms**, against 4.6 ms for the old solo-select code
+drawing a quarter as many rays.
+
 ## The bundler puts every module in one scope
 
 `build.mjs` strips `import`/`export` and concatenates, so two files that each
@@ -1065,7 +1142,7 @@ Snell's law (scalar and vector forms agree), Fresnel limits, the analytic
 extremum against an independent numeric (golden-section) search, the
 headline 42°/51° values, classification for every ray family, sky/horizon
 geometry, the bow-direction and scattering-angle constructors, and more —
-53 tests, all should stay green.
+55 tests, all should stay green.
 
 View/rendering changes: there is no visual regression suite, so verify by
 driving the actual app:
