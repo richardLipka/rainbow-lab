@@ -391,6 +391,19 @@ function noteParams(key, k = state.reflections) {
 const noteNode = (key, k) => el('p', { class: 'note' }, t(key, noteParams(key, k) || undefined));
 
 /**
+ * Supporting prose, folded away.
+ *
+ * Seven notes had accumulated in this panel, 420 words, 1474 px of it in a
+ * 734 px column -- so the mechanism the scene exists to teach was the second
+ * item of seven and half of them were below the fold. Two claims stay in the
+ * open; everything that qualifies or extends them goes in here.
+ */
+const moreNode = (...children) =>
+  el('details', { class: 'more' },
+    el('summary', {}, t('moreDetail')),
+    ...children.filter(Boolean));
+
+/**
  * The ledger: one line per reflection order, naming the bow it produces and
  * what is left of the light by the time it gets there.
  *
@@ -415,8 +428,6 @@ function bowLedgerNodes() {
           el('span', { class: 'row-key' }, `k = ${r.k} → ${t(bowNameKey(r.k), { k: r.k })}`),
           el('span', { class: 'row-val mono' },
             `${num(r.survives * 100, 2)} % · ×${num(r.relative, 2)}`)))),
-    el('p', { class: 'note' }, t('bowLedgerNote')),
-    noteNode('explWhyFainter'),
   ];
 }
 
@@ -451,26 +462,30 @@ function rayInfoNodes(opts = {}) {
       row('infoIntensity', `${num(p.intensity * 100, 2)} %`),
       dist === null ? null : row('infoDistanceFromBow', `${dist >= 0 ? '+' : ''}${num(dist, 2)}°`)
     ),
-    el('div', { class: `classification cls-${cls}` }, t(CLASS_KEY[cls] || 'classNonCaustic')),
+    // Named with its order. With several families on screen the verdict is
+    // about one of them, and an unlabelled "ordinary scattered ray" next to a
+    // ray visibly reaching its eye reads as a contradiction.
+    el('div', { class: `classification cls-${cls}` },
+      `${k >= 1 ? `k = ${k} · ` : ''}${t(CLASS_KEY[cls] || 'classNonCaustic')}`),
   ];
   if (CLASS_EXPLAIN[cls]) nodes.push(el('p', { class: 'note' }, t(CLASS_EXPLAIN[cls])));
   if (cls === 'nonCaustic' && k === 1) {
     nodes.push(el('p', { class: 'note' }, t('explNotOneReflection')));
   }
   if (!opts.compact) {
-    // Only once a second family is on screen: with one bow there are no two
-    // eyes to misread as being 93 degrees apart.
-    if (activeOrders().filter((o) => o >= 1).length > 1) {
-      // Three claims, in the order they have to be understood: one ray makes
-      // every order, the eyes are apart because the exit side flips, and a
-      // bow still needs its own impact parameter.
-      nodes.push(noteNode('coneSliceNote'), noteNode('entryHalvesNote'),
-        noteNode('explBowNeedsOwnRay'));
-    }
-    // Quoting the critical angle next to k = 0 would describe a bounce the
-    // ray never makes.
-    if (k >= 1) nodes.push(noteNode('explReflectionIsWeak', k));
+    const manyOrders = activeOrders().filter((o) => o >= 1).length > 1;
+    // The two claims that have to be read, in the open and in this order:
+    // one ray makes every order, and a bow still needs its own ray.
+    if (manyOrders) nodes.push(noteNode('coneSliceNote'), noteNode('explBowNeedsOwnRay'));
     nodes.push(...bowLedgerNodes());
+    nodes.push(moreNode(
+      manyOrders ? noteNode('entryHalvesNote') : null,
+      // Quoting the critical angle next to k = 0 would describe a bounce the
+      // ray never makes.
+      k >= 1 ? noteNode('explReflectionIsWeak', k) : null,
+      noteNode('explWhyFainter'),
+      el('p', { class: 'note' }, t('bowLedgerNote'))
+    ));
     nodes.push(el('p', { class: 'hint' }, t('rayInfoHint')));
   }
   return nodes.filter(Boolean);

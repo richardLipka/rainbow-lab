@@ -419,6 +419,22 @@ select {
 .chip:hover { color: var(--fg); border-color: var(--accent); }
 /* Chips inside the control column wrap rather than pushing the column wide. */
 .chip-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+/* Supporting prose, folded away so the claim that matters stays above the
+   fold. Closed by default -- see moreNode(). */
+.more { margin: 2px 0 10px; }
+.more > summary {
+  cursor: pointer;
+  color: var(--fg-faint);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  padding: 3px 0;
+  list-style: none;
+}
+.more > summary::-webkit-details-marker { display: none; }
+.more > summary::before { content: 'b8 '; color: var(--fg-faint); }
+.more[open] > summary::before { content: 'be '; }
+.more > summary:hover { color: var(--accent); }
+.more .note:last-child { margin-bottom: 0; }
 .chip-row .chip { font-size: 10.5px; padding: 2px 9px; }
 
 /* ------------------------------------------------------------------ panel */
@@ -1686,6 +1702,7 @@ const translations = {
     impactParameterHint:
       'Sluneční světlo přichází rovnoběžně, takže jediné, čím se paprsky liší, je místo dopadu. A protože je kapka zakřivená, tím je dané i to, pod jakým úhlem na povrch dopadnou: sin θᵢ = b/R. Jeden posuvník, dvě čísla.',
     bowRayChips: 'Skočit na duhový paprsek',
+    moreDetail: 'Podrobnosti',
     reflections: 'Vnitřní odrazy',
     reflectionsHint:
       'Zvolené číslo zapne všechny řády až po něj, aby šly duhy porovnat. Políčka níž je pak můžete jednotlivě vypnout.',
@@ -1812,7 +1829,7 @@ const translations = {
     bowLedgerNote:
       'Uvedené procento je čistý Fresnel: (1−R)²·Rᵏ pod vlastním úhlem dopadu té které duhy. Rozprostření na širší pás a větší prstenec ubere dál.',
     explWhyFainter:
-      'Počítejte odrazy. Jeden dělá primární duhu, dva vedlejší, tři terciární. Každý odraz navíc něco stojí — a není to málo, protože povrch vody je zevnitř mizerné zrcadlo. Pod úhlem primární duhy vrátí zpátky jen {r1} toho, co na něj dopadne, a zbytek pustí rovnou ven. Celá primární duha stojí na tomhle zlomku. Vyžádejte si druhý odraz a zbude vám zlomek ze zlomku: {rel2} světla primární duhy. Pak si ukousne i geometrie — vedlejší duha leží na větším prstenci a rozetře tytéž barvy skoro přes dvojnásobný úhel.',
+      'Každý odraz navíc něco stojí — a není to málo, protože povrch vody je zevnitř mizerné zrcadlo. Pod úhlem primární duhy vrátí zpátky jen {r1} toho, co na něj dopadne, a zbytek pustí rovnou ven. Celá primární duha stojí na tomhle zlomku. Vyžádejte si druhý odraz a zbude vám zlomek ze zlomku: {rel2} světla primární duhy. Pak si ukousne i geometrie — vedlejší duha leží na větším prstenci a rozetře tytéž barvy skoro přes dvojnásobný úhel.',
     explReflectionIsWeak:
       'V kapce se nic neodráží proto, že by muselo. Mezní úhel vody je {crit}, duhový paprsek dopadá na zadní stěnu zevnitř pod úhlem {theta}, tedy hluboko pod ním — povrch má volnou ruku světlo pustit ven, a pustí. Většina odejde na místě. Co zůstane, je duha.',
 
@@ -2160,6 +2177,7 @@ const translations = {
     impactParameterHint:
       'Sunlight arrives parallel, so the only thing that differs between rays is where they land. The droplet is curved, so that also fixes the angle they meet the surface at: sin θᵢ = b/R. One slider, two numbers.',
     bowRayChips: 'Jump to a bow ray',
+    moreDetail: 'More detail',
     reflections: 'Internal reflections',
     reflectionsHint:
       'Picking a number shows every order up to it, so the bows can be compared. The checkboxes below switch individual ones off again.',
@@ -2286,7 +2304,7 @@ const translations = {
     bowLedgerNote:
       "The percentage is pure Fresnel: (1−R)²·Rᵏ at that bow's own angle of incidence. Spreading over a wider band and a bigger ring takes more on top.",
     explWhyFainter:
-      "Count the bounces. One gives the primary bow, two the secondary, three the tertiary. Every extra bounce costs light, and the price is steep — seen from the inside, a water surface is a poor mirror. At the primary bow's angle it turns back only {r1} of what reaches it and lets the rest straight out. The whole primary rainbow stands on that sliver. Ask for a second bounce and you keep a fraction of a fraction: {rel2} of the primary's light. Then geometry takes its own cut, because the secondary sits on a bigger ring and smears the same colours across nearly twice the angle.",
+      "Every extra bounce costs light, and the price is steep — seen from the inside, a water surface is a poor mirror. At the primary bow's angle it turns back only {r1} of what reaches it and lets the rest straight out. The whole primary rainbow stands on that sliver. Ask for a second bounce and you keep a fraction of a fraction: {rel2} of the primary's light. Then geometry takes its own cut, because the secondary sits on a bigger ring and smears the same colours across nearly twice the angle.",
     explReflectionIsWeak:
       "Nothing in the droplet bounces because it has to. Water's critical angle is {crit}, and the rainbow ray meets the back wall from inside at {theta} — well under it, so the surface is free to let light through, and it does. Most of it leaves on the spot. What stays behind is the rainbow.",
 
@@ -4770,21 +4788,28 @@ function createDropletView(canvas) {
    * half of the sky.
    */
   function drawBowLine(ctx, w, y) {
-    const k = state.reflections;
-    if (k < 1) {
+    const orders = activeOrders().filter((k) => k >= 1);
+    if (!orders.length) {
       label(ctx, t('dropletBowNone'), w - 12, y, { align: 'right', color: '#8ea3c6' });
       return y + 18;
     }
-    const geo = O.rainbowGeometry(indexModel()(activeLambdas()[0]), k);
-    if (!geo) return y;
-    const sunward = geo.antisolarDeg > 90;
-    label(ctx, t('dropletBowLine', {
-      k,
-      bow: t(bowNameKey(k), { k }),
-      angle: deg(sunward ? 180 - geo.antisolarDeg : geo.antisolarDeg, 1),
-      side: t(sunward ? 'bowFromSun' : 'bowFromAntisolar'),
-    }), w - 12, y, { align: 'right', color: k === 1 ? '#6fd3a4' : k === 2 ? '#9b8cf0' : '#f0885d' });
-    return y + 18;
+    // One line per order on screen. Naming only state.reflections left a
+    // reader looking at two rays and one name, with no way to tell which
+    // caption belonged to which.
+    const idx = indexModel();
+    for (const k of orders) {
+      const geo = O.rainbowGeometry(idx(activeLambdas()[0]), k);
+      if (!geo) continue;
+      const sunward = geo.antisolarDeg > 90;
+      label(ctx, t('dropletBowLine', {
+        k,
+        bow: t(bowNameKey(k), { k }),
+        angle: deg(sunward ? 180 - geo.antisolarDeg : geo.antisolarDeg, 1),
+        side: t(sunward ? 'bowFromSun' : 'bowFromAntisolar'),
+      }), w - 12, y, { align: 'right', color: orderColor(k) });
+      y += 18;
+    }
+    return y;
   }
 
   function drawLegend(ctx, w, h, rays) {
@@ -7777,6 +7802,19 @@ function noteParams(key, k = state.reflections) {
 const noteNode = (key, k) => el('p', { class: 'note' }, t(key, noteParams(key, k) || undefined));
 
 /**
+ * Supporting prose, folded away.
+ *
+ * Seven notes had accumulated in this panel, 420 words, 1474 px of it in a
+ * 734 px column -- so the mechanism the scene exists to teach was the second
+ * item of seven and half of them were below the fold. Two claims stay in the
+ * open; everything that qualifies or extends them goes in here.
+ */
+const moreNode = (...children) =>
+  el('details', { class: 'more' },
+    el('summary', {}, t('moreDetail')),
+    ...children.filter(Boolean));
+
+/**
  * The ledger: one line per reflection order, naming the bow it produces and
  * what is left of the light by the time it gets there.
  *
@@ -7801,8 +7839,6 @@ function bowLedgerNodes() {
           el('span', { class: 'row-key' }, `k = ${r.k} → ${t(bowNameKey(r.k), { k: r.k })}`),
           el('span', { class: 'row-val mono' },
             `${num(r.survives * 100, 2)} % · ×${num(r.relative, 2)}`)))),
-    el('p', { class: 'note' }, t('bowLedgerNote')),
-    noteNode('explWhyFainter'),
   ];
 }
 
@@ -7837,26 +7873,30 @@ function rayInfoNodes(opts = {}) {
       row('infoIntensity', `${num(p.intensity * 100, 2)} %`),
       dist === null ? null : row('infoDistanceFromBow', `${dist >= 0 ? '+' : ''}${num(dist, 2)}°`)
     ),
-    el('div', { class: `classification cls-${cls}` }, t(CLASS_KEY[cls] || 'classNonCaustic')),
+    // Named with its order. With several families on screen the verdict is
+    // about one of them, and an unlabelled "ordinary scattered ray" next to a
+    // ray visibly reaching its eye reads as a contradiction.
+    el('div', { class: `classification cls-${cls}` },
+      `${k >= 1 ? `k = ${k} · ` : ''}${t(CLASS_KEY[cls] || 'classNonCaustic')}`),
   ];
   if (CLASS_EXPLAIN[cls]) nodes.push(el('p', { class: 'note' }, t(CLASS_EXPLAIN[cls])));
   if (cls === 'nonCaustic' && k === 1) {
     nodes.push(el('p', { class: 'note' }, t('explNotOneReflection')));
   }
   if (!opts.compact) {
-    // Only once a second family is on screen: with one bow there are no two
-    // eyes to misread as being 93 degrees apart.
-    if (activeOrders().filter((o) => o >= 1).length > 1) {
-      // Three claims, in the order they have to be understood: one ray makes
-      // every order, the eyes are apart because the exit side flips, and a
-      // bow still needs its own impact parameter.
-      nodes.push(noteNode('coneSliceNote'), noteNode('entryHalvesNote'),
-        noteNode('explBowNeedsOwnRay'));
-    }
-    // Quoting the critical angle next to k = 0 would describe a bounce the
-    // ray never makes.
-    if (k >= 1) nodes.push(noteNode('explReflectionIsWeak', k));
+    const manyOrders = activeOrders().filter((o) => o >= 1).length > 1;
+    // The two claims that have to be read, in the open and in this order:
+    // one ray makes every order, and a bow still needs its own ray.
+    if (manyOrders) nodes.push(noteNode('coneSliceNote'), noteNode('explBowNeedsOwnRay'));
     nodes.push(...bowLedgerNodes());
+    nodes.push(moreNode(
+      manyOrders ? noteNode('entryHalvesNote') : null,
+      // Quoting the critical angle next to k = 0 would describe a bounce the
+      // ray never makes.
+      k >= 1 ? noteNode('explReflectionIsWeak', k) : null,
+      noteNode('explWhyFainter'),
+      el('p', { class: 'note' }, t('bowLedgerNote'))
+    ));
     nodes.push(el('p', { class: 'hint' }, t('rayInfoHint')));
   }
   return nodes.filter(Boolean);

@@ -104,6 +104,7 @@ export const translations = {
     impactParameterHint:
       'Sluneční světlo přichází rovnoběžně, takže jediné, čím se paprsky liší, je místo dopadu. A protože je kapka zakřivená, tím je dané i to, pod jakým úhlem na povrch dopadnou: sin θᵢ = b/R. Jeden posuvník, dvě čísla.',
     bowRayChips: 'Skočit na duhový paprsek',
+    moreDetail: 'Podrobnosti',
     reflections: 'Vnitřní odrazy',
     reflectionsHint:
       'Zvolené číslo zapne všechny řády až po něj, aby šly duhy porovnat. Políčka níž je pak můžete jednotlivě vypnout.',
@@ -230,7 +231,7 @@ export const translations = {
     bowLedgerNote:
       'Uvedené procento je čistý Fresnel: (1−R)²·Rᵏ pod vlastním úhlem dopadu té které duhy. Rozprostření na širší pás a větší prstenec ubere dál.',
     explWhyFainter:
-      'Počítejte odrazy. Jeden dělá primární duhu, dva vedlejší, tři terciární. Každý odraz navíc něco stojí — a není to málo, protože povrch vody je zevnitř mizerné zrcadlo. Pod úhlem primární duhy vrátí zpátky jen {r1} toho, co na něj dopadne, a zbytek pustí rovnou ven. Celá primární duha stojí na tomhle zlomku. Vyžádejte si druhý odraz a zbude vám zlomek ze zlomku: {rel2} světla primární duhy. Pak si ukousne i geometrie — vedlejší duha leží na větším prstenci a rozetře tytéž barvy skoro přes dvojnásobný úhel.',
+      'Každý odraz navíc něco stojí — a není to málo, protože povrch vody je zevnitř mizerné zrcadlo. Pod úhlem primární duhy vrátí zpátky jen {r1} toho, co na něj dopadne, a zbytek pustí rovnou ven. Celá primární duha stojí na tomhle zlomku. Vyžádejte si druhý odraz a zbude vám zlomek ze zlomku: {rel2} světla primární duhy. Pak si ukousne i geometrie — vedlejší duha leží na větším prstenci a rozetře tytéž barvy skoro přes dvojnásobný úhel.',
     explReflectionIsWeak:
       'V kapce se nic neodráží proto, že by muselo. Mezní úhel vody je {crit}, duhový paprsek dopadá na zadní stěnu zevnitř pod úhlem {theta}, tedy hluboko pod ním — povrch má volnou ruku světlo pustit ven, a pustí. Většina odejde na místě. Co zůstane, je duha.',
 
@@ -578,6 +579,7 @@ export const translations = {
     impactParameterHint:
       'Sunlight arrives parallel, so the only thing that differs between rays is where they land. The droplet is curved, so that also fixes the angle they meet the surface at: sin θᵢ = b/R. One slider, two numbers.',
     bowRayChips: 'Jump to a bow ray',
+    moreDetail: 'More detail',
     reflections: 'Internal reflections',
     reflectionsHint:
       'Picking a number shows every order up to it, so the bows can be compared. The checkboxes below switch individual ones off again.',
@@ -704,7 +706,7 @@ export const translations = {
     bowLedgerNote:
       "The percentage is pure Fresnel: (1−R)²·Rᵏ at that bow's own angle of incidence. Spreading over a wider band and a bigger ring takes more on top.",
     explWhyFainter:
-      "Count the bounces. One gives the primary bow, two the secondary, three the tertiary. Every extra bounce costs light, and the price is steep — seen from the inside, a water surface is a poor mirror. At the primary bow's angle it turns back only {r1} of what reaches it and lets the rest straight out. The whole primary rainbow stands on that sliver. Ask for a second bounce and you keep a fraction of a fraction: {rel2} of the primary's light. Then geometry takes its own cut, because the secondary sits on a bigger ring and smears the same colours across nearly twice the angle.",
+      "Every extra bounce costs light, and the price is steep — seen from the inside, a water surface is a poor mirror. At the primary bow's angle it turns back only {r1} of what reaches it and lets the rest straight out. The whole primary rainbow stands on that sliver. Ask for a second bounce and you keep a fraction of a fraction: {rel2} of the primary's light. Then geometry takes its own cut, because the secondary sits on a bigger ring and smears the same colours across nearly twice the angle.",
     explReflectionIsWeak:
       "Nothing in the droplet bounces because it has to. Water's critical angle is {crit}, and the rainbow ray meets the back wall from inside at {theta} — well under it, so the surface is free to let light through, and it does. Most of it leaves on the spot. What stays behind is the rainbow.",
 

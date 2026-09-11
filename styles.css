@@ -414,6 +414,22 @@ select {
 .chip:hover { color: var(--fg); border-color: var(--accent); }
 /* Chips inside the control column wrap rather than pushing the column wide. */
 .chip-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+/* Supporting prose, folded away so the claim that matters stays above the
+   fold. Closed by default -- see moreNode(). */
+.more { margin: 2px 0 10px; }
+.more > summary {
+  cursor: pointer;
+  color: var(--fg-faint);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  padding: 3px 0;
+  list-style: none;
+}
+.more > summary::-webkit-details-marker { display: none; }
+.more > summary::before { content: 'b8 '; color: var(--fg-faint); }
+.more[open] > summary::before { content: 'be '; }
+.more > summary:hover { color: var(--accent); }
+.more .note:last-child { margin-bottom: 0; }
 .chip-row .chip { font-size: 10.5px; padding: 2px 9px; }
 
 /* ------------------------------------------------------------------ panel */

@@ -832,21 +832,28 @@ export function createDropletView(canvas) {
    * half of the sky.
    */
   function drawBowLine(ctx, w, y) {
-    const k = state.reflections;
-    if (k < 1) {
+    const orders = activeOrders().filter((k) => k >= 1);
+    if (!orders.length) {
       label(ctx, t('dropletBowNone'), w - 12, y, { align: 'right', color: '#8ea3c6' });
       return y + 18;
     }
-    const geo = O.rainbowGeometry(indexModel()(activeLambdas()[0]), k);
-    if (!geo) return y;
-    const sunward = geo.antisolarDeg > 90;
-    label(ctx, t('dropletBowLine', {
-      k,
-      bow: t(bowNameKey(k), { k }),
-      angle: deg(sunward ? 180 - geo.antisolarDeg : geo.antisolarDeg, 1),
-      side: t(sunward ? 'bowFromSun' : 'bowFromAntisolar'),
-    }), w - 12, y, { align: 'right', color: k === 1 ? '#6fd3a4' : k === 2 ? '#9b8cf0' : '#f0885d' });
-    return y + 18;
+    // One line per order on screen. Naming only state.reflections left a
+    // reader looking at two rays and one name, with no way to tell which
+    // caption belonged to which.
+    const idx = indexModel();
+    for (const k of orders) {
+      const geo = O.rainbowGeometry(idx(activeLambdas()[0]), k);
+      if (!geo) continue;
+      const sunward = geo.antisolarDeg > 90;
+      label(ctx, t('dropletBowLine', {
+        k,
+        bow: t(bowNameKey(k), { k }),
+        angle: deg(sunward ? 180 - geo.antisolarDeg : geo.antisolarDeg, 1),
+        side: t(sunward ? 'bowFromSun' : 'bowFromAntisolar'),
+      }), w - 12, y, { align: 'right', color: orderColor(k) });
+      y += 18;
+    }
+    return y;
   }
 
   function drawLegend(ctx, w, h, rays) {

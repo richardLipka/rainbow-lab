@@ -765,6 +765,44 @@ Two layout rules the marks need:
 Step 4's "extremum → rainbow" chip used to carry `impact: 0.861` as a literal,
 in the one file that is supposed to contain no angles. It computes now.
 
+### The panel had buried its own point
+
+Seven notes had accumulated in the ray readout, one per change, 420 words,
+1474 px of prose in a 734 px column. The mechanism the scene exists to teach
+was the *second item of seven* and half of them sat below the fold. Adding a
+note per fix without ever standing back is how a panel explains itself into
+silence.
+
+Two claims stay in the open, in this order: `coneSliceNote` (one ray makes
+every order) and `explBowNeedsOwnRay` (a bow still needs its own ray). The
+ledger's table stays too -- it is a table, not prose. Everything that
+qualifies or extends them went into a `<details class="more">`:
+`entryHalvesNote`, `explReflectionIsWeak`, `explWhyFainter` and the ledger's
+Fresnel caveat.
+
+Measured after: 3 notes open and 4 folded, 165 words, and both mechanism notes
+land fully above the fold (416-570 px and 580-695 px in a 734 px column).
+`explWhyFainter` also lost its opening two sentences, which restated the
+cascade that `coneSliceNote` now owns.
+
+**If you add another note here, take one out or fold it.** The panel fits
+because something is folded, not because the notes are short.
+
+### Two things that named the wrong scope
+
+Both showed up only once more than one order was on screen at a time, which
+is recent:
+
+- **The canvas caption named `state.reflections` alone.** Two rays were drawn
+  and one was named. `drawBowLine()` loops over `activeOrders()` now, one
+  coloured line per order.
+- **The classification chip did not say which order it judged.** At k=2 with
+  the ray parked on the primary's impact parameter, the chip read "ORDINARY
+  SCATTERED RAY" while the brightest thing on screen was a ray visibly
+  reaching its eye -- true of k=2, and a flat contradiction of the picture. It
+  reads `k = 2 · ORDINARY SCATTERED RAY` now. (k=0 keeps no prefix: there is
+  no reflection to number.)
+
 ### The same split, at every scale
 
 `explSameSplitInSky` closes the loop in all three many-droplet readouts (the
