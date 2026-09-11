@@ -31,6 +31,9 @@ const panelEl = el('div', { class: 'panel' });
 const headerEl = el('header', { class: 'app-header' });
 const sceneTabsEl = el('div', { class: 'scene-tabs' });
 const sceneDescEl = el('p', { class: 'scene-desc' });
+// Part of the static shell, so nothing rebuilds it -- and it sat in Czech
+// after a switch to English until applyVisibility() started refreshing it.
+const controlsTitleEl = el('h2', { class: 'col-title' }, t('controls'));
 const graphTabsEl = el('div', { class: 'graph-tabs' });
 const graphBarEl = el('div', { class: 'graph-bar' });
 const graphExplainEl = el('p', { class: 'graph-explain' });
@@ -46,7 +49,7 @@ root.append(
   el(
     'main',
     { class: 'layout' },
-    el('aside', { class: 'col col-controls' }, el('h2', { class: 'col-title' }, t('controls')), controlsEl),
+    el('aside', { class: 'col col-controls' }, controlsTitleEl, controlsEl),
     el(
       'section',
       { class: 'col col-scene' },
@@ -863,6 +866,7 @@ function applyVisibility() {
     c.classList.toggle('hidden', name !== state.scene);
   }
   sceneDescEl.textContent = t(`scene${state.scene[0].toUpperCase()}${state.scene.slice(1)}Desc`);
+  controlsTitleEl.textContent = t('controls');
   document.body.dataset.scene = state.scene;
 }
 
@@ -896,11 +900,21 @@ function panelKey() {
           return `${k ? `${k.k},${k.lambda},${k.roll.toFixed(2)}` : '-'}|${state.sunElevation}|${state.sunAzimuth}|${state.dispersion}|${state.indexMode}|${state.indexScale}`;
         })()
       : '';
+  // The field readout is about a clicked droplet in space, so it moves with
+  // the pick, the Sun, the index model and the order toggles -- everything
+  // fieldReport() reads. Without this the panel never rebuilt on a pick.
+  const fieldPart =
+    state.scene === 'field' && state.panel === 'ray'
+      ? (() => {
+          const d = state.fieldPick;
+          return `${d ? `${d.x.toFixed(4)},${d.y.toFixed(4)},${d.z.toFixed(4)}` : '-'}|${state.sunElevation}|${state.sunAzimuth}|${state.wavelength}|${state.dispersion}|${state.indexMode}|${state.indexScale}|${state.show.primary}${state.show.secondary}${state.show.higher}`;
+        })()
+      : '';
   const guidePart =
     state.mode === 'free' && state.panel === 'guide'
       ? `${state.dispersion}|${state.indexMode}|${state.indexScale}|${state.show.renderedBow}`
       : '';
-  return `${state.panel}|${state.scene}|${state.step}|${rayPart}|${mathPart}|${dropPart}|${skyPart}|${guidePart}`;
+  return `${state.panel}|${state.scene}|${state.step}|${rayPart}|${mathPart}|${dropPart}|${skyPart}|${fieldPart}|${guidePart}`;
 }
 
 /** Everything the shape of the graph section depends on. */

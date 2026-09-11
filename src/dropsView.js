@@ -12,7 +12,7 @@ import { state, set, indexModel } from './state.js';
 import { t, num, deg } from './i18n.js';
 import { fitCanvas, strokePath, label, capture, arrowHead, angleArc } from './ui.js';
 import {
-  colorFor, bowBands, colorAtPhi, dropReport, antisolarAxis, BOW_MATCH_DEG,
+  colorFor, bowBands, colorAtPhi, dropReport, antisolarAxis, BOW_MATCH_DEG, bowNameKey,
 } from './rays.js';
 
 const SMALL_FONT = '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif';
@@ -459,7 +459,7 @@ export function createDropsView(canvas) {
       if (state.show.labels) {
         const sdir = SD(refDirs[nearSide]);
         const L = Math.min(edgeDist(q, sdir, w, h), maxLen);
-        tip(ctx, `k=${band.k} · φ ${deg(ref.phi, 1)}`,
+        tip(ctx, `k=${band.k} · ${t(bowNameKey(band.k), { k: band.k })} · φ ${deg(ref.phi, 1)}`,
           q.x + sdir.x * (L - 18), q.y + sdir.y * (L - 18), w, h,
           { color: hit && hit.k === band.k ? '#ffdca0' : '#9fb4d8', bottom });
       }

@@ -495,6 +495,11 @@ select {
   border-bottom: 1px solid rgba(120, 145, 190, 0.08);
 }
 .row:last-child { border-bottom: none; }
+/* The ledger row matching the reflections control, so turning that knob
+   visibly moves the highlight down the table. */
+.row-on { color: var(--accent); }
+.row-on .row-key,
+.row-on .row-val { color: var(--accent); }
 .row-key { color: var(--fg-dim); }
 .row-val { color: var(--fg); text-align: right; }
 .row-val.mono { font-family: var(--mono); }
@@ -540,6 +545,12 @@ select {
 .math-table td:first-child, .math-table th:first-child { text-align: left; }
 /* the reflection order that actually reaches the eye, in the droplet readout */
 .math-table tr.hit td { color: var(--accent); border-bottom-color: rgba(224, 168, 63, 0.35); }
+/* An order the scene is not currently painting. Dimmed rather than hidden:
+   "this angle is on the secondary bow and you have the secondary switched
+   off" is an answer, and it needs the row to still be there. */
+.math-table tr.off td { color: var(--fg-faint); opacity: 0.55; }
+/* The bow-name column carries words, not figures, so it reads left. */
+.math-table td:nth-child(2).bow, .math-table th:nth-child(2).bow { text-align: left; }
 
 .qa { border-top: 1px solid var(--line); padding-top: 10px; margin-bottom: 6px; }
 .qa h3 { margin-top: 0; text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--fg); }
@@ -938,6 +949,44 @@ function rainbowGeometry(n, k) {
     scatteringDeg: foldToScattering(D) * DEG,
     antisolarDeg: antisolarAngle(D) * DEG,
     impactParameter: Math.sin(thetaI),
+  };
+}
+
+/**
+ * What one bow's light costs, in Fresnel terms.
+ *
+ * By reversibility the reflectance is identical at every interface on the
+ * path, so a ray that enters, bounces k times and leaves keeps
+ * (1-R)^2 * R^k of the light that fell on it.
+ *
+ * Two things about that are worth pulling out, because they are the whole
+ * answer to "why is the secondary fainter":
+ *
+ * - Internal incidence stays BELOW the critical angle for every order, so a
+ *   droplet never reflects by total internal reflection. It is a poor mirror
+ *   on purpose: at the primary bow it turns back about 6 % and lets the rest
+ *   straight out. The bow is built from that 6 %.
+ * - R *rises* with k, because the bow's incidence angle climbs towards
+ *   grazing. Each individual bounce is more efficient at higher order, and
+ *   the bow is still fainter -- R^k falls faster than R climbs.
+ *
+ * This is the Fresnel factor alone. The light of a higher order is also
+ * spread over a wider band and a bigger ring, which costs again; that part
+ * belongs to the sky geometry, not here.
+ */
+function bowBrightness(n, k) {
+  const geo = rainbowGeometry(n, k);
+  if (!geo) return null;
+  const R = fresnelReflectance(geo.thetaI, 1, n);
+  const crit = criticalAngle(n, 1);
+  return {
+    k,
+    n,
+    R,
+    survives: (1 - R) * (1 - R) * Math.pow(R, k),
+    internalDeg: geo.thetaRDeg,
+    criticalDeg: crit === null ? null : crit * DEG,
+    totalInternal: crit !== null && geo.thetaR > crit,
   };
 }
 
@@ -1500,7 +1549,7 @@ function alexandersBand(indexModel = defaultIndex) {
 
 /* namespace object standing in for `import * as O from "./optics.js"` */
 
-const O = { DEG, RAD, EPS, vec, vadd, vsub, vmul, vdot, vcross, vlen, vneg, clamp, vnorm, vangle, NAMED_COLORS, LAMBDA_REF, fitCauchy, CAUCHY, cauchyIndex, makeIndexModel, defaultIndex, refract, reflect, snellAngle, criticalAngle, fresnelReflectance, intersectRaySphere, RayClass, CAUSTIC_TOLERANCE_DEG, deviation, foldToScattering, antisolarAngle, rainbowIncidenceAnalytic, rainbowIncidenceNumeric, rainbowGeometry, traceRay, classifyRay, exitAngleCurve, angleFor, angularDistribution, sunDirection, antisolarDirection, orthonormalBasis, bowDirection, rainbowCircle, directionAtAngle, EARTH_RADIUS_M, horizonDipDeg, visibleFraction, wavelengthToRGB, rgbCss, linspace, spectralProfile, alexandersBand };
+const O = { DEG, RAD, EPS, vec, vadd, vsub, vmul, vdot, vcross, vlen, vneg, clamp, vnorm, vangle, NAMED_COLORS, LAMBDA_REF, fitCauchy, CAUCHY, cauchyIndex, makeIndexModel, defaultIndex, refract, reflect, snellAngle, criticalAngle, fresnelReflectance, intersectRaySphere, RayClass, CAUSTIC_TOLERANCE_DEG, deviation, foldToScattering, antisolarAngle, rainbowIncidenceAnalytic, rainbowIncidenceNumeric, rainbowGeometry, bowBrightness, traceRay, classifyRay, exitAngleCurve, angleFor, angularDistribution, sunDirection, antisolarDirection, orthonormalBasis, bowDirection, rainbowCircle, directionAtAngle, EARTH_RADIUS_M, horizonDipDeg, visibleFraction, wavelengthToRGB, rgbCss, linspace, spectralProfile, alexandersBand };
 
 /* ============ src/assets.js ============ */
 
@@ -1563,9 +1612,9 @@ const translations = {
     sceneFieldDesc: 'Tisíce kapek v prostoru. Duha se poskládá sama, nikdo ji nekreslí.',
     fieldCount: 'Počet kapek v prostoru',
     fieldCountHint:
-      'Každá kapka se ptá na totéž co v plošné scéně: pod jakým úhlem ji vidím a vychází právě tam nějaká vlnová délka? Čím víc kapek, tím zřetelnější kruh — ale kreslí se pořád jen kapky.',
+      'U každé kapky se ptáme na totéž co v plošné scéně: pod jakým úhlem ji vidíte a vychází právě tam nějaká vlnová délka? Čím víc kapek, tím zřetelnější kruh. Kreslí se přitom pořád jen kapky.',
     fieldNoCircle: 'Žádná kružnice se nekreslí — barevné jsou jen kapky, které prošly testem.',
-    fieldHint: 'Táhněte myší, kolečkem přiblížíte. Přepněte na pohled okem a duha se uzavře do kruhu.',
+    fieldHint: 'Táhněte myší = otáčení, kolečko = přiblížení. V pohledu okem se duha uzavře do kruhu.',
     fieldClickHint: 'Klepněte na kapku — uvidíte, kudy jí prochází světlo a pod jakými úhly.',
     fieldClearHint: 'Dalším klepnutím na tutéž kapku výběr zrušíte.',
     sceneDropletDesc: 'Řez jednou kulovou kapkou. Paprsek se počítá, nikoli kreslí.',
@@ -1592,9 +1641,9 @@ const translations = {
     graphCollapsedHint:
       'Výstupní úhel a rozdělení paprsků — čísla, ze kterých duhový úhel vychází.',
     graphExitExplain:
-      'Každý přicházející paprsek je popsán tím, kam do kapky dopadne: b/R = 0 je přesný střed, b/R = 1 okraj. Křivka udává směr, kterým paprsek vyjde ven. V okolí svého extrému je téměř vodorovná, takže celý pás parametrů dopadu odchází skoro stejným směrem — právě tam se paprsky hromadí a ten úhel je úhlový poloměr duhy. Každá vlnová délka má svou křivku a každá se obrací u trochu jiného úhlu; odtud jsou barvy.',
+      'Každý přicházející paprsek je popsán tím, kam do kapky dopadne: b/R = 0 je přesný střed, b/R = 1 okraj. Křivka udává směr, kterým paprsek vyjde ven. V okolí svého extrému je téměř vodorovná, takže celý pás parametrů dopadu odchází skoro stejným směrem — právě tam se paprsky hromadí a ten úhel je úhlový poloměr duhy. Každá vlnová délka má svou křivku a každá se obrací u trochu jiného úhlu. Odtud pocházejí barvy.',
     graphDistExplain:
-      'Paprsky se vystřelují náhodně po celé ploše kapky a počítá se, kterým směrem odejdou. Do většiny směrů jich jde podobně málo; do jednoho ne. U úhlu, kde se křivka výstupního úhlu obrací, počet prudce vyskočí — a protože tenhle graf je jas v závislosti na úhlu, tedy přesně to, co měří oko přejíždějící po obloze, ten vrchol je duha a leží u úhlu, pod kterým ji uvidíte. Zvyšte počet paprsků a vyloupne se ze šumu sám.',
+      'Paprsky vystřelujeme náhodně po celé ploše kapky a počítáme, kterým směrem odejdou. Do většiny směrů jich jde podobně málo. Do jednoho ne: u úhlu, kde se křivka výstupního úhlu obrací, počet prudce vyskočí. Svislá osa je jas, vodorovná úhel — přesně to, co měří oko přejíždějící po obloze — takže ten vrchol je duha a leží u úhlu, pod kterým ji uvidíte. Zvyšte počet paprsků a vyloupne se ze šumu sám.',
     extremumLabel: 'extrém → duha',
     rayCount: 'Počet paprsků',
     accumulate: 'Přidávat paprsky',
@@ -1659,7 +1708,7 @@ const translations = {
     showDroplets: 'Kapky',
     showCone: 'Kužel duhy',
     showAntisolar: 'Antisolární bod',
-    showHorizon: 'Horizont',
+    showHorizon: 'Obzor',
     showGround: 'Země',
     showRenderedBow: 'Vykreslit duhu',
     showAlexander: 'Alexandrův temný pás',
@@ -1682,7 +1731,7 @@ const translations = {
     secondaryRainbow: 'Vedlejší duha',
     higherOrderRainbow: 'Vyšší řád duhy',
     antisolarPoint: 'Antisolární bod',
-    horizon: 'horizont',
+    horizon: 'obzor',
     raindrop: 'dešťová kapka',
     sunLabel: 'Slunce',
     observerLabel: 'Pozorovatel',
@@ -1719,22 +1768,60 @@ const translations = {
     classNonCaustic: 'BĚŽNÝ ROZPTÝLENÝ PAPRSEK',
 
     /* ---- labelled explanations required by the brief ---- */
-    explPrimary: 'Primární duha vzniká po jednom vnitřním odrazu paprsku uvnitř kapky.',
+    explPrimary:
+      'Jeden vnitřní odraz uvnitř kapky, a jenom jeden. To je primární duha — nejjasnější ze všech, protože se z paprsku zatím nic dalšího nezahodilo.',
     explSecondary:
-      'Vedlejší (sekundární) duha vzniká po dvou vnitřních odrazech. Je slabší, má větší úhlový poloměr a obrácené pořadí barev.',
+      'Vedlejší duha vzniká po dvou vnitřních odrazech. Je slabší, má větší úhlový poloměr a obrácené pořadí barev. Za všechno může ten jeden odraz navíc.',
     explNoReflection: 'Bez vnitřního odrazu — nepřispívá k primární duze.',
-    explNonCaustic: 'Jeden vnitřní odraz, ale jiný výstupní úhel — běžný rozptýlený paprsek.',
-    explHigherOrder: 'Vyšší řád duhy — velmi slabý.',
+    explNonCaustic:
+      'Odrazy tam jsou, výstupní úhel ne. Tenhle paprsek odchází daleko od extrému, takže se rozptýlí jako každý jiný a k žádné duze nepřispívá.',
+    explHigherOrder:
+      'Tři odrazy a víc. Zbude zlomek toho, co má primární duha, a vrací se na opačnou stranu oblohy — vedle Slunce, ne proti němu.',
     explCaustic:
       'V okolí tohoto extrému se mnoho různých paprsků odchyluje do velmi podobného směru. Světlo se proto v tomto směru výrazně koncentruje. Tento jev se nazývá kaustika.',
     explObserverHeight:
-      'Úhlový poloměr duhy není dán výškou pozorovatele. Výška pozorovatele mění především to, jak velkou část kruhové duhy může zakrývat horizont.',
+      'Úhlový poloměr duhy nezávisí na výšce pozorovatele. Výška mění jen to, jak velkou část kruhu může zakrýt obzor.',
     explNotOneReflection:
       'Jeden vnitřní odraz sám o sobě duhu nedělá. Duha vzniká teprve tehdy, když se k jednomu vnitřnímu odrazu přidá úhlová koncentrace paprsků poblíž extrému.',
     explAlexander:
       'Mezi oběma duhami leží pás, do kterého geometrická optika neposílá žádné paprsky s jedním ani dvěma vnitřními odrazy. Proto se jeví tmavší. Není však úplně černý — světlo tam přichází z vyšších řádů, z odrazu na povrchu kapek a z běžného rozptylu v atmosféře.',
     explNotAnObject:
       'Duha není předmět v určité vzdálenosti. Každý pozorovatel dostává světlo od jiných kapek — od těch, které mu leží ve správném úhlovém směru.',
+
+    /* ---- which reflection count makes which bow ---- */
+    bowName0: 'žádná duha',
+    bowName1: 'primární duha',
+    bowName2: 'vedlejší duha',
+    bowName3: 'terciární duha',
+    bowNameK: 'duha {k}. řádu',
+    bowFromAntisolar: 'od antisolárního bodu',
+    bowFromSun: 'od Slunce',
+    dropletBowLine: 'k = {k} → {bow} · {angle} {side}',
+    dropletBowNone: 'k = 0 → bez vnitřního odrazu, duha nevznikne',
+    bowLedgerTitle: 'Který odraz dělá kterou duhu',
+    bowLedgerLight: 'zbývá světla',
+    bowLedgerVs: 'proti primární',
+    bowLedgerNote:
+      'Uvedené procento je čistý Fresnel: (1−R)²·Rᵏ pod vlastním úhlem dopadu té které duhy. Rozprostření na širší pás a větší prstenec ubere dál.',
+    explWhyFainter:
+      'Počítejte odrazy. Jeden dělá primární duhu, dva vedlejší, tři terciární. Každý odraz navíc něco stojí — a není to málo, protože povrch vody je zevnitř mizerné zrcadlo. Pod úhlem primární duhy vrátí zpátky jen {r1} toho, co na něj dopadne, a zbytek pustí rovnou ven. Celá primární duha stojí na tomhle zlomku. Vyžádejte si druhý odraz a zbude vám zlomek ze zlomku: {rel2} světla primární duhy. Pak si ukousne i geometrie — vedlejší duha leží na větším prstenci a rozetře tytéž barvy skoro přes dvojnásobný úhel.',
+    explReflectionIsWeak:
+      'V kapce se nic neodráží proto, že by muselo. Mezní úhel vody je {crit}, duhový paprsek dopadá na zadní stěnu zevnitř pod úhlem {theta}, tedy hluboko pod ním — povrch má volnou ruku světlo pustit ven, a pustí. Většina odejde na místě. Co zůstane, je duha.',
+
+    /* ---- 3-D field: why this droplet and not the one beside it ---- */
+    fieldPickInfo: 'Vybraná kapka',
+    fieldBandsTitle: 'Kde který řád vychází',
+    bowLedgerBow: 'duha',
+    fieldTestNote:
+      'Celý test je jediná otázka: pod jakým úhlem od antisolárního bodu tu kapku vidíte? Když v tom úhlu právě vychází nějaká vlnová délka (±{tol}), kapka se obarví. Na vzdálenost se nikdo neptá — proto je v tabulce jen pro zajímavost.',
+    fieldDelivers: 'Posílá vám {nm} nm ({color}) — {bow}.',
+    fieldDeliversNone: 'Neposílá vám nic. Nejbližší duhový pás míjí o {delta}.',
+    fieldHiddenOrder:
+      'Úhel by seděl, jenže {bow} máte vypnutou. Zapněte ji a kapka se rozsvítí.',
+    fieldWhyNote:
+      'Sousední kapka o kousek vedle je vidět pod jiným úhlem, takže z ní vyjde jiná vlnová délka — nebo žádná. Odtud ta barevná kružnice: není nakreslená, jsou to prostě všechny směry, které svírají tentýž úhel s osou.',
+    fieldLitOfShown: 'Svítí {lit} z {shown} kapek',
+    fieldTestLine: 'Test: úhel od antisolárního bodu ±{tol}. Vzdálenost se nepočítá.',
 
     /* ---- mathematics panel ---- */
     mathematics: 'Matematika',
@@ -1766,7 +1853,7 @@ const translations = {
       'Jas se odhaduje geometricky: paprsky se vzorkují úměrně ploše (b·db), váží se nepolarizovanými Fresnelovými koeficienty (1−R)²·Rᵏ a třídí se podle φ. Dělením sin φ se z energie stane jas. Jde o výukové přiblížení — nikoli o přesný elektromagnetický výpočet.',
     mathLimits: 'Meze modelu',
     mathLimitsNote:
-      'Použita je pouze geometrická optika. Simulace nepočítá interferenci, ohyb, Mieův rozptyl, vedlejší (supernumerární) oblouky ani polarizaci. Velmi malé kapky vyžadují vlnovou optiku.',
+      'Simulace počítá jen geometrickou optiku. Nepočítá interferenci, ohyb, Mieův rozptyl, vedlejší (supernumerární) oblouky ani polarizaci. Velmi malé kapky vyžadují vlnovou optiku.',
 
     /* ---- droplet size note ---- */
     dropletSizeNote:
@@ -1790,7 +1877,7 @@ const translations = {
       'Táhněte posuvníkem parametru dopadu (nebo myší v kapce). Paprsek se láme podle Snellova zákona: sin θᵢ = n · sin θᵣ. Nic není nakresleno předem.',
     s3title: 'Přidejte vnitřní odraz',
     s3body:
-      'Na zadní straně kapky se část světla odrazí zpět dovnitř. Přepněte počet vnitřních odrazů na 1 a sledujte dráhu R0 → R1 → R2 → R3.',
+      'Na zadní straně kapky se část světla odrazí zpět dovnitř. Jeden vnitřní odraz je teď zapnutý — sledujte dráhu R0 → R1 → R2 → R3.',
     s4title: 'Kam paprsek míří?',
     s4body:
       'Změřte úhel mezi vystupujícím paprskem a směrem od Slunce. Panel vpravo ukazuje φ — úhel od antisolárního směru.',
@@ -1799,24 +1886,24 @@ const translations = {
       'Projděte celý rozsah parametru dopadu a dívejte se na graf dole. Výstupní úhel není konstantní — ale ani nestoupá donekonečna.',
     s7title: 'Proč existuje jasný směr?',
     s7body:
-      'Křivka má extrém. V jeho okolí je skoro plochá, takže mnoho různých vstupních paprsků odchází téměř stejným směrem. Přepněte graf na rozdělení paprsků a přidávejte je.',
+      'Křivka má extrém. V jeho okolí je skoro plochá, takže mnoho různých vstupních paprsků odchází téměř stejným směrem. Graf dole teď počítá paprsky podle směru — zvyšte jejich počet a sledujte, jak vrchol roste.',
     s8title: 'Teď přidejte tisíce kapek',
     s8body:
-      'Každá kapka dělá totéž. K pozorovateli se dostane světlo jen od těch kapek, které leží ve správném úhlu. Zapněte přidávání kapek.',
+      'Každá kapka dělá totéž. K pozorovateli se dostane světlo jen od těch kapek, které leží ve správném úhlu. Přidávejte kapky a sledujte, jak oblouk houstne.',
     s10title: 'Tytéž kapky, ale v prostoru',
     s10body:
-      'Stejná otázka, jen bez řezu: každá kapka kolem vás se ptá, pod jakým úhlem ji vidíte a jestli právě tam nějaká vlnová délka vychází. Žádná kružnice se nekreslí — barevné jsou jen kapky, které prošly testem, a oblouk z nich stejně vyjde.',
+      'Stejná otázka, jen bez řezu: u každé kapky kolem vás se ptáme, pod jakým úhlem ji vidíte a jestli právě tam nějaká vlnová délka vychází. Žádná kružnice se nekreslí. Barevné jsou jen kapky, které prošly testem — a oblouk z nich stejně vyjde.',
     explFieldAssembles:
       'Přidejte kapky a oblouk zhoustne, uberte je a rozpadne se na jednotlivé body. Duha není nakreslený tvar, je to statistika: kolik kapek náhodou stojí ve správném směru.',
     s11title: 'Proč je to oblouk?',
     s11body:
-      'Ve třech rozměrech tvoří všechny takové směry kužel kolem antisolárního bodu. Průnik kužele s oblohou je kružnice. Zapněte horizont a dolní část zmizí.',
+      'Ve třech rozměrech tvoří všechny takové směry kužel kolem antisolárního bodu. Průnik kužele s oblohou je kružnice. Zapněte obzor a dolní část zmizí.',
     s12title: 'Odkud jsou barvy?',
     s12body:
-      'Index lomu vody závisí na vlnové délce. Posuňte disperzi z 0 % na 100 % a sledujte, jak se jediný úhel rozpadne na pás barev — a s ním i graf dole, na jednu křivku pro každou vlnovou délku.',
+      'Index lomu vody závisí na vlnové délce. Posuňte disperzi z 0 % na 100 % a jediný úhel se rozpadne na pás barev. Graf dole se rozpadne s ním — na jednu křivku pro každou vlnovou délku.',
     s13title: 'Může být duh víc?',
     s13body:
-      'Nastavte dva vnitřní odrazy. Vznikne slabší duha s větším poloměrem a obráceným pořadím barev. Mezi nimi zůstane Alexandrův temný pás.',
+      'Dva vnitřní odrazy dávají druhou duhu. Je slabší, má větší poloměr a obrácené pořadí barev. Mezera mezi oběma duhami je Alexandrův temný pás.',
 
 /* ---- controls: the observer ---- */
     observerGroup: 'Pozorovatel',
@@ -1831,11 +1918,11 @@ const translations = {
     observerRise: 'Pozorovatel — nahoru / dolů',
     observerMoveHint:
       'Posunutím pozorovatele se změní úhly ke všem kapkám, takže duhu začne tvořit jiná skupina kapek. Pozorovatele lze také přetáhnout myší v obrázku.',
-    observerRecentre: 'Zpět na výchozí',
+    observerRecentre: 'Zpět na výchozí místo',
     indexGroup: 'Index lomu (pokročilé)',
     observerOnBow: '✓ přesně na duze',
     observerManualHint:
-      'Zvýrazněné paprsky vycházejí právě pod úhlem, na kterém stojí oko. Čím víc jich je, tím jasnější je ten směr.',
+      'Zvýrazněné paprsky vycházejí přesně pod tím úhlem, ve kterém stojí oko. Čím víc jich je, tím jasnější je ten směr.',
     dropsMoveHint: 'Přetáhněte pozorovatele — duha se přesune s vámi na jiné kapky.',
     obsChipForward: 'dál do deště',
     obsChipUp: 'výš',
@@ -1844,12 +1931,12 @@ const translations = {
     /* ---- tutorial: the two observer steps ---- */
     s6title: 'Kde musí pozorovatel stát?',
     s6body:
-      'Oko je teď na vás. Táhněte jím po obrázku (nebo použijte posuvník úhlu) a sledujte počítadlo paprsků vpravo nahoře. Ve většině úhlů dorazí do oka jeden nebo dva paprsky. V jednom jediném úhlu jich dorazí celý svazek — a právě pod tím úhlem vidíme duhu.',
+      'Oko teď ovládáte vy. Táhněte jím po obrázku (nebo použijte posuvník úhlu) a sledujte počítadlo paprsků vpravo nahoře. Ve většině úhlů dorazí do oka jeden nebo dva paprsky. V jednom jediném úhlu jich dorazí celý svazek — a přesně pod tím úhlem vidíme duhu.',
     explObserverAngle:
-      'Úhel φ se měří u pozorovatele: mezi pohledem na kapku a antisolárním směrem, tedy směrem, kterým slunečné světlo letělo dál. Je to přesně to samé φ, které ukazuje výpis u výstupu paprsku.',
+      'Úhel φ se měří u pozorovatele: mezi pohledem na kapku a antisolárním směrem, tedy směrem, kterým sluneční světlo letělo dál. Je to přesně totéž φ, které ukazuje výpis u výstupu paprsku.',
     s9title: 'Duha není na jednom místě',
     s9body:
-      'Kapky se teď nezmění ani o jednu. Změní se jen to, kde stojíte. Posuňte pozorovatele — a duhu začne tvořit úplně jiná skupina kapek, protože rozhoduje výhradně úhel, pod kterým je vidíte.',
+      'Ani jedna kapka se nepohne. Mění se jen to, kde stojíte vy. Posuňte pozorovatele a duhu začne tvořit úplně jiná skupina kapek — rozhoduje totiž výhradně úhel, pod kterým je vidíte.',
     explBowFollowsYou:
       'Proto k duze nelze dojít a proto ji každý vidí na jiných kapkách. Vaše duha je jen vaše.',
     explDispersionZoom:
@@ -1857,7 +1944,7 @@ const translations = {
 
 /* ---- export & footer ---- */
     exportPng: 'Uložit PNG',
-    exportPngHint: 'Uloží tento obrázek ve trojnásobném rozlišení, včetně popisku.',
+    exportPngHint: 'Uloží tento obrázek v trojnásobném rozlišení, včetně popisku.',
     exportWorking: 'ukládám…',
     exportSaved: 'uloženo',
     exportDeclined: 'zrušeno',
@@ -1878,7 +1965,7 @@ const translations = {
     q4: 'Proč je duha kruhová?',
     a4: 'Protože příslušné výstupní směry tvoří kužel kolem antisolárního směru.',
     q5: 'Proč obvykle vidíme jen oblouk?',
-    a5: 'Protože horizont a země zakrývají spodní část kružnice.',
+    a5: 'Protože obzor a země zakrývají spodní část kružnice.',
     q6: 'Proč jsou tam barvy?',
     a6: 'Protože voda má pro různé vlnové délky různý index lomu.',
     q7: 'Proč je vedlejší duha vně primární?',
@@ -1889,9 +1976,9 @@ const translations = {
     dropsHint:
       'Zelené kapky posílají světlo k pozorovateli, šedé ne. Rozhoduje jen úhel, ne vzdálenost.',
     dropsSunHint:
-      'Posuňte výšku Slunce — rozsvítí se jiné kapky. Duha není předmět na jednom místě, je to jen úhel; jiný pozorovatel by měl svou vlastní.',
+      'Změňte výšku Slunce — rozsvítí se jiné kapky. Duha není předmět na jednom místě, je to jen úhel. Jiný pozorovatel by měl svou vlastní.',
     dropsLegendReaches: 'dosáhne oka pozorovatele',
-    dropsLegendMisses: 'kapka je osvětlená, ale míjí — jiný úhel',
+    dropsLegendMisses: 'osvětlená taky, ale míjí oko — jiný úhel',
     dropsContributing: 'Kapek přispívajících pozorovateli',
 
     /* ---- many droplets: inspecting one of them ---- */
@@ -1906,7 +1993,7 @@ const translations = {
     dropDistanceNote:
       'Vzdálenost se ve výpočtu nikde neobjeví. Rozhoduje jen směr — proto duha není předmět na určitém místě.',
     dropOrdersTitle: 'Kam kapka posílá soustředěné světlo',
-    dropDelivers: 'Do oka posílá {color} (k = {k}).',
+    dropDelivers: 'Do oka posílá {color} — {bow}.',
     dropDeliversNone: 'Do oka neposílá nic — nejbližší duhový směr míjí o {delta}.',
     dropPhiThetaNote:
       'Θ je úhel, o který kapka světlo stočí; φ = 180° − Θ je úhel, pod kterým musí být kapka vidět. V obrázku je proto Θ vyneseno u kapky a φ u oka.',
@@ -1914,7 +2001,7 @@ const translations = {
       'Třetí odraz vychází až u φ ≈ {phi}, tedy asi {fromSun} od Slunce — dopředu do deště, ne zpátky k pozorovateli. Proto terciární duhu na obloze proti Slunci nikdy nenajdete.',
     dropInfoHint: 'Klepnutím na jinou kapku v obrázku vyberete jinou.',
     dropClear: 'Zrušit výběr',
-    animateDrops: 'Animovat přibývání',
+    animateDrops: 'Přidávat kapky postupně',
 
     /* ---- sky scene ---- */
     skyHint: 'Táhněte myší = otáčení, kolečko = přiblížení.',
@@ -1927,7 +2014,7 @@ const translations = {
     skyPickElevation: 'Výška nad obzorem',
     skyPickRoll: 'Poloha na kružnici',
     skyPickNote:
-      'Kapka v tomto směru dostává sluneční světlo jako všechny ostatní. Řád k = {k} z ní vychází přesně pod úhlem, na kterém stojíte, a doletí do oka. Ostatní řády opouštějí tutéž kapku jinam — proto v jednom směru vidíte vždy jen jeden řád a vedlejší duhu vám tvoří úplně jiné kapky.',
+      'Kapka v tomto směru dostává sluneční světlo jako všechny ostatní. Řád k = {k} z ní vychází přesně pod tím úhlem, pod kterým se na ni díváte, a doletí vám do oka. Ostatní řády opouštějí tutéž kapku jinam — proto v jednom směru vidíte vždy jen jeden řád a vedlejší duhu vám tvoří úplně jiné kapky.',
     skyPickOthers: 'Kam z téže kapky míří ostatní řády',
     skyPickMiss: 'míjí oko o {delta}',
     skyPickReaches: 'trefí oko',
@@ -1936,16 +2023,16 @@ const translations = {
       'Tento směr je pod obzorem, takže tam žádný déšť nevidíte a paprsek se nekreslí. Snižte Slunce nebo zapněte déšť pod úrovní očí.',
     coneAngle: 'Úhel kužele',
     bowVisible: 'Viditelná část duhy',
-    rainSeenBelow: 'Déšť vidíte až do',
-    horizonDip: 'Pokles horizontu',
-    horizonOfObserver: 'horizont pozorovatele',
+    rainSeenBelow: 'Déšť pod obzorem',
+    horizonDip: 'Pokles obzoru',
+    horizonOfObserver: 'obzor pozorovatele',
     groundLevel: 'úroveň země',
     fullCircle: 'Úplný kruh',
     flyMode: 'Let nad krajinou',
     bowTopElevation: 'Vrchol duhy nad obzorem',
     bowBelowHorizon: 'Celá primární duha je pod obzorem — Slunce je příliš vysoko.',
     fullCircleNote:
-      'Nad horizontem může být celá kružnice jen tehdy, když jsou kapky i pod úrovní očí a horizont je nezakrývá. Samotná výška to nezaručí: i v kilometru klesne obzor jen asi o 1°.',
+      'Celá kružnice může být nad obzorem jen tehdy, když jsou kapky i pod úrovní očí a obzor je nezakrývá. Samotná výška to nezaručí: ani z kilometru neklesne obzor víc než asi o 1°.',
     metres: 'm',
     degrees: '°',
     nm: 'nm',
@@ -1957,7 +2044,7 @@ const translations = {
     reconstructBody:
       'jednotlivé paprsky → rozdělení výstupních úhlů → kaustika → mnoho kapek → kužel v 3D → kruhová duha → horizont → viditelný oblouk',
     warningNoRender:
-      'Vykreslení duhy je vypnuté. Zapněte je až tehdy, když už tušíte, proč tam bude.',
+      'Vykreslení duhy je vypnuté. Zapněte je, až budete umět odhadnout, kde duha bude.',
   },
 
   en: {
@@ -1980,11 +2067,11 @@ const translations = {
     sceneSky: 'Sky 3D',
     sceneField: 'Droplets in space',
     sceneFieldDesc: 'Thousands of droplets in space. The bow assembles itself; nothing draws it.',
-    fieldCount: 'Droplets in the volume',
+    fieldCount: 'Number of droplets in space',
     fieldCountHint:
-      'Every droplet is asked what the flat scene asks it: at what angle do I see it, and does some wavelength come out exactly there? More droplets, a cleaner circle — but only droplets are ever drawn.',
+      'Every droplet gets the same question as in the flat scene: at what angle do you see it, and does some wavelength come out exactly there? More droplets, a cleaner circle. Only droplets are ever drawn.',
     fieldNoCircle: 'No circle is drawn — the coloured dots are the droplets that passed the test.',
-    fieldHint: 'Drag to orbit, scroll to zoom. Switch to the eye view and the bow closes into a ring.',
+    fieldHint: 'Drag to orbit, scroll to zoom. In the eye view the bow closes into a ring.',
     fieldClickHint: 'Click a droplet to see the light passing through it, and at what angles.',
     fieldClearHint: 'Click the same droplet again to clear the selection.',
     sceneDropletDesc: 'Cross-section of one spherical droplet. The ray is computed, not drawn.',
@@ -2011,24 +2098,24 @@ const translations = {
     graphCollapsedHint:
       'Exit angle and ray distribution — the numbers the rainbow angle comes out of.',
     graphExitExplain:
-      'Every incoming ray is labelled by where it hits the droplet: b/R = 0 is dead centre, b/R = 1 grazes the edge. The curve gives the direction that ray leaves in. Near its turning point the curve is almost flat, so a whole band of impact parameters exits at nearly the same angle — that pile-up is the rainbow, and the angle it happens at is the bow’s angular radius. Each wavelength has its own curve, each turning over at a slightly different angle; that is where the colours come from.',
+      "Every incoming ray is labelled by where it hits the droplet: b/R = 0 is dead centre, b/R = 1 grazes the edge. The curve gives the direction that ray leaves in. Near its turning point the curve is almost flat, so a whole band of impact parameters exits at nearly the same angle — that pile-up is the rainbow, and the angle it happens at is the bow's angular radius. Each wavelength has its own curve, each turning over at a slightly different angle; that is where the colours come from.",
     graphDistExplain:
-      'Rays are fired at random across the whole face of the droplet and counted by the direction they leave in. Most directions get a similar modest share; one does not. At the angle where the exit-angle curve turns over the count spikes — and since this plot is brightness against angle, exactly what an eye measures sweeping across the sky, that spike is the bow, sitting at the angle you have to look at. Raise the ray count and it sharpens out of the noise on its own.',
+      'Rays are fired at random across the whole face of the droplet and counted by the direction they leave in. Most directions get a similar modest share. One does not: at the angle where the exit-angle curve turns over, the count spikes. The vertical axis is brightness and the horizontal one is angle — exactly what an eye measures sweeping the sky — so that spike is the bow, sitting at the angle you have to look at. Raise the ray count and it sharpens out of the noise on its own.',
     extremumLabel: 'extremum → rainbow',
     rayCount: 'Number of rays',
     accumulate: 'Accumulate rays',
 
     /* ---- controls: sun ---- */
     sun: 'Sun',
-    sunElevation: 'Height of Sun above horizon',
+    sunElevation: 'Height of the Sun above the horizon',
     sunAzimuth: 'Sun azimuth',
     observer: 'Observer',
     observerHeight: 'Observer height',
     viewMode: 'View',
     viewOrbit: 'From outside',
     viewEye: "Observer's eye",
-    lookAzimuth: 'Looking towards',
-    lookElevation: 'Look elevation',
+    lookAzimuth: 'View direction',
+    lookElevation: 'View tilt',
     fieldOfView: 'Field of view',
 
     /* ---- controls: light ---- */
@@ -2055,7 +2142,7 @@ const translations = {
     indexModel: 'Refractive-index model',
     indexTable: 'table (6 colours)',
     indexCauchy: 'Cauchy relation',
-    indexScale: 'Refractive index multiplier',
+    indexScale: 'Refractive-index multiplier',
     optics: 'Optics',
 
     /* ---- controls: rays ---- */
@@ -2135,26 +2222,63 @@ const translations = {
     classPrimary: 'PRIMARY RAINBOW FAMILY',
     classSecondary: 'SECONDARY RAINBOW FAMILY',
     classHigherOrder: 'HIGHER-ORDER RAINBOW',
-    classNonCaustic: 'OTHER / NON-CAUSTIC RAY',
+    classNonCaustic: 'ORDINARY SCATTERED RAY',
 
     /* ---- labelled explanations required by the brief ---- */
     explPrimary:
-      'The primary rainbow is produced by rays that undergo one internal reflection inside the droplet.',
+      'One internal reflection inside the droplet, and only one. That is the primary bow, the brightest of them, because nothing further has been thrown away yet.',
     explSecondary:
-      'The secondary rainbow is produced after two internal reflections. It is fainter, has a larger angular radius, and its color order is reversed.',
+      'The secondary bow comes from two internal reflections. It is fainter, its angular radius is larger, and its colour order runs the other way. The one extra bounce is what does all three.',
     explNoReflection: 'No internal reflection — does not contribute to the primary rainbow.',
-    explNonCaustic: 'One internal reflection, but a different exit angle — an ordinary scattered ray.',
-    explHigherOrder: 'Higher-order rainbow — very faint.',
+    explNonCaustic:
+      'The bounces are there, the exit angle is not. This ray leaves nowhere near the extremum, so it scatters like any other and adds to no bow at all.',
+    explHigherOrder:
+      'Three bounces or more. What is left is a fraction of the primary, and it comes back on the wrong side of the sky — beside the Sun rather than opposite it.',
     explCaustic:
       'Near this extremum, many different incoming rays leave the droplet in nearly the same direction. Light therefore becomes strongly concentrated in this direction. This concentration is called a caustic.',
     explObserverHeight:
-      "The angular radius of the rainbow is not determined by the observer's height. Observer height mainly changes how much of the circular rainbow can be visible above the horizon.",
+      "The angular radius of the rainbow does not depend on the observer's height. Height only changes how much of the circle the horizon can hide.",
     explNotOneReflection:
       'One internal reflection alone does not make a rainbow. The bright bow appears only when one internal reflection is combined with the angular concentration of rays near the extremum.',
     explAlexander:
       'Between the two bows lies a band into which geometric optics sends no once- or twice-reflected rays, so it looks darker. It is not truly black: higher orders, reflection from droplet surfaces and ordinary atmospheric scattering all put some light there.',
     explNotAnObject:
       'A rainbow is not an object at some distance. Every observer receives light from a different set of droplets — the ones that happen to lie in the right angular direction.',
+
+    /* ---- which reflection count makes which bow ---- */
+    bowName0: 'no bow',
+    bowName1: 'primary bow',
+    bowName2: 'secondary bow',
+    bowName3: 'tertiary bow',
+    bowNameK: 'order-{k} bow',
+    bowFromAntisolar: 'from the antisolar point',
+    bowFromSun: 'from the Sun',
+    dropletBowLine: 'k = {k} → {bow} · {angle} {side}',
+    dropletBowNone: 'k = 0 → no internal reflection, no bow',
+    bowLedgerTitle: 'Which bounce makes which bow',
+    bowLedgerLight: 'light left',
+    bowLedgerVs: 'vs primary',
+    bowLedgerNote:
+      "The percentage is pure Fresnel: (1−R)²·Rᵏ at that bow's own angle of incidence. Spreading over a wider band and a bigger ring takes more on top.",
+    explWhyFainter:
+      "Count the bounces. One gives the primary bow, two the secondary, three the tertiary. Every extra bounce costs light, and the price is steep — seen from the inside, a water surface is a poor mirror. At the primary bow's angle it turns back only {r1} of what reaches it and lets the rest straight out. The whole primary rainbow stands on that sliver. Ask for a second bounce and you keep a fraction of a fraction: {rel2} of the primary's light. Then geometry takes its own cut, because the secondary sits on a bigger ring and smears the same colours across nearly twice the angle.",
+    explReflectionIsWeak:
+      "Nothing in the droplet bounces because it has to. Water's critical angle is {crit}, and the rainbow ray meets the back wall from inside at {theta} — well under it, so the surface is free to let light through, and it does. Most of it leaves on the spot. What stays behind is the rainbow.",
+
+    /* ---- 3-D field: why this droplet and not the one beside it ---- */
+    fieldPickInfo: 'Selected droplet',
+    fieldBandsTitle: 'Where each order comes out',
+    bowLedgerBow: 'bow',
+    fieldTestNote:
+      'The whole test is one question: at what angle from the antisolar point do you see this droplet? If some wavelength comes out at exactly that angle (±{tol}), the droplet is coloured. Nobody asks about distance — it is in the table out of curiosity, nothing more.',
+    fieldDelivers: 'Sends you {nm} nm ({color}) — the {bow}.',
+    fieldDeliversNone: 'Sends you nothing. The nearest bow band misses by {delta}.',
+    fieldHiddenOrder:
+      'The angle would work, but you have the {bow} switched off. Turn it on and this droplet lights up.',
+    fieldWhyNote:
+      'The droplet just beside this one is seen at a slightly different angle, so a different wavelength comes out of it — or none does. That is where the coloured ring comes from. Nothing draws it; it is simply every direction that makes the same angle with the axis.',
+    fieldLitOfShown: '{lit} of {shown} droplets are lit',
+    fieldTestLine: 'The test: angle from the antisolar point, ±{tol}. Distance does not enter it.',
 
     /* ---- mathematics panel ---- */
     mathematics: 'Mathematics',
@@ -2211,7 +2335,7 @@ const translations = {
       "Drag the impact-parameter slider (or drag inside the droplet). The ray bends according to Snell's law: sin θᵢ = n · sin θᵣ. Nothing here is drawn in advance.",
     s3title: 'Add internal reflection',
     s3body:
-      'At the back of the droplet part of the light reflects back inside. Set the number of internal reflections to 1 and follow the path R0 → R1 → R2 → R3.',
+      'At the back of the droplet part of the light reflects back inside. One internal reflection is switched on now — follow the path R0 → R1 → R2 → R3.',
     s4title: 'Where does the outgoing ray point?',
     s4body:
       'Measure the angle between the outgoing ray and the direction away from the Sun. The panel on the right shows φ, the angle from the antisolar direction.',
@@ -2220,10 +2344,10 @@ const translations = {
       'Sweep the whole range of the impact parameter and watch the graph below. The exit angle is not constant — but it does not grow without limit either.',
     s7title: 'Why is there a bright direction?',
     s7body:
-      'The curve has an extremum. Near it the curve is almost flat, so many different incoming rays leave in almost the same direction. Switch the graph to the ray distribution and add rays.',
+      'The curve has an extremum. Near it the curve is almost flat, so many different incoming rays leave in almost the same direction. The graph below now counts rays by direction — raise the ray count and watch the spike grow.',
     s8title: 'Now add thousands of droplets',
     s8body:
-      'Every droplet does the same thing. Light reaches the observer only from those droplets that lie at the right angle. Turn on droplet accumulation.',
+      'Every droplet does the same thing. Light reaches the observer only from droplets that lie at the right angle. Raise the droplet count and watch the bow fill in.',
     s10title: 'The same droplets, now in space',
     s10body:
       'The same question with the cross-section removed: every droplet around you is asked what angle you see it at, and whether some wavelength comes out exactly there. No circle is drawn — only the droplets that passed are coloured, and an arc comes out of them anyway.',
@@ -2232,18 +2356,18 @@ const translations = {
     s11title: 'Why does it look like an arc?',
     s11body:
       'In three dimensions all those directions form a cone around the antisolar point. The cone meets the sky in a circle. Switch the horizon on and the lower part disappears.',
-    s12title: 'Where do the colors come from?',
+    s12title: 'Where do the colours come from?',
     s12body:
-      "Water's refractive index depends on wavelength. Move dispersion from 0 % to 100 % and watch a single angle split into a band of colours — and the graph below splits with it, one curve per wavelength.",
+      "Water's refractive index depends on wavelength. Move dispersion from 0 % to 100 % and a single angle splits into a band of colours. The graph below splits with it, one curve per wavelength.",
     s13title: 'Can there be another rainbow?',
     s13body:
-      "Set two internal reflections. A fainter bow appears with a larger radius and reversed colour order, with Alexander's dark band between them.",
+      "Two internal reflections make a second bow. It is fainter, its radius is larger, and its colours run the other way. The gap between the two bows is Alexander's dark band.",
 
 /* ---- controls: the observer ---- */
     observerGroup: 'Observer',
     observerPlacement: 'Eye placement',
     observerAuto: 'automatic',
-    observerManual: 'by hand',
+    observerManual: 'manual',
     observerAngle: 'Observer angle φ',
     observerAngleHint:
       'Where the observer stands, measured from the antisolar direction. Drag the eye in the picture, or use this slider, and hunt for the angle where the most rays arrive.',
@@ -2252,11 +2376,11 @@ const translations = {
     observerRise: 'Observer — up / down',
     observerMoveHint:
       'Moving the observer changes the angle to every droplet, so a different set of droplets forms the bow. The observer can also be dragged in the picture.',
-    observerRecentre: 'Back to the start',
+    observerRecentre: 'Back to the starting point',
     indexGroup: 'Refractive index (advanced)',
     observerOnBow: '✓ exactly on the bow',
     observerManualHint:
-      'Highlighted rays leave at exactly the angle the eye is standing at. The more of them there are, the brighter that direction.',
+      'Highlighted rays leave at exactly the angle the eye sits at. The more of them there are, the brighter that direction.',
     dropsMoveHint: 'Drag the observer — the bow moves with you, onto different droplets.',
     obsChipForward: 'further into the rain',
     obsChipUp: 'higher',
@@ -2265,12 +2389,12 @@ const translations = {
     /* ---- tutorial: the two observer steps ---- */
     s6title: 'Where does the observer have to stand?',
     s6body:
-      'The eye is yours now. Drag it across the picture (or use the angle slider) and watch the ray tally in the top right. At most angles one or two rays arrive. At one angle a whole bundle arrives at once — and that is the angle a rainbow is seen at.',
+      'The eye is yours now. Drag it across the picture (or use the angle slider) and watch the ray tally in the top right. Most angles give one or two rays. One angle gives a whole bundle at once — and that is the angle a rainbow is seen at.',
     explObserverAngle:
       'φ is measured at the observer: between the line of sight to the droplet and the antisolar direction, the direction the sunlight was already travelling. It is the same φ the exit readout prints.',
     s9title: 'A rainbow is not in a place',
     s9body:
-      'Not one droplet moves here. Only where you are standing does. Move the observer, and a completely different set of droplets forms the bow — because the only thing that decides is the angle you see them at.',
+      'Not one droplet moves. The only thing that changes is where you stand. Move the observer and a completely different set of droplets forms the bow, because the only thing that decides is the angle you see them at.',
     explBowFollowsYou:
       'This is why you can never walk up to a rainbow, and why no two people see theirs on the same droplets. Yours is yours alone.',
     explDispersionZoom:
@@ -2290,7 +2414,7 @@ const translations = {
     quizIntro: 'You can check every answer in the simulation itself.',
     showAnswer: 'Show answer',
     hideAnswer: 'Hide answer',
-    q1: 'What happens if the ray enters the droplet without an internal reflection?',
+    q1: 'What happens if a ray passes through the droplet without an internal reflection?',
     a1: 'It carries on forwards, only slightly deflected. It heads away from an observer who has the Sun behind them, and contributes nothing to the primary bow.',
     q2: 'Does every one-reflection ray produce a rainbow?',
     a2: 'No. The bright rainbow results from angular concentration near the caustic.',
@@ -2299,8 +2423,8 @@ const translations = {
     q4: 'Why is the rainbow circular?',
     a4: 'Because the relevant outgoing directions form a cone around the antisolar direction.',
     q5: 'Why do we usually see only an arc?',
-    a5: 'Because the horizon and ground hide the lower part of the circle.',
-    q6: 'Why are there colors?',
+    a5: 'Because the horizon and the ground hide the lower part of the circle.',
+    q6: 'Why are there colours?',
     a6: 'Because water has different refractive indices for different wavelengths.',
     q7: 'Why is the secondary rainbow outside the primary?',
     a7: 'Two internal reflections produce a larger angular deviation.',
@@ -2310,14 +2434,14 @@ const translations = {
     dropsHint:
       'Green droplets send light to the observer, grey ones do not. Only the angle matters, not the distance.',
     dropsSunHint:
-      "Drag the Sun's height — different droplets light up. A rainbow isn't an object at one place, only an angle; another observer would have their own.",
-    dropsLegendReaches: 'reaches the observer’s eye',
+      "Change the Sun's height — different droplets light up. A rainbow is not an object at one place, only an angle. Another observer would have their own.",
+    dropsLegendReaches: "reaches the observer's eye",
     dropsLegendMisses: 'lit too, but misses — wrong angle',
     dropsContributing: 'Droplets reaching the observer',
 
     /* ---- many droplets: inspecting one of them ---- */
     dropsClickHint: 'Click a droplet to see every ray it sends out, and at what angle.',
-    dropsClearHint: 'Click empty sky to clear the selection.',
+    dropsClearHint: 'Click away from any droplet to clear the selection.',
     dropIncoming: 'sunlight',
     dropHits: 'φ {angle} — reaches the eye',
     dropMisses: 'φ {angle} — misses the eye',
@@ -2327,7 +2451,7 @@ const translations = {
     dropDistanceNote:
       'Distance appears nowhere in the test. Only the direction counts — which is why a rainbow is not an object sitting in a place.',
     dropOrdersTitle: 'Where this droplet sends its concentrated light',
-    dropDelivers: 'Delivers {color} to your eye (k = {k}).',
+    dropDelivers: 'Sends you {color} — the {bow}.',
     dropDeliversNone: 'Delivers nothing to your eye — the nearest bow direction misses by {delta}.',
     dropPhiThetaNote:
       'Θ is the angle the droplet turns the light through; φ = 180° − Θ is the angle the droplet has to be seen at. So the figure draws Θ at the droplet and φ at the eye.',
@@ -2335,7 +2459,7 @@ const translations = {
       'The third reflection only comes out at φ ≈ {phi}, about {fromSun} from the Sun — forward into the rain, not back towards the observer. That is why you never find a tertiary bow in the sky opposite the Sun.',
     dropInfoHint: 'Click another droplet in the figure to select that one instead.',
     dropClear: 'Clear selection',
-    animateDrops: 'Animate accumulation',
+    animateDrops: 'Add droplets gradually',
 
     /* ---- sky scene ---- */
     skyHint: 'Drag to rotate, scroll to zoom.',
@@ -2348,7 +2472,7 @@ const translations = {
     skyPickElevation: 'Elevation above the horizon',
     skyPickRoll: 'Position around the circle',
     skyPickNote:
-      'The droplet in this direction receives sunlight like every other one. Order k = {k} leaves it at exactly the angle you are standing at, so that light reaches your eye. The other orders leave the same droplet in other directions — which is why you only ever see one order in a given direction, and why the secondary bow is made of entirely different droplets.',
+      'The droplet in this direction receives sunlight like every other one. Order k = {k} leaves it at exactly the angle you are looking from, so that light reaches your eye. The other orders leave the same droplet in other directions — which is why you only ever see one order in a given direction, and why the secondary bow is made of entirely different droplets.',
     skyPickOthers: 'Where the other orders leave the same droplet',
     skyPickMiss: 'misses your eye by {delta}',
     skyPickReaches: 'reaches your eye',
@@ -2357,7 +2481,7 @@ const translations = {
       'This direction is below the horizon, so there is no rain to see there and the beam is not drawn. Lower the Sun, or turn on rain below eye level.',
     coneAngle: 'Cone angle',
     bowVisible: 'Visible part of the bow',
-    rainSeenBelow: 'Rain seen down to',
+    rainSeenBelow: 'Rain below the horizon',
     horizonDip: 'Horizon dip',
     horizonOfObserver: "observer's horizon",
     groundLevel: 'ground level',
@@ -2378,7 +2502,7 @@ const translations = {
     reconstructBody:
       'individual rays → distribution of exit angles → caustic → many droplets → 3D cone → circular rainbow → horizon → visible arc',
     warningNoRender:
-      'Rendering of the bow is switched off. Turn it on once you can already predict where it will be.',
+      'Rendering of the bow is switched off. Turn it on once you can predict where it will be.',
   },
 };
 
@@ -3195,6 +3319,24 @@ function colorIdFor(lambda) {
   return c ? c.id : null;
 }
 
+/**
+ * The named colour a continuous wavelength is closest to.
+ *
+ * The droplet field inverts an angle straight back to a wavelength, so its
+ * answers land anywhere in 400-680 nm and `colorIdFor()` returns null for
+ * almost all of them. Naming the nearest colour lets that scene say "564 nm,
+ * green" where the flat scene says "green", instead of the two readouts
+ * describing the same droplet in two different vocabularies.
+ */
+function nearestColorId(lambda) {
+  let best = null;
+  for (const c of O.NAMED_COLORS) {
+    const d = Math.abs(c.lambda - lambda);
+    if (best === null || d < best.d) best = { d, id: c.id };
+  }
+  return best ? best.id : null;
+}
+
 /* ----------------------------------------------------- bow geometry -- */
 
 /**
@@ -3361,6 +3503,171 @@ function bowSpectrum(idx, k, samples = 96) {
   };
 }
 
+/* ==========================================================================
+ * Which reflection count makes which bow
+ * ======================================================================== */
+
+/** Translation key naming the bow a given reflection count produces. */
+function bowNameKey(k) {
+  if (k === 1) return 'bowName1';
+  if (k === 2) return 'bowName2';
+  if (k === 3) return 'bowName3';
+  return 'bowNameK';
+}
+
+/**
+ * One row per reflection order: which bow it makes, where it lands, and how
+ * much of the incoming light is left by the time it gets there.
+ *
+ * `relative` is the Fresnel factor measured against the primary, and it is
+ * the only brightness ratio quoted anywhere in the UI -- exact, and derived
+ * from one formula. The spreading loss on top of it (a wider colour band on
+ * a bigger ring) is stated in words rather than as a second number, because
+ * a single figure for it would depend on where you cut the band.
+ *
+ * `sunward` matters more than it looks: k=1 and k=2 come back towards the
+ * antisolar point, k=3 goes the other way and lands next to the Sun. That is
+ * why nobody has seen a tertiary bow by looking at the primary's sky.
+ */
+function orderLedger(idx, orders = DROP_ORDERS, lambda = 650) {
+  const n = idx(lambda);
+  const rows = [];
+  for (const k of orders) {
+    const geo = O.rainbowGeometry(n, k);
+    const light = O.bowBrightness(n, k);
+    if (!geo || !light) continue;
+    const band = bowBand(idx, k);
+    const sunward = geo.antisolarDeg > 90;
+    rows.push({
+      k,
+      geo,
+      light,
+      R: light.R,
+      survives: light.survives,
+      phiDeg: geo.antisolarDeg,
+      seenAtDeg: sunward ? 180 - geo.antisolarDeg : geo.antisolarDeg,
+      sunward,
+      widthDeg: band ? Math.abs(band.hi - band.lo) : 0,
+    });
+  }
+  const base = rows.length ? rows[0].survives : 0;
+  for (const r of rows) r.relative = base > 0 ? r.survives / base : null;
+  return rows;
+}
+
+/* ==========================================================================
+ * The droplet-field test, in one place
+ * ======================================================================== */
+
+/**
+ * The orders the field is currently painting, as the show toggles set them.
+ *
+ * Deliberately NOT `DROP_ORDERS`: that says which orders an inspection takes
+ * apart (all three, including the one nobody can see), this says which ones
+ * the scene is highlighting right now. Conflating them would make a readout
+ * claim a droplet is lit while the scene draws it grey.
+ */
+function shownOrders() {
+  const orders = [];
+  if (state.show.primary) orders.push(1);
+  if (state.show.secondary) orders.push(2);
+  if (state.show.higher) orders.push(3);
+  return orders;
+}
+
+/**
+ * "At angle phi, does any shown order deliver a wavelength?" -- the single
+ * question the droplet field asks, built once and then run.
+ *
+ * `fieldView` builds it once per physics change and runs `at()` over sixty
+ * thousand droplets; the readout builds it again for the one droplet the
+ * reader clicked. Same object, same answer. A panel that disagreed with the
+ * dots it is describing is exactly the failure this exists to prevent, and
+ * it is the reason the test is not written out twice.
+ */
+function fieldTest(idx, orders = shownOrders()) {
+  const single = state.wavelength === 'white' ? null : state.wavelength;
+  const spectra = single === null ? orders.map((k) => bowSpectrum(idx, k)).filter(Boolean) : [];
+  const mono = [];
+  if (single !== null) {
+    for (const k of orders) {
+      const geo = O.rainbowGeometry(idx(single), k);
+      if (geo) mono.push({ k, phi: geo.antisolarDeg });
+    }
+  }
+  return {
+    orders,
+    single,
+    spectra,
+    mono,
+    /** {lambda, k} for the first shown order that answers yes, else null. */
+    at(phi) {
+      if (single !== null) {
+        for (const m of mono) {
+          if (Math.abs(phi - m.phi) <= BOW_MATCH_DEG) return { lambda: single, k: m.k };
+        }
+        return null;
+      }
+      for (const sp of spectra) {
+        const lam = sp.lambdaAt(phi);
+        if (lam !== null) return { lambda: lam, k: sp.k };
+      }
+      return null;
+    },
+    /**
+     * How far this angle is from the nearest band it could have hit, and
+     * which one. The number a droplet that missed is actually missing BY --
+     * "no" is a worse answer than "no, by 0.8 degrees".
+     */
+    missBy(phi) {
+      let best = null;
+      const keep = (gap, k) => {
+        if (best === null || gap < best.gap) best = { gap, k };
+      };
+      if (single !== null) for (const m of mono) keep(Math.abs(phi - m.phi), m.k);
+      else for (const sp of spectra) keep(phi < sp.lo ? sp.lo - phi : phi > sp.hi ? phi - sp.hi : 0, sp.k);
+      return best;
+    },
+  };
+}
+
+/**
+ * Everything the 3-D field knows about ONE droplet.
+ *
+ * The flat scene's `dropReport()` asked the same question in two dimensions
+ * with the observer at `dropsObserverX/Y`; here the observer sits at the
+ * origin, so a droplet's world position IS the line of sight to it, and the
+ * antisolar direction is a real 3-D vector rather than a screen axis.
+ *
+ * `rows` covers all of `DROP_ORDERS` rather than only the shown ones, marked
+ * with `shown`, because "this angle is on the secondary bow and you have the
+ * secondary switched off" is a different answer from "nothing comes out
+ * here", and a reader staring at a grey droplet deserves to be told which.
+ */
+function fieldReport(drop, orders = shownOrders()) {
+  const idx = indexModel();
+  const anti = O.antisolarDirection(state.sunElevation, state.sunAzimuth);
+  const distance = O.vlen(drop);
+  if (distance < 1e-9) {
+    return { anti, distance, dir: null, phiSeen: null, orders, rows: [], hit: null, miss: null };
+  }
+  const dir = O.vmul(drop, 1 / distance);
+  const phiSeen = O.vangle(dir, anti) * O.DEG;
+  const test = fieldTest(idx, orders);
+  const rows = DROP_ORDERS.map((k) => {
+    const band = bowBand(idx, k);
+    if (!band) return null;
+    const ref = band.angles.find((a) => a.lambda === 650) || band.angles[0];
+    // Signed distance to the band, zero inside it: a droplet sitting in the
+    // band is on the bow whether or not that bow is being drawn.
+    const gap = phiSeen < band.lo ? phiSeen - band.lo : phiSeen > band.hi ? phiSeen - band.hi : 0;
+    return { k, band, ref, gap, shown: orders.includes(k), inBand: gap === 0 };
+  }).filter(Boolean);
+  const hit = test.at(phiSeen);
+  const hidden = hit ? null : rows.find((r) => r.inBand && !r.shown) || null;
+  return { anti, distance, dir, phiSeen, orders, rows, hit, hidden, miss: test.missBy(phiSeen) };
+}
+
 /* ============ src/beam3d.js ============ */
 
 /**
@@ -3474,7 +3781,7 @@ function drawDropletBeam(ctx, cam, size, opts) {
       const at = O.vadd(P, O.vmul(out, OUT_LEN * OUT_LABEL_AT));
       if (cam.depth(at) > NEAR) {
         const p = cam.project(at);
-        capLabel(ctx, `k=${order} · φ ${deg(geo.antisolarDeg, 1)}`, p.x, p.y, w, h,
+        capLabel(ctx, `k=${order} · ${t(bowNameKey(order), { k: order })} · φ ${deg(geo.antisolarDeg, 1)}`, p.x, p.y, w, h,
           ORDER_COLOR[order] || ORDER_COLOR[3]);
       }
     }
@@ -3513,7 +3820,7 @@ function drawDropletBeam(ctx, cam, size, opts) {
     ctx.restore();
     if (state.show.labels) {
       const cap = k
-        ? `k=${k} · ${Math.round(refLambda)} ${t('nm')}`
+        ? `k=${k} · ${t(bowNameKey(k), { k })} · ${Math.round(refLambda)} ${t('nm')}`
         : t('dropMisses', { angle: deg(phi, 1) });
       capLabel(ctx, cap, p.x, p.y - 20, w, h, k ? colorFor(refLambda) : '#cfa9e8');
     }
@@ -4131,6 +4438,32 @@ function createDropletView(canvas) {
         align: 'center', color: '#93a7c9', font: '10px "IBM Plex Mono", ui-monospace, monospace',
       });
     }
+    drawBounceNumbers(ctx, ray);
+  }
+
+  /**
+   * Number the bounces.
+   *
+   * Which bow a ray belongs to is decided by one integer, and the path
+   * already draws a dot at each internal reflection -- but counting dots in
+   * a folded path is not something anyone gets right twice, and at k=3 the
+   * dots sit close enough together to read as two. The numbers carry the
+   * reflection dot's own colour so the pair reads as one mark.
+   */
+  function drawBounceNumbers(ctx, ray) {
+    let n = 0;
+    for (const v of ray.path.vertices) {
+      if (v.type !== 'reflection') continue;
+      n++;
+      const q = project(v.point);
+      // Pushed away from the droplet centre, so the number never lands on
+      // the path it is counting.
+      const away = { x: v.point.x, y: -v.point.y };
+      const len = Math.hypot(away.x, away.y) || 1;
+      label(ctx, String(n), q.x + (away.x / len) * 13, q.y + (away.y / len) * 13, {
+        align: 'center', color: '#ffd166', font: '10px "IBM Plex Mono", ui-monospace, monospace',
+      });
+    }
   }
 
   function drawAngles(ctx, ray) {
@@ -4199,8 +4532,41 @@ function createDropletView(canvas) {
     }
   }
 
+  /**
+   * What the current reflection count actually produces.
+   *
+   * The control says "internal reflections: 2" and the classification chip
+   * in the side panel says "secondary rainbow family", but only for a ray
+   * that happens to be sitting on the caustic -- so at any other impact
+   * parameter nothing on screen connected the integer to the bow. This line
+   * always does, straight out of `rainbowGeometry`.
+   *
+   * Order 3 is quoted from the SUN, not from the antisolar point, because
+   * that is where it comes back: phi is 137 deg and reading "137 deg" next
+   * to the primary's 42 deg invites the reader to look for it in the wrong
+   * half of the sky.
+   */
+  function drawBowLine(ctx, w, y) {
+    const k = state.reflections;
+    if (k < 1) {
+      label(ctx, t('dropletBowNone'), w - 12, y, { align: 'right', color: '#8ea3c6' });
+      return y + 18;
+    }
+    const geo = O.rainbowGeometry(indexModel()(activeLambdas()[0]), k);
+    if (!geo) return y;
+    const sunward = geo.antisolarDeg > 90;
+    label(ctx, t('dropletBowLine', {
+      k,
+      bow: t(bowNameKey(k), { k }),
+      angle: deg(sunward ? 180 - geo.antisolarDeg : geo.antisolarDeg, 1),
+      side: t(sunward ? 'bowFromSun' : 'bowFromAntisolar'),
+    }), w - 12, y, { align: 'right', color: k === 1 ? '#6fd3a4' : k === 2 ? '#9b8cf0' : '#f0885d' });
+    return y + 18;
+  }
+
   function drawLegend(ctx, w, h, rays) {
     let y = 18;
+    if (state.show.labels) y = drawBowLine(ctx, w, y) + 4;
     if (state.show.wavelengthLabels) {
       const main = rays.filter((r) => r.role === 'main');
       const seen = new Set();
@@ -5240,7 +5606,7 @@ function createDropsView(canvas) {
       if (state.show.labels) {
         const sdir = SD(refDirs[nearSide]);
         const L = Math.min(edgeDist(q, sdir, w, h), maxLen);
-        tip(ctx, `k=${band.k} · φ ${deg(ref.phi, 1)}`,
+        tip(ctx, `k=${band.k} · ${t(bowNameKey(band.k), { k: band.k })} · φ ${deg(ref.phi, 1)}`,
           q.x + sdir.x * (L - 18), q.y + sdir.y * (L - 18), w, h,
           { color: hit && hit.k === band.k ? '#ffdca0' : '#9fb4d8', bottom });
       }
@@ -5895,7 +6261,7 @@ function createSkyView(canvas) {
         const top = topOfBow(anti, geo.antisolarDeg);
         if (top && cam.depth(top) > NEAR) {
           const p = cam.project(top);
-          label(ctx, `k=${k} · φ=${deg(geo.antisolarDeg, 2)}`, p.x, p.y - 14, {
+          label(ctx, `k=${k} · ${t(bowNameKey(k), { k })} · φ=${deg(geo.antisolarDeg, 2)}`, p.x, p.y - 14, {
             align: 'center', color: colorFor(lam),
           });
         }
@@ -6404,23 +6770,13 @@ function createFieldView(canvas) {
     const key = classKey();
     if (cls.key === key) return cls;
 
+    // The test itself lives in rays.js, so the readout describing a clicked
+    // droplet runs the identical object rather than a second copy of these
+    // few lines. With one colour selected there is no band to invert: that
+    // wavelength has one bow angle per order, and a droplet lights up within
+    // the same tolerance the flat scene matches with.
     const idx = indexModel();
-    const orders = [];
-    if (state.show.primary) orders.push(1);
-    if (state.show.secondary) orders.push(2);
-    if (state.show.higher) orders.push(3);
-    // With one colour selected there is no band to invert: that wavelength
-    // has one bow angle per order, and a droplet lights up within the same
-    // tolerance the flat scene matches with.
-    const single = state.wavelength === 'white' ? null : state.wavelength;
-    const spectra = single === null ? orders.map((k) => bowSpectrum(idx, k)).filter(Boolean) : [];
-    const mono = [];
-    if (single !== null) {
-      for (const k of orders) {
-        const geo = O.rainbowGeometry(idx(single), k);
-        if (geo) mono.push({ k, phi: geo.antisolarDeg });
-      }
-    }
+    const test = fieldTest(idx);
 
     const anti = O.antisolarDirection(state.sunElevation, state.sunAzimuth);
     const floor = rainFloor();
@@ -6438,23 +6794,11 @@ function createFieldView(canvas) {
       // The angle the observer sees this droplet at. This is the whole test:
       // distance appears nowhere, exactly as in the flat scene.
       const phi = Math.acos(O.clamp((d.x * anti.x + d.y * anti.y + d.z * anti.z) / len, -1, 1)) * O.DEG;
-      if (single !== null) {
-        for (const m of mono) {
-          if (Math.abs(phi - m.phi) > BOW_MATCH_DEG) continue;
-          lambda[i] = single;
-          order[i] = m.k;
-          lit++;
-          break;
-        }
-      } else {
-        for (const sp of spectra) {
-          const lam = sp.lambdaAt(phi);
-          if (lam === null) continue;
-          lambda[i] = lam;
-          order[i] = sp.k;
-          lit++;
-          break;
-        }
+      const answer = test.at(phi);
+      if (answer) {
+        lambda[i] = answer.lambda;
+        order[i] = answer.k;
+        lit++;
       }
     }
     cls = { key, lambda, order, lit, shown };
@@ -6698,6 +7042,10 @@ function createFieldView(canvas) {
     };
     put(`${t('dropCount')}: ${fmt(answers.shown)}`, '#cfe0ff');
     put(`${t('dropsContributing')}: ${fmt(answers.lit)}`, '#6fd3a4');
+    // The scene said which droplets passed and never once said what the test
+    // was, which left "the coloured dots are the ones that passed" as an
+    // assertion the reader had to take on trust.
+    put(t('fieldTestLine', { tol: deg(BOW_MATCH_DEG, 2) }), '#cfa9e8');
     put(`${t('fieldNoCircle')}`, '#8ea3c6');
     if (state.show.labels) {
       const hintFont = '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif';
@@ -6826,6 +7174,9 @@ function createFieldView(canvas) {
 
 
 
+// One definition of what a world unit is worth, shared with the scene that
+// generates the rain -- a readout quoting its own metres would drift.
+
 /* ==========================================================================
  * Tutorial
  * ======================================================================== */
@@ -6881,6 +7232,7 @@ const TUTORIAL = [
       show: { normals: false, angles: true },
     },
     focus: ['reflections', 'showNonRainbow'],
+    note: 'explReflectionIsWeak',
   },
   {
     title: 's4title', body: 's4body',
@@ -7060,7 +7412,7 @@ const TUTORIAL = [
       { labelKey: 'showAlexander', patch: { show: { alexander: true } } },
       { labelKey: 'showCone', patch: { show: { cone: true } } },
     ],
-    note: 'explAlexander',
+    note: ['explAlexander', 'explWhyFainter'],
   },
 ];
 
@@ -7092,7 +7444,9 @@ function renderTutorial() {
     );
   }
   if (s.showRay) nodes.push(...rayInfoNodes({ compact: true }));
-  if (s.note) nodes.push(el('p', { class: 'note' }, t(s.note)));
+  // A step may carry more than one note: naming the bow a reflection count
+  // makes and saying what the extra bounce costs are two separate claims.
+  for (const key of [].concat(s.note || [])) nodes.push(noteNode(key));
 
   nodes.push(
     el('div', { class: 'step-nav' },
@@ -7139,6 +7493,61 @@ function renderFreeGuide() {
 }
 
 /* ==========================================================================
+ * Which reflection count makes which bow
+ * ======================================================================== */
+
+/**
+ * Notes whose sentences quote engine numbers.
+ *
+ * The percentages live in the placeholders rather than in the Czech and
+ * English prose, for the same reason no angle is written down anywhere else
+ * here: change the index model and the sentence has to change with it, and a
+ * number typed into a translation string never will.
+ */
+function noteParams(key, k = state.reflections) {
+  const idx = indexModel();
+  if (key === 'explWhyFainter') {
+    const [first, second] = orderLedger(idx);
+    if (!first || !second) return null;
+    return { r1: `${num(first.R * 100, 1)} %`, rel2: `${num(second.relative * 100, 0)} %` };
+  }
+  if (key === 'explReflectionIsWeak') {
+    const light = O.bowBrightness(idx(650), Math.max(1, k));
+    if (!light || light.criticalDeg === null) return null;
+    return { crit: deg(light.criticalDeg, 1), theta: deg(light.internalDeg, 1) };
+  }
+  return null;
+}
+
+const noteNode = (key, k) => el('p', { class: 'note' }, t(key, noteParams(key, k) || undefined));
+
+/**
+ * The ledger: one line per reflection order, naming the bow it produces and
+ * what is left of the light by the time it gets there.
+ *
+ * Both numbers come from `bowBrightness()`, so the table is the Fresnel
+ * factor and nothing else. The row matching the reflections control is
+ * marked, which is the whole point of putting it next to that control: turn
+ * the knob to 2 and watch the highlight move to the line that says the light
+ * has dropped to a third.
+ */
+function bowLedgerNodes() {
+  const rows = orderLedger(indexModel());
+  if (!rows.length) return [];
+  return [
+    el('h3', {}, t('bowLedgerTitle')),
+    el('div', { class: 'panel-block' },
+      rows.map((r) =>
+        el('div', { class: 'row' + (r.k === state.reflections ? ' row-on' : '') },
+          el('span', { class: 'row-key' }, `k = ${r.k} → ${t(bowNameKey(r.k), { k: r.k })}`),
+          el('span', { class: 'row-val mono' },
+            `${num(r.survives * 100, 2)} % · ×${num(r.relative, 2)}`)))),
+    el('p', { class: 'note' }, t('bowLedgerNote')),
+    noteNode('explWhyFainter'),
+  ];
+}
+
+/* ==========================================================================
  * Ray readout
  * ======================================================================== */
 
@@ -7175,7 +7584,13 @@ function rayInfoNodes(opts = {}) {
   if (cls === 'nonCaustic' && k === 1) {
     nodes.push(el('p', { class: 'note' }, t('explNotOneReflection')));
   }
-  if (!opts.compact) nodes.push(el('p', { class: 'hint' }, t('rayInfoHint')));
+  if (!opts.compact) {
+    // Quoting the critical angle next to k = 0 would describe a bounce the
+    // ray never makes.
+    if (k >= 1) nodes.push(noteNode('explReflectionIsWeak', k));
+    nodes.push(...bowLedgerNodes());
+    nodes.push(el('p', { class: 'hint' }, t('rayInfoHint')));
+  }
   return nodes.filter(Boolean);
 }
 
@@ -7211,21 +7626,24 @@ function dropInfoNodes() {
     el('h3', {}, t('dropOrdersTitle')),
     el('table', { class: 'math-table' },
       el('thead', {}, el('tr', {},
-        el('th', {}, 'k'), el('th', {}, 'θᵢ'), el('th', {}, 'φ'), el('th', {}, 'Θ'), el('th', {}, 'Δφ'))),
+        el('th', {}, 'k'), el('th', { class: 'bow' }, t('bowLedgerBow')), el('th', {}, 'θᵢ'), el('th', {}, 'φ'), el('th', {}, 'Δφ'))),
       el('tbody', {},
         rep.bands.map((b) => {
           const ref = b.angles.find((a) => a.lambda === 650) || b.angles[0];
           return el('tr', { class: b.reaches ? 'hit' : null },
             el('td', {}, String(b.k)),
+            el('td', { class: 'bow' }, t(bowNameKey(b.k), { k: b.k })),
             el('td', {}, num(ref.geo.thetaIDeg, 1)),
             el('td', {}, `${num(b.lo, 1)}–${num(b.hi, 1)}`),
-            el('td', {}, num(180 - ref.phi, 1)),
             el('td', {}, b.delta === null ? '—' : `${b.delta >= 0 ? '+' : ''}${num(b.delta, 2)}`));
         }))),
 
     el('div', { class: `classification cls-${hit ? ORDER_CLASS[hit.k] || 'higherOrder' : 'nonCaustic'}` },
       hit
-        ? t('dropDelivers', { color: t(colorIdFor(hit.nearest.lambda) || 'red'), k: hit.k })
+        ? t('dropDelivers', {
+            color: t(colorIdFor(hit.nearest.lambda) || 'red'),
+            bow: t(bowNameKey(hit.k), { k: hit.k }),
+          })
         : t('dropDeliversNone', { delta: missBy === null ? '—' : deg(missBy, 2) })),
 
     el('p', { class: 'note' }, t('dropPhiThetaNote')),
@@ -7239,6 +7657,69 @@ function dropInfoNodes() {
       onclick: () => set({ selectedDrop: null, panel: 'guide' }),
     }, t('dropClear')),
     el('p', { class: 'hint' }, t('dropInfoHint')),
+  ].filter(Boolean);
+}
+
+/* ==========================================================================
+ * Clicked droplet in the 3-D field
+ * ======================================================================== */
+
+/**
+ * Why THIS droplet is coloured and the one beside it is not.
+ *
+ * The scene answers that by drawing the beam; this answers it in numbers,
+ * and it has to be the SAME answer -- so the verdict comes from
+ * `fieldReport()`, which runs the identical `fieldTest` object the field
+ * classified all sixty thousand droplets with.
+ *
+ * The table lists all three orders, not only the ones being highlighted. A
+ * grey droplet that is sitting exactly on the secondary bow with the
+ * secondary switched off is a different story from one that is nowhere near
+ * any bow, and the reader cannot tell those apart by looking.
+ */
+function fieldPickNodes() {
+  const rep = fieldReport(state.fieldPick);
+  const cls = rep.hit ? ORDER_CLASS[rep.hit.k] || 'higherOrder' : 'nonCaustic';
+
+  return [
+    el('h2', {}, t('fieldPickInfo')),
+    el('div', { class: 'panel-block' },
+      row('dropSeenAt', rep.phiSeen === null ? '—' : deg(rep.phiSeen, 2)),
+      row('dropDistanceRow', `${num(rep.distance * WORLD_SCALE_M, 0)} ${t('metres')}`)
+    ),
+    el('p', { class: 'note' }, t('fieldTestNote', { tol: deg(BOW_MATCH_DEG, 2) })),
+
+    el('h3', {}, t('fieldBandsTitle')),
+    el('table', { class: 'math-table' },
+      el('thead', {}, el('tr', {},
+        el('th', {}, 'k'), el('th', { class: 'bow' }, t('bowLedgerBow')), el('th', {}, 'φ'), el('th', {}, 'Δφ'))),
+      el('tbody', {},
+        rep.rows.map((r) =>
+          el('tr', { class: r.inBand && r.shown ? 'hit' : r.shown ? null : 'off' },
+            el('td', {}, String(r.k)),
+            el('td', { class: 'bow' }, t(bowNameKey(r.k), { k: r.k })),
+            el('td', {}, `${num(r.band.lo, 1)}–${num(r.band.hi, 1)}`),
+            el('td', {}, r.gap === 0 ? '0' : `${r.gap >= 0 ? '+' : ''}${num(r.gap, 2)}`))))),
+
+    el('div', { class: `classification cls-${cls}` },
+      rep.hit
+        ? t('fieldDelivers', {
+            nm: String(Math.round(rep.hit.lambda)),
+            color: t(nearestColorId(rep.hit.lambda) || 'red'),
+            bow: t(bowNameKey(rep.hit.k), { k: rep.hit.k }),
+          })
+        : t('fieldDeliversNone', { delta: rep.miss ? deg(rep.miss.gap, 2) : '—' })),
+
+    rep.hidden
+      ? el('p', { class: 'note warn' },
+          t('fieldHiddenOrder', { bow: t(bowNameKey(rep.hidden.k), { k: rep.hidden.k }) }))
+      : null,
+    el('p', { class: 'note' }, t('fieldWhyNote')),
+    el('button', {
+      class: 'btn wide', type: 'button',
+      onclick: () => set({ fieldPick: null, panel: 'guide' }),
+    }, t('dropClear')),
+    el('p', { class: 'hint' }, t('fieldClearHint')),
   ].filter(Boolean);
 }
 
@@ -7275,7 +7756,7 @@ function skyPickNodes() {
     el('h2', {}, t('skyPickInfo')),
     el('div', { class: 'panel-block' },
       row('infoWavelength', `${pick.lambda} ${t('nm')}`, { color: O.rgbCss(pick.lambda) }),
-      row('skyPickOrder', String(pick.k)),
+      row('skyPickOrder', `${pick.k} · ${t(bowNameKey(pick.k), { k: pick.k })}`),
       row('infoExitAngle', deg(geo.antisolarDeg, 2)),
       row('infoScattering', deg(geo.scatteringDeg, 2)),
       row('infoIncidence', deg(geo.thetaIDeg, 2)),
@@ -7286,10 +7767,11 @@ function skyPickNodes() {
     el('h3', {}, t('skyPickOthers')),
     el('table', { class: 'math-table' },
       el('thead', {}, el('tr', {},
-        el('th', {}, 'k'), el('th', {}, 'φ'), el('th', {}, 'Θ'), el('th', {}, 'Δ'))),
+        el('th', {}, 'k'), el('th', { class: 'bow' }, t('bowLedgerBow')), el('th', {}, 'φ'), el('th', {}, 'Θ'), el('th', {}, 'Δ'))),
       el('tbody', {},
         rows.map((r) => el('tr', { class: r.k === pick.k ? 'hit' : null },
           el('td', {}, String(r.k)),
+          el('td', { class: 'bow' }, t(bowNameKey(r.k), { k: r.k })),
           el('td', {}, num(r.g.antisolarDeg, 2)),
           el('td', {}, num(r.g.scatteringDeg, 2)),
           el('td', {}, r.k === pick.k ? t('skyPickReaches') : t('skyPickMiss', { delta: deg(r.miss, 2) }))))))
@@ -7321,6 +7803,14 @@ function renderRayInfo() {
   if (state.scene === 'sky') {
     if (state.skyPick) return skyPickNodes();
     return [el('h2', {}, t('skyPickInfo')), el('p', { class: 'hint' }, t('skyClickHint'))];
+  }
+  // The droplet field had no branch at all, so clicking a droplet there drew
+  // the beam on the canvas while this column went on describing a ray in the
+  // single-droplet cross-section -- a different scene, a different droplet,
+  // an impact parameter that means nothing here.
+  if (state.scene === 'field') {
+    if (state.fieldPick) return fieldPickNodes();
+    return [el('h2', {}, t('fieldPickInfo')), el('p', { class: 'hint' }, t('fieldClickHint'))];
   }
   return rayInfoNodes();
 }
@@ -7396,6 +7886,7 @@ function renderMath() {
 
     el('h3', {}, t('mathIntensityTitle')),
     el('p', { class: 'note' }, t('mathIntensityNote')),
+    ...bowLedgerNodes(),
     el('h3', {}, t('mathLimits')),
     el('p', { class: 'note' }, t('mathLimitsNote')),
     el('p', { class: 'note' }, t('dropletSizeNote')),
@@ -7492,6 +7983,9 @@ const panelEl = el('div', { class: 'panel' });
 const headerEl = el('header', { class: 'app-header' });
 const sceneTabsEl = el('div', { class: 'scene-tabs' });
 const sceneDescEl = el('p', { class: 'scene-desc' });
+// Part of the static shell, so nothing rebuilds it -- and it sat in Czech
+// after a switch to English until applyVisibility() started refreshing it.
+const controlsTitleEl = el('h2', { class: 'col-title' }, t('controls'));
 const graphTabsEl = el('div', { class: 'graph-tabs' });
 const graphBarEl = el('div', { class: 'graph-bar' });
 const graphExplainEl = el('p', { class: 'graph-explain' });
@@ -7507,7 +8001,7 @@ root.append(
   el(
     'main',
     { class: 'layout' },
-    el('aside', { class: 'col col-controls' }, el('h2', { class: 'col-title' }, t('controls')), controlsEl),
+    el('aside', { class: 'col col-controls' }, controlsTitleEl, controlsEl),
     el(
       'section',
       { class: 'col col-scene' },
@@ -8324,6 +8818,7 @@ function applyVisibility() {
     c.classList.toggle('hidden', name !== state.scene);
   }
   sceneDescEl.textContent = t(`scene${state.scene[0].toUpperCase()}${state.scene.slice(1)}Desc`);
+  controlsTitleEl.textContent = t('controls');
   document.body.dataset.scene = state.scene;
 }
 
@@ -8357,11 +8852,21 @@ function panelKey() {
           return `${k ? `${k.k},${k.lambda},${k.roll.toFixed(2)}` : '-'}|${state.sunElevation}|${state.sunAzimuth}|${state.dispersion}|${state.indexMode}|${state.indexScale}`;
         })()
       : '';
+  // The field readout is about a clicked droplet in space, so it moves with
+  // the pick, the Sun, the index model and the order toggles -- everything
+  // fieldReport() reads. Without this the panel never rebuilt on a pick.
+  const fieldPart =
+    state.scene === 'field' && state.panel === 'ray'
+      ? (() => {
+          const d = state.fieldPick;
+          return `${d ? `${d.x.toFixed(4)},${d.y.toFixed(4)},${d.z.toFixed(4)}` : '-'}|${state.sunElevation}|${state.sunAzimuth}|${state.wavelength}|${state.dispersion}|${state.indexMode}|${state.indexScale}|${state.show.primary}${state.show.secondary}${state.show.higher}`;
+        })()
+      : '';
   const guidePart =
     state.mode === 'free' && state.panel === 'guide'
       ? `${state.dispersion}|${state.indexMode}|${state.indexScale}|${state.show.renderedBow}`
       : '';
-  return `${state.panel}|${state.scene}|${state.step}|${rayPart}|${mathPart}|${dropPart}|${skyPart}|${guidePart}`;
+  return `${state.panel}|${state.scene}|${state.step}|${rayPart}|${mathPart}|${dropPart}|${skyPart}|${fieldPart}|${guidePart}`;
 }
 
 /** Everything the shape of the graph section depends on. */

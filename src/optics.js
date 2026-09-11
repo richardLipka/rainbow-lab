@@ -358,6 +358,44 @@ export function rainbowGeometry(n, k) {
   };
 }
 
+/**
+ * What one bow's light costs, in Fresnel terms.
+ *
+ * By reversibility the reflectance is identical at every interface on the
+ * path, so a ray that enters, bounces k times and leaves keeps
+ * (1-R)^2 * R^k of the light that fell on it.
+ *
+ * Two things about that are worth pulling out, because they are the whole
+ * answer to "why is the secondary fainter":
+ *
+ * - Internal incidence stays BELOW the critical angle for every order, so a
+ *   droplet never reflects by total internal reflection. It is a poor mirror
+ *   on purpose: at the primary bow it turns back about 6 % and lets the rest
+ *   straight out. The bow is built from that 6 %.
+ * - R *rises* with k, because the bow's incidence angle climbs towards
+ *   grazing. Each individual bounce is more efficient at higher order, and
+ *   the bow is still fainter -- R^k falls faster than R climbs.
+ *
+ * This is the Fresnel factor alone. The light of a higher order is also
+ * spread over a wider band and a bigger ring, which costs again; that part
+ * belongs to the sky geometry, not here.
+ */
+export function bowBrightness(n, k) {
+  const geo = rainbowGeometry(n, k);
+  if (!geo) return null;
+  const R = fresnelReflectance(geo.thetaI, 1, n);
+  const crit = criticalAngle(n, 1);
+  return {
+    k,
+    n,
+    R,
+    survives: (1 - R) * (1 - R) * Math.pow(R, k),
+    internalDeg: geo.thetaRDeg,
+    criticalDeg: crit === null ? null : crit * DEG,
+    totalInternal: crit !== null && geo.thetaR > crit,
+  };
+}
+
 /* =========================================================================
  * 7. Full vector ray trace through a spherical droplet
  * =======================================================================*/

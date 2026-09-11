@@ -559,3 +559,166 @@ test('directionAtAngle survives a line of sight along the axis', () => {
   close(O.vlen(d), 1, 1e-12, 'unit');
   close(O.vangle(d, anti) * O.DEG, 42, 1e-10, 'still 42 deg off the axis');
 });
+
+
+/* -------------------------------------------- how many bounces, and the cost */
+
+test('one bounce makes the primary, two the secondary, three the tertiary', () => {
+  const idx = O.makeIndexModel();
+  const n = idx(589); // sodium D, the line the published figures are quoted at
+
+  // Textbook values: primary 42 deg and secondary 51 deg from the antisolar
+  // point; tertiary and quaternary come back on the SUNWARD side, about 40
+  // and 45 deg from the Sun itself.
+  close(O.rainbowGeometry(n, 1).antisolarDeg, 42.0, 0.3, 'primary');
+  close(O.rainbowGeometry(n, 2).antisolarDeg, 51.0, 0.4, 'secondary');
+  close(180 - O.rainbowGeometry(n, 3).antisolarDeg, 40.9, 0.8, 'tertiary, from the Sun');
+  close(180 - O.rainbowGeometry(n, 4).antisolarDeg, 45.0, 1.0, 'quaternary, from the Sun');
+
+  // k=1 and k=2 land opposite the Sun; k=3 and k=4 do not. This is why a
+  // tertiary bow is not found by looking harder at the primary's sky.
+  assert.ok(O.rainbowGeometry(n, 1).antisolarDeg < 90, 'primary is antisolar');
+  assert.ok(O.rainbowGeometry(n, 2).antisolarDeg < 90, 'secondary is antisolar');
+  assert.ok(O.rainbowGeometry(n, 3).antisolarDeg > 90, 'tertiary is sunward');
+  assert.ok(O.rainbowGeometry(n, 4).antisolarDeg > 90, 'quaternary is sunward');
+});
+
+test('bowBrightness is the Fresnel budget of that bow, and nothing else', () => {
+  const n = O.makeIndexModel()(650);
+  for (const k of [1, 2, 3, 4]) {
+    const geo = O.rainbowGeometry(n, k);
+    const b = O.bowBrightness(n, k);
+    const R = O.fresnelReflectance(geo.thetaI, 1, n);
+    close(b.R, R, 1e-15, `k=${k} reflectance is taken at the bow's own incidence`);
+    close(b.survives, (1 - R) * (1 - R) * Math.pow(R, k), 1e-15, `k=${k} (1-R)^2 R^k`);
+  }
+});
+
+test('the droplet is a poor mirror, which is the whole reason bows get fainter', () => {
+  const n = O.makeIndexModel()(650);
+  const rows = [1, 2, 3, 4].map((k) => O.bowBrightness(n, k));
+
+  // Nothing bounces by total internal reflection: the internal incidence is
+  // under the critical angle at every order, so each wall lets most of the
+  // light straight out and keeps only R.
+  for (const b of rows) {
+    assert.ok(!b.totalInternal, `k=${b.k} must not be total internal reflection`);
+    assert.ok(b.internalDeg < b.criticalDeg, `k=${b.k} internal ${b.internalDeg} < crit ${b.criticalDeg}`);
+  }
+
+  // The counterintuitive pair: each individual bounce gets MORE efficient as
+  // k rises (the bow's incidence angle climbs towards grazing) and the bow
+  // still gets fainter, because R^k falls faster than R climbs.
+  for (let i = 1; i < rows.length; i++) {
+    assert.ok(rows[i].R > rows[i - 1].R, `R rises: k=${rows[i].k}`);
+    assert.ok(rows[i].survives < rows[i - 1].survives, `light falls: k=${rows[i].k}`);
+  }
+
+  // A bounce keeps only a few per cent at the primary bow, so the secondary
+  // carries roughly a third of the primary's light before spreading is even
+  // considered. Both are quoted in the UI; pin them so the prose cannot drift.
+  close(rows[0].R, 0.057, 0.006, 'primary bounce reflectance');
+  close(rows[1].survives / rows[0].survives, 0.35, 0.03, 'secondary vs primary');
+  close(rows[2].survives / rows[0].survives, 0.18, 0.03, 'tertiary vs primary');
+});
+
+test('the simulation independently agrees that higher bows are dimmer', () => {
+  // Not the formula this time: fire rays, bin them by angle, and compare the
+  // mean radiance across each bow's own band. Fresnel alone predicts 0.35 for
+  // the secondary; the binned answer is lower because the light of a higher
+  // order is also spread over a wider band on a bigger ring.
+  const n = O.makeIndexModel()(589);
+  const bandMean = (k) => {
+    const geo = O.rainbowGeometry(n, k);
+    const bins = 1440;
+    const d = O.angularDistribution({ n, orders: [k], rays: 200000, bins });
+    let sum = 0;
+    let count = 0;
+    for (let i = 0; i < bins; i++) {
+      const phi = d.minDeg + (i + 0.5) * d.binWidth;
+      if (Math.abs(phi - geo.antisolarDeg) <= 2) {
+        sum += d.bins[i];
+        count++;
+      }
+    }
+    return sum / count;
+  };
+  const primary = bandMean(1);
+  const secondary = bandMean(2) / primary;
+  const tertiary = bandMean(3) / primary;
+  assert.ok(secondary < 0.35, `secondary ${secondary} must be below the Fresnel-only 0.35`);
+  assert.ok(secondary > 0.05, `secondary ${secondary} should still be a visible fraction`);
+  assert.ok(tertiary < secondary, `tertiary ${tertiary} below secondary ${secondary}`);
+});
+
+
+/* ------------------------------------- the field readout and the field agree */
+
+test('the droplet field and its readout run the identical test', async () => {
+  // The scene classifies sixty thousand droplets and the panel describes one
+  // of them. They must be the same test, or a readout will call a droplet lit
+  // that the scene drew grey. Both go through fieldTest(), and this is the
+  // assertion that keeps it that way.
+  const { fieldTest, fieldReport, shownOrders } = await import('../src/rays.js');
+  const { state, indexModel } = await import('../src/state.js');
+
+  state.wavelength = 'white';
+  state.dispersion = 1;
+  state.sunElevation = 15;
+  state.sunAzimuth = 180;
+  state.show.primary = true;
+  state.show.secondary = true;
+  state.show.higher = false;
+
+  const anti = O.antisolarDirection(state.sunElevation, state.sunAzimuth);
+  const test = fieldTest(indexModel());
+  assert.deepEqual(shownOrders(), [1, 2], 'higher orders are off');
+
+  // Walk a droplet around the antisolar axis and check the readout's verdict
+  // against the raw test at every angle, band edges included.
+  let lit = 0;
+  for (let phi = 0; phi <= 90; phi += 0.13) {
+    const dir = O.directionAtAngle(anti, O.orthonormalBasis(anti).u, phi);
+    const drop = O.vmul(dir, 3.7); // distance is not part of the question
+    const rep = fieldReport(drop);
+    close(rep.phiSeen, phi, 1e-9, `phi round-trips at ${phi}`);
+    const raw = test.at(phi);
+    assert.equal(!!rep.hit, !!raw, `verdict at phi=${phi.toFixed(2)}`);
+    if (raw) {
+      lit++;
+      assert.equal(rep.hit.k, raw.k, `order at phi=${phi.toFixed(2)}`);
+      // 1e-9 nm, not 1e-12: at 514 nm a single ulp is 1.1e-13, and the two
+      // paths interpolate the same table through a couple of extra additions.
+      close(rep.hit.lambda, raw.lambda, 1e-9, `wavelength at phi=${phi.toFixed(2)}`);
+    }
+  }
+  assert.ok(lit > 20, `the sweep must cross both bands, got ${lit} lit angles`);
+});
+
+test('a droplet on a switched-off bow is reported as switched off, not as empty sky', async () => {
+  const { fieldReport } = await import('../src/rays.js');
+  const { state, indexModel } = await import('../src/state.js');
+
+  state.wavelength = 'white';
+  state.dispersion = 1;
+  state.sunElevation = 15;
+  state.sunAzimuth = 180;
+  state.show.primary = true;
+  state.show.secondary = false;
+  state.show.higher = false;
+
+  const idx = indexModel();
+  const anti = O.antisolarDirection(state.sunElevation, state.sunAzimuth);
+  // Straight down the middle of the secondary band, which is not being drawn.
+  const geo = O.rainbowGeometry(idx(520), 2);
+  const dir = O.directionAtAngle(anti, O.orthonormalBasis(anti).u, geo.antisolarDeg);
+  const rep = fieldReport(O.vmul(dir, 2.2));
+
+  assert.equal(rep.hit, null, 'nothing is delivered while the bow is off');
+  assert.ok(rep.hidden, 'but the reader is told which bow would have worked');
+  assert.equal(rep.hidden.k, 2);
+  assert.ok(rep.rows.find((r) => r.k === 2).inBand, 'the angle really is in the band');
+  assert.equal(rep.rows.find((r) => r.k === 2).shown, false);
+
+  state.show.secondary = true; // leave the store as the other tests expect it
+});

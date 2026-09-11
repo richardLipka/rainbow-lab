@@ -6,7 +6,13 @@ import * as O from './optics.js';
 import { state, set, indexModel, activeLambdas } from './state.js';
 import { t, deg, num, CLASS_KEY, CLASS_EXPLAIN } from './i18n.js';
 import { el, row, segmented } from './ui.js';
-import { traceOne, distanceFromExtremum, dropReport, colorIdFor, DROP_ORDERS } from './rays.js';
+import {
+  traceOne, distanceFromExtremum, dropReport, colorIdFor, DROP_ORDERS,
+  orderLedger, bowNameKey, fieldReport, BOW_MATCH_DEG, nearestColorId,
+} from './rays.js';
+// One definition of what a world unit is worth, shared with the scene that
+// generates the rain -- a readout quoting its own metres would drift.
+import { WORLD_SCALE_M } from './fieldView.js';
 
 /* ==========================================================================
  * Tutorial
@@ -63,6 +69,7 @@ export const TUTORIAL = [
       show: { normals: false, angles: true },
     },
     focus: ['reflections', 'showNonRainbow'],
+    note: 'explReflectionIsWeak',
   },
   {
     title: 's4title', body: 's4body',
@@ -242,7 +249,7 @@ export const TUTORIAL = [
       { labelKey: 'showAlexander', patch: { show: { alexander: true } } },
       { labelKey: 'showCone', patch: { show: { cone: true } } },
     ],
-    note: 'explAlexander',
+    note: ['explAlexander', 'explWhyFainter'],
   },
 ];
 
@@ -274,7 +281,9 @@ function renderTutorial() {
     );
   }
   if (s.showRay) nodes.push(...rayInfoNodes({ compact: true }));
-  if (s.note) nodes.push(el('p', { class: 'note' }, t(s.note)));
+  // A step may carry more than one note: naming the bow a reflection count
+  // makes and saying what the extra bounce costs are two separate claims.
+  for (const key of [].concat(s.note || [])) nodes.push(noteNode(key));
 
   nodes.push(
     el('div', { class: 'step-nav' },
@@ -321,6 +330,61 @@ function renderFreeGuide() {
 }
 
 /* ==========================================================================
+ * Which reflection count makes which bow
+ * ======================================================================== */
+
+/**
+ * Notes whose sentences quote engine numbers.
+ *
+ * The percentages live in the placeholders rather than in the Czech and
+ * English prose, for the same reason no angle is written down anywhere else
+ * here: change the index model and the sentence has to change with it, and a
+ * number typed into a translation string never will.
+ */
+function noteParams(key, k = state.reflections) {
+  const idx = indexModel();
+  if (key === 'explWhyFainter') {
+    const [first, second] = orderLedger(idx);
+    if (!first || !second) return null;
+    return { r1: `${num(first.R * 100, 1)} %`, rel2: `${num(second.relative * 100, 0)} %` };
+  }
+  if (key === 'explReflectionIsWeak') {
+    const light = O.bowBrightness(idx(650), Math.max(1, k));
+    if (!light || light.criticalDeg === null) return null;
+    return { crit: deg(light.criticalDeg, 1), theta: deg(light.internalDeg, 1) };
+  }
+  return null;
+}
+
+const noteNode = (key, k) => el('p', { class: 'note' }, t(key, noteParams(key, k) || undefined));
+
+/**
+ * The ledger: one line per reflection order, naming the bow it produces and
+ * what is left of the light by the time it gets there.
+ *
+ * Both numbers come from `bowBrightness()`, so the table is the Fresnel
+ * factor and nothing else. The row matching the reflections control is
+ * marked, which is the whole point of putting it next to that control: turn
+ * the knob to 2 and watch the highlight move to the line that says the light
+ * has dropped to a third.
+ */
+function bowLedgerNodes() {
+  const rows = orderLedger(indexModel());
+  if (!rows.length) return [];
+  return [
+    el('h3', {}, t('bowLedgerTitle')),
+    el('div', { class: 'panel-block' },
+      rows.map((r) =>
+        el('div', { class: 'row' + (r.k === state.reflections ? ' row-on' : '') },
+          el('span', { class: 'row-key' }, `k = ${r.k} → ${t(bowNameKey(r.k), { k: r.k })}`),
+          el('span', { class: 'row-val mono' },
+            `${num(r.survives * 100, 2)} % · ×${num(r.relative, 2)}`)))),
+    el('p', { class: 'note' }, t('bowLedgerNote')),
+    noteNode('explWhyFainter'),
+  ];
+}
+
+/* ==========================================================================
  * Ray readout
  * ======================================================================== */
 
@@ -357,7 +421,13 @@ function rayInfoNodes(opts = {}) {
   if (cls === 'nonCaustic' && k === 1) {
     nodes.push(el('p', { class: 'note' }, t('explNotOneReflection')));
   }
-  if (!opts.compact) nodes.push(el('p', { class: 'hint' }, t('rayInfoHint')));
+  if (!opts.compact) {
+    // Quoting the critical angle next to k = 0 would describe a bounce the
+    // ray never makes.
+    if (k >= 1) nodes.push(noteNode('explReflectionIsWeak', k));
+    nodes.push(...bowLedgerNodes());
+    nodes.push(el('p', { class: 'hint' }, t('rayInfoHint')));
+  }
   return nodes.filter(Boolean);
 }
 
@@ -393,21 +463,24 @@ function dropInfoNodes() {
     el('h3', {}, t('dropOrdersTitle')),
     el('table', { class: 'math-table' },
       el('thead', {}, el('tr', {},
-        el('th', {}, 'k'), el('th', {}, 'θᵢ'), el('th', {}, 'φ'), el('th', {}, 'Θ'), el('th', {}, 'Δφ'))),
+        el('th', {}, 'k'), el('th', { class: 'bow' }, t('bowLedgerBow')), el('th', {}, 'θᵢ'), el('th', {}, 'φ'), el('th', {}, 'Δφ'))),
       el('tbody', {},
         rep.bands.map((b) => {
           const ref = b.angles.find((a) => a.lambda === 650) || b.angles[0];
           return el('tr', { class: b.reaches ? 'hit' : null },
             el('td', {}, String(b.k)),
+            el('td', { class: 'bow' }, t(bowNameKey(b.k), { k: b.k })),
             el('td', {}, num(ref.geo.thetaIDeg, 1)),
             el('td', {}, `${num(b.lo, 1)}–${num(b.hi, 1)}`),
-            el('td', {}, num(180 - ref.phi, 1)),
             el('td', {}, b.delta === null ? '—' : `${b.delta >= 0 ? '+' : ''}${num(b.delta, 2)}`));
         }))),
 
     el('div', { class: `classification cls-${hit ? ORDER_CLASS[hit.k] || 'higherOrder' : 'nonCaustic'}` },
       hit
-        ? t('dropDelivers', { color: t(colorIdFor(hit.nearest.lambda) || 'red'), k: hit.k })
+        ? t('dropDelivers', {
+            color: t(colorIdFor(hit.nearest.lambda) || 'red'),
+            bow: t(bowNameKey(hit.k), { k: hit.k }),
+          })
         : t('dropDeliversNone', { delta: missBy === null ? '—' : deg(missBy, 2) })),
 
     el('p', { class: 'note' }, t('dropPhiThetaNote')),
@@ -421,6 +494,69 @@ function dropInfoNodes() {
       onclick: () => set({ selectedDrop: null, panel: 'guide' }),
     }, t('dropClear')),
     el('p', { class: 'hint' }, t('dropInfoHint')),
+  ].filter(Boolean);
+}
+
+/* ==========================================================================
+ * Clicked droplet in the 3-D field
+ * ======================================================================== */
+
+/**
+ * Why THIS droplet is coloured and the one beside it is not.
+ *
+ * The scene answers that by drawing the beam; this answers it in numbers,
+ * and it has to be the SAME answer -- so the verdict comes from
+ * `fieldReport()`, which runs the identical `fieldTest` object the field
+ * classified all sixty thousand droplets with.
+ *
+ * The table lists all three orders, not only the ones being highlighted. A
+ * grey droplet that is sitting exactly on the secondary bow with the
+ * secondary switched off is a different story from one that is nowhere near
+ * any bow, and the reader cannot tell those apart by looking.
+ */
+function fieldPickNodes() {
+  const rep = fieldReport(state.fieldPick);
+  const cls = rep.hit ? ORDER_CLASS[rep.hit.k] || 'higherOrder' : 'nonCaustic';
+
+  return [
+    el('h2', {}, t('fieldPickInfo')),
+    el('div', { class: 'panel-block' },
+      row('dropSeenAt', rep.phiSeen === null ? '—' : deg(rep.phiSeen, 2)),
+      row('dropDistanceRow', `${num(rep.distance * WORLD_SCALE_M, 0)} ${t('metres')}`)
+    ),
+    el('p', { class: 'note' }, t('fieldTestNote', { tol: deg(BOW_MATCH_DEG, 2) })),
+
+    el('h3', {}, t('fieldBandsTitle')),
+    el('table', { class: 'math-table' },
+      el('thead', {}, el('tr', {},
+        el('th', {}, 'k'), el('th', { class: 'bow' }, t('bowLedgerBow')), el('th', {}, 'φ'), el('th', {}, 'Δφ'))),
+      el('tbody', {},
+        rep.rows.map((r) =>
+          el('tr', { class: r.inBand && r.shown ? 'hit' : r.shown ? null : 'off' },
+            el('td', {}, String(r.k)),
+            el('td', { class: 'bow' }, t(bowNameKey(r.k), { k: r.k })),
+            el('td', {}, `${num(r.band.lo, 1)}–${num(r.band.hi, 1)}`),
+            el('td', {}, r.gap === 0 ? '0' : `${r.gap >= 0 ? '+' : ''}${num(r.gap, 2)}`))))),
+
+    el('div', { class: `classification cls-${cls}` },
+      rep.hit
+        ? t('fieldDelivers', {
+            nm: String(Math.round(rep.hit.lambda)),
+            color: t(nearestColorId(rep.hit.lambda) || 'red'),
+            bow: t(bowNameKey(rep.hit.k), { k: rep.hit.k }),
+          })
+        : t('fieldDeliversNone', { delta: rep.miss ? deg(rep.miss.gap, 2) : '—' })),
+
+    rep.hidden
+      ? el('p', { class: 'note warn' },
+          t('fieldHiddenOrder', { bow: t(bowNameKey(rep.hidden.k), { k: rep.hidden.k }) }))
+      : null,
+    el('p', { class: 'note' }, t('fieldWhyNote')),
+    el('button', {
+      class: 'btn wide', type: 'button',
+      onclick: () => set({ fieldPick: null, panel: 'guide' }),
+    }, t('dropClear')),
+    el('p', { class: 'hint' }, t('fieldClearHint')),
   ].filter(Boolean);
 }
 
@@ -457,7 +593,7 @@ function skyPickNodes() {
     el('h2', {}, t('skyPickInfo')),
     el('div', { class: 'panel-block' },
       row('infoWavelength', `${pick.lambda} ${t('nm')}`, { color: O.rgbCss(pick.lambda) }),
-      row('skyPickOrder', String(pick.k)),
+      row('skyPickOrder', `${pick.k} · ${t(bowNameKey(pick.k), { k: pick.k })}`),
       row('infoExitAngle', deg(geo.antisolarDeg, 2)),
       row('infoScattering', deg(geo.scatteringDeg, 2)),
       row('infoIncidence', deg(geo.thetaIDeg, 2)),
@@ -468,10 +604,11 @@ function skyPickNodes() {
     el('h3', {}, t('skyPickOthers')),
     el('table', { class: 'math-table' },
       el('thead', {}, el('tr', {},
-        el('th', {}, 'k'), el('th', {}, 'φ'), el('th', {}, 'Θ'), el('th', {}, 'Δ'))),
+        el('th', {}, 'k'), el('th', { class: 'bow' }, t('bowLedgerBow')), el('th', {}, 'φ'), el('th', {}, 'Θ'), el('th', {}, 'Δ'))),
       el('tbody', {},
         rows.map((r) => el('tr', { class: r.k === pick.k ? 'hit' : null },
           el('td', {}, String(r.k)),
+          el('td', { class: 'bow' }, t(bowNameKey(r.k), { k: r.k })),
           el('td', {}, num(r.g.antisolarDeg, 2)),
           el('td', {}, num(r.g.scatteringDeg, 2)),
           el('td', {}, r.k === pick.k ? t('skyPickReaches') : t('skyPickMiss', { delta: deg(r.miss, 2) }))))))
@@ -503,6 +640,14 @@ function renderRayInfo() {
   if (state.scene === 'sky') {
     if (state.skyPick) return skyPickNodes();
     return [el('h2', {}, t('skyPickInfo')), el('p', { class: 'hint' }, t('skyClickHint'))];
+  }
+  // The droplet field had no branch at all, so clicking a droplet there drew
+  // the beam on the canvas while this column went on describing a ray in the
+  // single-droplet cross-section -- a different scene, a different droplet,
+  // an impact parameter that means nothing here.
+  if (state.scene === 'field') {
+    if (state.fieldPick) return fieldPickNodes();
+    return [el('h2', {}, t('fieldPickInfo')), el('p', { class: 'hint' }, t('fieldClickHint'))];
   }
   return rayInfoNodes();
 }
@@ -578,6 +723,7 @@ function renderMath() {
 
     el('h3', {}, t('mathIntensityTitle')),
     el('p', { class: 'note' }, t('mathIntensityNote')),
+    ...bowLedgerNodes(),
     el('h3', {}, t('mathLimits')),
     el('p', { class: 'note' }, t('mathLimitsNote')),
     el('p', { class: 'note' }, t('dropletSizeNote')),

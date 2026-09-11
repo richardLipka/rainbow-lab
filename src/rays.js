@@ -135,6 +135,24 @@ export function colorIdFor(lambda) {
   return c ? c.id : null;
 }
 
+/**
+ * The named colour a continuous wavelength is closest to.
+ *
+ * The droplet field inverts an angle straight back to a wavelength, so its
+ * answers land anywhere in 400-680 nm and `colorIdFor()` returns null for
+ * almost all of them. Naming the nearest colour lets that scene say "564 nm,
+ * green" where the flat scene says "green", instead of the two readouts
+ * describing the same droplet in two different vocabularies.
+ */
+export function nearestColorId(lambda) {
+  let best = null;
+  for (const c of O.NAMED_COLORS) {
+    const d = Math.abs(c.lambda - lambda);
+    if (best === null || d < best.d) best = { d, id: c.id };
+  }
+  return best ? best.id : null;
+}
+
 /* ----------------------------------------------------- bow geometry -- */
 
 /**
@@ -299,4 +317,169 @@ export function bowSpectrum(idx, k, samples = 96) {
       return null;
     },
   };
+}
+
+/* ==========================================================================
+ * Which reflection count makes which bow
+ * ======================================================================== */
+
+/** Translation key naming the bow a given reflection count produces. */
+export function bowNameKey(k) {
+  if (k === 1) return 'bowName1';
+  if (k === 2) return 'bowName2';
+  if (k === 3) return 'bowName3';
+  return 'bowNameK';
+}
+
+/**
+ * One row per reflection order: which bow it makes, where it lands, and how
+ * much of the incoming light is left by the time it gets there.
+ *
+ * `relative` is the Fresnel factor measured against the primary, and it is
+ * the only brightness ratio quoted anywhere in the UI -- exact, and derived
+ * from one formula. The spreading loss on top of it (a wider colour band on
+ * a bigger ring) is stated in words rather than as a second number, because
+ * a single figure for it would depend on where you cut the band.
+ *
+ * `sunward` matters more than it looks: k=1 and k=2 come back towards the
+ * antisolar point, k=3 goes the other way and lands next to the Sun. That is
+ * why nobody has seen a tertiary bow by looking at the primary's sky.
+ */
+export function orderLedger(idx, orders = DROP_ORDERS, lambda = 650) {
+  const n = idx(lambda);
+  const rows = [];
+  for (const k of orders) {
+    const geo = O.rainbowGeometry(n, k);
+    const light = O.bowBrightness(n, k);
+    if (!geo || !light) continue;
+    const band = bowBand(idx, k);
+    const sunward = geo.antisolarDeg > 90;
+    rows.push({
+      k,
+      geo,
+      light,
+      R: light.R,
+      survives: light.survives,
+      phiDeg: geo.antisolarDeg,
+      seenAtDeg: sunward ? 180 - geo.antisolarDeg : geo.antisolarDeg,
+      sunward,
+      widthDeg: band ? Math.abs(band.hi - band.lo) : 0,
+    });
+  }
+  const base = rows.length ? rows[0].survives : 0;
+  for (const r of rows) r.relative = base > 0 ? r.survives / base : null;
+  return rows;
+}
+
+/* ==========================================================================
+ * The droplet-field test, in one place
+ * ======================================================================== */
+
+/**
+ * The orders the field is currently painting, as the show toggles set them.
+ *
+ * Deliberately NOT `DROP_ORDERS`: that says which orders an inspection takes
+ * apart (all three, including the one nobody can see), this says which ones
+ * the scene is highlighting right now. Conflating them would make a readout
+ * claim a droplet is lit while the scene draws it grey.
+ */
+export function shownOrders() {
+  const orders = [];
+  if (state.show.primary) orders.push(1);
+  if (state.show.secondary) orders.push(2);
+  if (state.show.higher) orders.push(3);
+  return orders;
+}
+
+/**
+ * "At angle phi, does any shown order deliver a wavelength?" -- the single
+ * question the droplet field asks, built once and then run.
+ *
+ * `fieldView` builds it once per physics change and runs `at()` over sixty
+ * thousand droplets; the readout builds it again for the one droplet the
+ * reader clicked. Same object, same answer. A panel that disagreed with the
+ * dots it is describing is exactly the failure this exists to prevent, and
+ * it is the reason the test is not written out twice.
+ */
+export function fieldTest(idx, orders = shownOrders()) {
+  const single = state.wavelength === 'white' ? null : state.wavelength;
+  const spectra = single === null ? orders.map((k) => bowSpectrum(idx, k)).filter(Boolean) : [];
+  const mono = [];
+  if (single !== null) {
+    for (const k of orders) {
+      const geo = O.rainbowGeometry(idx(single), k);
+      if (geo) mono.push({ k, phi: geo.antisolarDeg });
+    }
+  }
+  return {
+    orders,
+    single,
+    spectra,
+    mono,
+    /** {lambda, k} for the first shown order that answers yes, else null. */
+    at(phi) {
+      if (single !== null) {
+        for (const m of mono) {
+          if (Math.abs(phi - m.phi) <= BOW_MATCH_DEG) return { lambda: single, k: m.k };
+        }
+        return null;
+      }
+      for (const sp of spectra) {
+        const lam = sp.lambdaAt(phi);
+        if (lam !== null) return { lambda: lam, k: sp.k };
+      }
+      return null;
+    },
+    /**
+     * How far this angle is from the nearest band it could have hit, and
+     * which one. The number a droplet that missed is actually missing BY --
+     * "no" is a worse answer than "no, by 0.8 degrees".
+     */
+    missBy(phi) {
+      let best = null;
+      const keep = (gap, k) => {
+        if (best === null || gap < best.gap) best = { gap, k };
+      };
+      if (single !== null) for (const m of mono) keep(Math.abs(phi - m.phi), m.k);
+      else for (const sp of spectra) keep(phi < sp.lo ? sp.lo - phi : phi > sp.hi ? phi - sp.hi : 0, sp.k);
+      return best;
+    },
+  };
+}
+
+/**
+ * Everything the 3-D field knows about ONE droplet.
+ *
+ * The flat scene's `dropReport()` asked the same question in two dimensions
+ * with the observer at `dropsObserverX/Y`; here the observer sits at the
+ * origin, so a droplet's world position IS the line of sight to it, and the
+ * antisolar direction is a real 3-D vector rather than a screen axis.
+ *
+ * `rows` covers all of `DROP_ORDERS` rather than only the shown ones, marked
+ * with `shown`, because "this angle is on the secondary bow and you have the
+ * secondary switched off" is a different answer from "nothing comes out
+ * here", and a reader staring at a grey droplet deserves to be told which.
+ */
+export function fieldReport(drop, orders = shownOrders()) {
+  const idx = indexModel();
+  const anti = O.antisolarDirection(state.sunElevation, state.sunAzimuth);
+  const distance = O.vlen(drop);
+  if (distance < 1e-9) {
+    return { anti, distance, dir: null, phiSeen: null, orders, rows: [], hit: null, miss: null };
+  }
+  const dir = O.vmul(drop, 1 / distance);
+  const phiSeen = O.vangle(dir, anti) * O.DEG;
+  const test = fieldTest(idx, orders);
+  const rows = DROP_ORDERS.map((k) => {
+    const band = bowBand(idx, k);
+    if (!band) return null;
+    const ref = band.angles.find((a) => a.lambda === 650) || band.angles[0];
+    // Signed distance to the band, zero inside it: a droplet sitting in the
+    // band is on the bow whether or not that bow is being drawn.
+    const gap = phiSeen < band.lo ? phiSeen - band.lo : phiSeen > band.hi ? phiSeen - band.hi : 0;
+    return { k, band, ref, gap, shown: orders.includes(k), inBand: gap === 0 };
+  }).filter(Boolean);
+  const hit = test.at(phiSeen);
+  const hidden = hit ? null : rows.find((r) => r.inBand && !r.shown) || null;
+  return { anti, distance, dir, phiSeen, orders, rows, hit, hidden, miss: test.missBy(phiSeen) };
 }

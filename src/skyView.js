@@ -15,7 +15,7 @@ import { t, deg, num } from './i18n.js';
 import { fitCanvas, strokePath, label, arrowHead, capture } from './ui.js';
 import { NEAR, SUN_FAR, CLICK_SLOP, makeCamera, clipPolyline, clampToCanvas } from './camera3d.js';
 import { drawDropletBeam } from './beam3d.js';
-import { colorFor } from './rays.js';
+import { colorFor, bowNameKey } from './rays.js';
 
 /**
  * How many wavelengths the bow is drawn from, and how many points per circle.
@@ -446,7 +446,7 @@ export function createSkyView(canvas) {
         const top = topOfBow(anti, geo.antisolarDeg);
         if (top && cam.depth(top) > NEAR) {
           const p = cam.project(top);
-          label(ctx, `k=${k} · φ=${deg(geo.antisolarDeg, 2)}`, p.x, p.y - 14, {
+          label(ctx, `k=${k} · ${t(bowNameKey(k), { k })} · φ=${deg(geo.antisolarDeg, 2)}`, p.x, p.y - 14, {
             align: 'center', color: colorFor(lam),
           });
         }

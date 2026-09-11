@@ -15,7 +15,7 @@ import { state } from './state.js';
 import { t, deg } from './i18n.js';
 import { strokePath, label, arrowHead } from './ui.js';
 import { NEAR, SUN_FAR, clipPolyline } from './camera3d.js';
-import { colorFor, DROP_ORDERS } from './rays.js';
+import { colorFor, DROP_ORDERS, bowNameKey } from './rays.js';
 
 /** How far past the observer a missing order runs, in world units. */
 const OUT_LEN = 1.55;
@@ -110,7 +110,7 @@ export function drawDropletBeam(ctx, cam, size, opts) {
       const at = O.vadd(P, O.vmul(out, OUT_LEN * OUT_LABEL_AT));
       if (cam.depth(at) > NEAR) {
         const p = cam.project(at);
-        capLabel(ctx, `k=${order} · φ ${deg(geo.antisolarDeg, 1)}`, p.x, p.y, w, h,
+        capLabel(ctx, `k=${order} · ${t(bowNameKey(order), { k: order })} · φ ${deg(geo.antisolarDeg, 1)}`, p.x, p.y, w, h,
           ORDER_COLOR[order] || ORDER_COLOR[3]);
       }
     }
@@ -149,7 +149,7 @@ export function drawDropletBeam(ctx, cam, size, opts) {
     ctx.restore();
     if (state.show.labels) {
       const cap = k
-        ? `k=${k} · ${Math.round(refLambda)} ${t('nm')}`
+        ? `k=${k} · ${t(bowNameKey(k), { k })} · ${Math.round(refLambda)} ${t('nm')}`
         : t('dropMisses', { angle: deg(phi, 1) });
       capLabel(ctx, cap, p.x, p.y - 20, w, h, k ? colorFor(refLambda) : '#cfa9e8');
     }

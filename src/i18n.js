@@ -33,9 +33,9 @@ export const translations = {
     sceneFieldDesc: 'Tisíce kapek v prostoru. Duha se poskládá sama, nikdo ji nekreslí.',
     fieldCount: 'Počet kapek v prostoru',
     fieldCountHint:
-      'Každá kapka se ptá na totéž co v plošné scéně: pod jakým úhlem ji vidím a vychází právě tam nějaká vlnová délka? Čím víc kapek, tím zřetelnější kruh — ale kreslí se pořád jen kapky.',
+      'U každé kapky se ptáme na totéž co v plošné scéně: pod jakým úhlem ji vidíte a vychází právě tam nějaká vlnová délka? Čím víc kapek, tím zřetelnější kruh. Kreslí se přitom pořád jen kapky.',
     fieldNoCircle: 'Žádná kružnice se nekreslí — barevné jsou jen kapky, které prošly testem.',
-    fieldHint: 'Táhněte myší, kolečkem přiblížíte. Přepněte na pohled okem a duha se uzavře do kruhu.',
+    fieldHint: 'Táhněte myší = otáčení, kolečko = přiblížení. V pohledu okem se duha uzavře do kruhu.',
     fieldClickHint: 'Klepněte na kapku — uvidíte, kudy jí prochází světlo a pod jakými úhly.',
     fieldClearHint: 'Dalším klepnutím na tutéž kapku výběr zrušíte.',
     sceneDropletDesc: 'Řez jednou kulovou kapkou. Paprsek se počítá, nikoli kreslí.',
@@ -62,9 +62,9 @@ export const translations = {
     graphCollapsedHint:
       'Výstupní úhel a rozdělení paprsků — čísla, ze kterých duhový úhel vychází.',
     graphExitExplain:
-      'Každý přicházející paprsek je popsán tím, kam do kapky dopadne: b/R = 0 je přesný střed, b/R = 1 okraj. Křivka udává směr, kterým paprsek vyjde ven. V okolí svého extrému je téměř vodorovná, takže celý pás parametrů dopadu odchází skoro stejným směrem — právě tam se paprsky hromadí a ten úhel je úhlový poloměr duhy. Každá vlnová délka má svou křivku a každá se obrací u trochu jiného úhlu; odtud jsou barvy.',
+      'Každý přicházející paprsek je popsán tím, kam do kapky dopadne: b/R = 0 je přesný střed, b/R = 1 okraj. Křivka udává směr, kterým paprsek vyjde ven. V okolí svého extrému je téměř vodorovná, takže celý pás parametrů dopadu odchází skoro stejným směrem — právě tam se paprsky hromadí a ten úhel je úhlový poloměr duhy. Každá vlnová délka má svou křivku a každá se obrací u trochu jiného úhlu. Odtud pocházejí barvy.',
     graphDistExplain:
-      'Paprsky se vystřelují náhodně po celé ploše kapky a počítá se, kterým směrem odejdou. Do většiny směrů jich jde podobně málo; do jednoho ne. U úhlu, kde se křivka výstupního úhlu obrací, počet prudce vyskočí — a protože tenhle graf je jas v závislosti na úhlu, tedy přesně to, co měří oko přejíždějící po obloze, ten vrchol je duha a leží u úhlu, pod kterým ji uvidíte. Zvyšte počet paprsků a vyloupne se ze šumu sám.',
+      'Paprsky vystřelujeme náhodně po celé ploše kapky a počítáme, kterým směrem odejdou. Do většiny směrů jich jde podobně málo. Do jednoho ne: u úhlu, kde se křivka výstupního úhlu obrací, počet prudce vyskočí. Svislá osa je jas, vodorovná úhel — přesně to, co měří oko přejíždějící po obloze — takže ten vrchol je duha a leží u úhlu, pod kterým ji uvidíte. Zvyšte počet paprsků a vyloupne se ze šumu sám.',
     extremumLabel: 'extrém → duha',
     rayCount: 'Počet paprsků',
     accumulate: 'Přidávat paprsky',
@@ -129,7 +129,7 @@ export const translations = {
     showDroplets: 'Kapky',
     showCone: 'Kužel duhy',
     showAntisolar: 'Antisolární bod',
-    showHorizon: 'Horizont',
+    showHorizon: 'Obzor',
     showGround: 'Země',
     showRenderedBow: 'Vykreslit duhu',
     showAlexander: 'Alexandrův temný pás',
@@ -152,7 +152,7 @@ export const translations = {
     secondaryRainbow: 'Vedlejší duha',
     higherOrderRainbow: 'Vyšší řád duhy',
     antisolarPoint: 'Antisolární bod',
-    horizon: 'horizont',
+    horizon: 'obzor',
     raindrop: 'dešťová kapka',
     sunLabel: 'Slunce',
     observerLabel: 'Pozorovatel',
@@ -189,22 +189,60 @@ export const translations = {
     classNonCaustic: 'BĚŽNÝ ROZPTÝLENÝ PAPRSEK',
 
     /* ---- labelled explanations required by the brief ---- */
-    explPrimary: 'Primární duha vzniká po jednom vnitřním odrazu paprsku uvnitř kapky.',
+    explPrimary:
+      'Jeden vnitřní odraz uvnitř kapky, a jenom jeden. To je primární duha — nejjasnější ze všech, protože se z paprsku zatím nic dalšího nezahodilo.',
     explSecondary:
-      'Vedlejší (sekundární) duha vzniká po dvou vnitřních odrazech. Je slabší, má větší úhlový poloměr a obrácené pořadí barev.',
+      'Vedlejší duha vzniká po dvou vnitřních odrazech. Je slabší, má větší úhlový poloměr a obrácené pořadí barev. Za všechno může ten jeden odraz navíc.',
     explNoReflection: 'Bez vnitřního odrazu — nepřispívá k primární duze.',
-    explNonCaustic: 'Jeden vnitřní odraz, ale jiný výstupní úhel — běžný rozptýlený paprsek.',
-    explHigherOrder: 'Vyšší řád duhy — velmi slabý.',
+    explNonCaustic:
+      'Odrazy tam jsou, výstupní úhel ne. Tenhle paprsek odchází daleko od extrému, takže se rozptýlí jako každý jiný a k žádné duze nepřispívá.',
+    explHigherOrder:
+      'Tři odrazy a víc. Zbude zlomek toho, co má primární duha, a vrací se na opačnou stranu oblohy — vedle Slunce, ne proti němu.',
     explCaustic:
       'V okolí tohoto extrému se mnoho různých paprsků odchyluje do velmi podobného směru. Světlo se proto v tomto směru výrazně koncentruje. Tento jev se nazývá kaustika.',
     explObserverHeight:
-      'Úhlový poloměr duhy není dán výškou pozorovatele. Výška pozorovatele mění především to, jak velkou část kruhové duhy může zakrývat horizont.',
+      'Úhlový poloměr duhy nezávisí na výšce pozorovatele. Výška mění jen to, jak velkou část kruhu může zakrýt obzor.',
     explNotOneReflection:
       'Jeden vnitřní odraz sám o sobě duhu nedělá. Duha vzniká teprve tehdy, když se k jednomu vnitřnímu odrazu přidá úhlová koncentrace paprsků poblíž extrému.',
     explAlexander:
       'Mezi oběma duhami leží pás, do kterého geometrická optika neposílá žádné paprsky s jedním ani dvěma vnitřními odrazy. Proto se jeví tmavší. Není však úplně černý — světlo tam přichází z vyšších řádů, z odrazu na povrchu kapek a z běžného rozptylu v atmosféře.',
     explNotAnObject:
       'Duha není předmět v určité vzdálenosti. Každý pozorovatel dostává světlo od jiných kapek — od těch, které mu leží ve správném úhlovém směru.',
+
+    /* ---- which reflection count makes which bow ---- */
+    bowName0: 'žádná duha',
+    bowName1: 'primární duha',
+    bowName2: 'vedlejší duha',
+    bowName3: 'terciární duha',
+    bowNameK: 'duha {k}. řádu',
+    bowFromAntisolar: 'od antisolárního bodu',
+    bowFromSun: 'od Slunce',
+    dropletBowLine: 'k = {k} → {bow} · {angle} {side}',
+    dropletBowNone: 'k = 0 → bez vnitřního odrazu, duha nevznikne',
+    bowLedgerTitle: 'Který odraz dělá kterou duhu',
+    bowLedgerLight: 'zbývá světla',
+    bowLedgerVs: 'proti primární',
+    bowLedgerNote:
+      'Uvedené procento je čistý Fresnel: (1−R)²·Rᵏ pod vlastním úhlem dopadu té které duhy. Rozprostření na širší pás a větší prstenec ubere dál.',
+    explWhyFainter:
+      'Počítejte odrazy. Jeden dělá primární duhu, dva vedlejší, tři terciární. Každý odraz navíc něco stojí — a není to málo, protože povrch vody je zevnitř mizerné zrcadlo. Pod úhlem primární duhy vrátí zpátky jen {r1} toho, co na něj dopadne, a zbytek pustí rovnou ven. Celá primární duha stojí na tomhle zlomku. Vyžádejte si druhý odraz a zbude vám zlomek ze zlomku: {rel2} světla primární duhy. Pak si ukousne i geometrie — vedlejší duha leží na větším prstenci a rozetře tytéž barvy skoro přes dvojnásobný úhel.',
+    explReflectionIsWeak:
+      'V kapce se nic neodráží proto, že by muselo. Mezní úhel vody je {crit}, duhový paprsek dopadá na zadní stěnu zevnitř pod úhlem {theta}, tedy hluboko pod ním — povrch má volnou ruku světlo pustit ven, a pustí. Většina odejde na místě. Co zůstane, je duha.',
+
+    /* ---- 3-D field: why this droplet and not the one beside it ---- */
+    fieldPickInfo: 'Vybraná kapka',
+    fieldBandsTitle: 'Kde který řád vychází',
+    bowLedgerBow: 'duha',
+    fieldTestNote:
+      'Celý test je jediná otázka: pod jakým úhlem od antisolárního bodu tu kapku vidíte? Když v tom úhlu právě vychází nějaká vlnová délka (±{tol}), kapka se obarví. Na vzdálenost se nikdo neptá — proto je v tabulce jen pro zajímavost.',
+    fieldDelivers: 'Posílá vám {nm} nm ({color}) — {bow}.',
+    fieldDeliversNone: 'Neposílá vám nic. Nejbližší duhový pás míjí o {delta}.',
+    fieldHiddenOrder:
+      'Úhel by seděl, jenže {bow} máte vypnutou. Zapněte ji a kapka se rozsvítí.',
+    fieldWhyNote:
+      'Sousední kapka o kousek vedle je vidět pod jiným úhlem, takže z ní vyjde jiná vlnová délka — nebo žádná. Odtud ta barevná kružnice: není nakreslená, jsou to prostě všechny směry, které svírají tentýž úhel s osou.',
+    fieldLitOfShown: 'Svítí {lit} z {shown} kapek',
+    fieldTestLine: 'Test: úhel od antisolárního bodu ±{tol}. Vzdálenost se nepočítá.',
 
     /* ---- mathematics panel ---- */
     mathematics: 'Matematika',
@@ -236,7 +274,7 @@ export const translations = {
       'Jas se odhaduje geometricky: paprsky se vzorkují úměrně ploše (b·db), váží se nepolarizovanými Fresnelovými koeficienty (1−R)²·Rᵏ a třídí se podle φ. Dělením sin φ se z energie stane jas. Jde o výukové přiblížení — nikoli o přesný elektromagnetický výpočet.',
     mathLimits: 'Meze modelu',
     mathLimitsNote:
-      'Použita je pouze geometrická optika. Simulace nepočítá interferenci, ohyb, Mieův rozptyl, vedlejší (supernumerární) oblouky ani polarizaci. Velmi malé kapky vyžadují vlnovou optiku.',
+      'Simulace počítá jen geometrickou optiku. Nepočítá interferenci, ohyb, Mieův rozptyl, vedlejší (supernumerární) oblouky ani polarizaci. Velmi malé kapky vyžadují vlnovou optiku.',
 
     /* ---- droplet size note ---- */
     dropletSizeNote:
@@ -260,7 +298,7 @@ export const translations = {
       'Táhněte posuvníkem parametru dopadu (nebo myší v kapce). Paprsek se láme podle Snellova zákona: sin θᵢ = n · sin θᵣ. Nic není nakresleno předem.',
     s3title: 'Přidejte vnitřní odraz',
     s3body:
-      'Na zadní straně kapky se část světla odrazí zpět dovnitř. Přepněte počet vnitřních odrazů na 1 a sledujte dráhu R0 → R1 → R2 → R3.',
+      'Na zadní straně kapky se část světla odrazí zpět dovnitř. Jeden vnitřní odraz je teď zapnutý — sledujte dráhu R0 → R1 → R2 → R3.',
     s4title: 'Kam paprsek míří?',
     s4body:
       'Změřte úhel mezi vystupujícím paprskem a směrem od Slunce. Panel vpravo ukazuje φ — úhel od antisolárního směru.',
@@ -269,24 +307,24 @@ export const translations = {
       'Projděte celý rozsah parametru dopadu a dívejte se na graf dole. Výstupní úhel není konstantní — ale ani nestoupá donekonečna.',
     s7title: 'Proč existuje jasný směr?',
     s7body:
-      'Křivka má extrém. V jeho okolí je skoro plochá, takže mnoho různých vstupních paprsků odchází téměř stejným směrem. Přepněte graf na rozdělení paprsků a přidávejte je.',
+      'Křivka má extrém. V jeho okolí je skoro plochá, takže mnoho různých vstupních paprsků odchází téměř stejným směrem. Graf dole teď počítá paprsky podle směru — zvyšte jejich počet a sledujte, jak vrchol roste.',
     s8title: 'Teď přidejte tisíce kapek',
     s8body:
-      'Každá kapka dělá totéž. K pozorovateli se dostane světlo jen od těch kapek, které leží ve správném úhlu. Zapněte přidávání kapek.',
+      'Každá kapka dělá totéž. K pozorovateli se dostane světlo jen od těch kapek, které leží ve správném úhlu. Přidávejte kapky a sledujte, jak oblouk houstne.',
     s10title: 'Tytéž kapky, ale v prostoru',
     s10body:
-      'Stejná otázka, jen bez řezu: každá kapka kolem vás se ptá, pod jakým úhlem ji vidíte a jestli právě tam nějaká vlnová délka vychází. Žádná kružnice se nekreslí — barevné jsou jen kapky, které prošly testem, a oblouk z nich stejně vyjde.',
+      'Stejná otázka, jen bez řezu: u každé kapky kolem vás se ptáme, pod jakým úhlem ji vidíte a jestli právě tam nějaká vlnová délka vychází. Žádná kružnice se nekreslí. Barevné jsou jen kapky, které prošly testem — a oblouk z nich stejně vyjde.',
     explFieldAssembles:
       'Přidejte kapky a oblouk zhoustne, uberte je a rozpadne se na jednotlivé body. Duha není nakreslený tvar, je to statistika: kolik kapek náhodou stojí ve správném směru.',
     s11title: 'Proč je to oblouk?',
     s11body:
-      'Ve třech rozměrech tvoří všechny takové směry kužel kolem antisolárního bodu. Průnik kužele s oblohou je kružnice. Zapněte horizont a dolní část zmizí.',
+      'Ve třech rozměrech tvoří všechny takové směry kužel kolem antisolárního bodu. Průnik kužele s oblohou je kružnice. Zapněte obzor a dolní část zmizí.',
     s12title: 'Odkud jsou barvy?',
     s12body:
-      'Index lomu vody závisí na vlnové délce. Posuňte disperzi z 0 % na 100 % a sledujte, jak se jediný úhel rozpadne na pás barev — a s ním i graf dole, na jednu křivku pro každou vlnovou délku.',
+      'Index lomu vody závisí na vlnové délce. Posuňte disperzi z 0 % na 100 % a jediný úhel se rozpadne na pás barev. Graf dole se rozpadne s ním — na jednu křivku pro každou vlnovou délku.',
     s13title: 'Může být duh víc?',
     s13body:
-      'Nastavte dva vnitřní odrazy. Vznikne slabší duha s větším poloměrem a obráceným pořadím barev. Mezi nimi zůstane Alexandrův temný pás.',
+      'Dva vnitřní odrazy dávají druhou duhu. Je slabší, má větší poloměr a obrácené pořadí barev. Mezera mezi oběma duhami je Alexandrův temný pás.',
 
 /* ---- controls: the observer ---- */
     observerGroup: 'Pozorovatel',
@@ -301,11 +339,11 @@ export const translations = {
     observerRise: 'Pozorovatel — nahoru / dolů',
     observerMoveHint:
       'Posunutím pozorovatele se změní úhly ke všem kapkám, takže duhu začne tvořit jiná skupina kapek. Pozorovatele lze také přetáhnout myší v obrázku.',
-    observerRecentre: 'Zpět na výchozí',
+    observerRecentre: 'Zpět na výchozí místo',
     indexGroup: 'Index lomu (pokročilé)',
     observerOnBow: '✓ přesně na duze',
     observerManualHint:
-      'Zvýrazněné paprsky vycházejí právě pod úhlem, na kterém stojí oko. Čím víc jich je, tím jasnější je ten směr.',
+      'Zvýrazněné paprsky vycházejí přesně pod tím úhlem, ve kterém stojí oko. Čím víc jich je, tím jasnější je ten směr.',
     dropsMoveHint: 'Přetáhněte pozorovatele — duha se přesune s vámi na jiné kapky.',
     obsChipForward: 'dál do deště',
     obsChipUp: 'výš',
@@ -314,12 +352,12 @@ export const translations = {
     /* ---- tutorial: the two observer steps ---- */
     s6title: 'Kde musí pozorovatel stát?',
     s6body:
-      'Oko je teď na vás. Táhněte jím po obrázku (nebo použijte posuvník úhlu) a sledujte počítadlo paprsků vpravo nahoře. Ve většině úhlů dorazí do oka jeden nebo dva paprsky. V jednom jediném úhlu jich dorazí celý svazek — a právě pod tím úhlem vidíme duhu.',
+      'Oko teď ovládáte vy. Táhněte jím po obrázku (nebo použijte posuvník úhlu) a sledujte počítadlo paprsků vpravo nahoře. Ve většině úhlů dorazí do oka jeden nebo dva paprsky. V jednom jediném úhlu jich dorazí celý svazek — a přesně pod tím úhlem vidíme duhu.',
     explObserverAngle:
-      'Úhel φ se měří u pozorovatele: mezi pohledem na kapku a antisolárním směrem, tedy směrem, kterým slunečné světlo letělo dál. Je to přesně to samé φ, které ukazuje výpis u výstupu paprsku.',
+      'Úhel φ se měří u pozorovatele: mezi pohledem na kapku a antisolárním směrem, tedy směrem, kterým sluneční světlo letělo dál. Je to přesně totéž φ, které ukazuje výpis u výstupu paprsku.',
     s9title: 'Duha není na jednom místě',
     s9body:
-      'Kapky se teď nezmění ani o jednu. Změní se jen to, kde stojíte. Posuňte pozorovatele — a duhu začne tvořit úplně jiná skupina kapek, protože rozhoduje výhradně úhel, pod kterým je vidíte.',
+      'Ani jedna kapka se nepohne. Mění se jen to, kde stojíte vy. Posuňte pozorovatele a duhu začne tvořit úplně jiná skupina kapek — rozhoduje totiž výhradně úhel, pod kterým je vidíte.',
     explBowFollowsYou:
       'Proto k duze nelze dojít a proto ji každý vidí na jiných kapkách. Vaše duha je jen vaše.',
     explDispersionZoom:
@@ -327,7 +365,7 @@ export const translations = {
 
 /* ---- export & footer ---- */
     exportPng: 'Uložit PNG',
-    exportPngHint: 'Uloží tento obrázek ve trojnásobném rozlišení, včetně popisku.',
+    exportPngHint: 'Uloží tento obrázek v trojnásobném rozlišení, včetně popisku.',
     exportWorking: 'ukládám…',
     exportSaved: 'uloženo',
     exportDeclined: 'zrušeno',
@@ -348,7 +386,7 @@ export const translations = {
     q4: 'Proč je duha kruhová?',
     a4: 'Protože příslušné výstupní směry tvoří kužel kolem antisolárního směru.',
     q5: 'Proč obvykle vidíme jen oblouk?',
-    a5: 'Protože horizont a země zakrývají spodní část kružnice.',
+    a5: 'Protože obzor a země zakrývají spodní část kružnice.',
     q6: 'Proč jsou tam barvy?',
     a6: 'Protože voda má pro různé vlnové délky různý index lomu.',
     q7: 'Proč je vedlejší duha vně primární?',
@@ -359,9 +397,9 @@ export const translations = {
     dropsHint:
       'Zelené kapky posílají světlo k pozorovateli, šedé ne. Rozhoduje jen úhel, ne vzdálenost.',
     dropsSunHint:
-      'Posuňte výšku Slunce — rozsvítí se jiné kapky. Duha není předmět na jednom místě, je to jen úhel; jiný pozorovatel by měl svou vlastní.',
+      'Změňte výšku Slunce — rozsvítí se jiné kapky. Duha není předmět na jednom místě, je to jen úhel. Jiný pozorovatel by měl svou vlastní.',
     dropsLegendReaches: 'dosáhne oka pozorovatele',
-    dropsLegendMisses: 'kapka je osvětlená, ale míjí — jiný úhel',
+    dropsLegendMisses: 'osvětlená taky, ale míjí oko — jiný úhel',
     dropsContributing: 'Kapek přispívajících pozorovateli',
 
     /* ---- many droplets: inspecting one of them ---- */
@@ -376,7 +414,7 @@ export const translations = {
     dropDistanceNote:
       'Vzdálenost se ve výpočtu nikde neobjeví. Rozhoduje jen směr — proto duha není předmět na určitém místě.',
     dropOrdersTitle: 'Kam kapka posílá soustředěné světlo',
-    dropDelivers: 'Do oka posílá {color} (k = {k}).',
+    dropDelivers: 'Do oka posílá {color} — {bow}.',
     dropDeliversNone: 'Do oka neposílá nic — nejbližší duhový směr míjí o {delta}.',
     dropPhiThetaNote:
       'Θ je úhel, o který kapka světlo stočí; φ = 180° − Θ je úhel, pod kterým musí být kapka vidět. V obrázku je proto Θ vyneseno u kapky a φ u oka.',
@@ -384,7 +422,7 @@ export const translations = {
       'Třetí odraz vychází až u φ ≈ {phi}, tedy asi {fromSun} od Slunce — dopředu do deště, ne zpátky k pozorovateli. Proto terciární duhu na obloze proti Slunci nikdy nenajdete.',
     dropInfoHint: 'Klepnutím na jinou kapku v obrázku vyberete jinou.',
     dropClear: 'Zrušit výběr',
-    animateDrops: 'Animovat přibývání',
+    animateDrops: 'Přidávat kapky postupně',
 
     /* ---- sky scene ---- */
     skyHint: 'Táhněte myší = otáčení, kolečko = přiblížení.',
@@ -397,7 +435,7 @@ export const translations = {
     skyPickElevation: 'Výška nad obzorem',
     skyPickRoll: 'Poloha na kružnici',
     skyPickNote:
-      'Kapka v tomto směru dostává sluneční světlo jako všechny ostatní. Řád k = {k} z ní vychází přesně pod úhlem, na kterém stojíte, a doletí do oka. Ostatní řády opouštějí tutéž kapku jinam — proto v jednom směru vidíte vždy jen jeden řád a vedlejší duhu vám tvoří úplně jiné kapky.',
+      'Kapka v tomto směru dostává sluneční světlo jako všechny ostatní. Řád k = {k} z ní vychází přesně pod tím úhlem, pod kterým se na ni díváte, a doletí vám do oka. Ostatní řády opouštějí tutéž kapku jinam — proto v jednom směru vidíte vždy jen jeden řád a vedlejší duhu vám tvoří úplně jiné kapky.',
     skyPickOthers: 'Kam z téže kapky míří ostatní řády',
     skyPickMiss: 'míjí oko o {delta}',
     skyPickReaches: 'trefí oko',
@@ -406,16 +444,16 @@ export const translations = {
       'Tento směr je pod obzorem, takže tam žádný déšť nevidíte a paprsek se nekreslí. Snižte Slunce nebo zapněte déšť pod úrovní očí.',
     coneAngle: 'Úhel kužele',
     bowVisible: 'Viditelná část duhy',
-    rainSeenBelow: 'Déšť vidíte až do',
-    horizonDip: 'Pokles horizontu',
-    horizonOfObserver: 'horizont pozorovatele',
+    rainSeenBelow: 'Déšť pod obzorem',
+    horizonDip: 'Pokles obzoru',
+    horizonOfObserver: 'obzor pozorovatele',
     groundLevel: 'úroveň země',
     fullCircle: 'Úplný kruh',
     flyMode: 'Let nad krajinou',
     bowTopElevation: 'Vrchol duhy nad obzorem',
     bowBelowHorizon: 'Celá primární duha je pod obzorem — Slunce je příliš vysoko.',
     fullCircleNote:
-      'Nad horizontem může být celá kružnice jen tehdy, když jsou kapky i pod úrovní očí a horizont je nezakrývá. Samotná výška to nezaručí: i v kilometru klesne obzor jen asi o 1°.',
+      'Celá kružnice může být nad obzorem jen tehdy, když jsou kapky i pod úrovní očí a obzor je nezakrývá. Samotná výška to nezaručí: ani z kilometru neklesne obzor víc než asi o 1°.',
     metres: 'm',
     degrees: '°',
     nm: 'nm',
@@ -427,7 +465,7 @@ export const translations = {
     reconstructBody:
       'jednotlivé paprsky → rozdělení výstupních úhlů → kaustika → mnoho kapek → kužel v 3D → kruhová duha → horizont → viditelný oblouk',
     warningNoRender:
-      'Vykreslení duhy je vypnuté. Zapněte je až tehdy, když už tušíte, proč tam bude.',
+      'Vykreslení duhy je vypnuté. Zapněte je, až budete umět odhadnout, kde duha bude.',
   },
 
   en: {
@@ -450,11 +488,11 @@ export const translations = {
     sceneSky: 'Sky 3D',
     sceneField: 'Droplets in space',
     sceneFieldDesc: 'Thousands of droplets in space. The bow assembles itself; nothing draws it.',
-    fieldCount: 'Droplets in the volume',
+    fieldCount: 'Number of droplets in space',
     fieldCountHint:
-      'Every droplet is asked what the flat scene asks it: at what angle do I see it, and does some wavelength come out exactly there? More droplets, a cleaner circle — but only droplets are ever drawn.',
+      'Every droplet gets the same question as in the flat scene: at what angle do you see it, and does some wavelength come out exactly there? More droplets, a cleaner circle. Only droplets are ever drawn.',
     fieldNoCircle: 'No circle is drawn — the coloured dots are the droplets that passed the test.',
-    fieldHint: 'Drag to orbit, scroll to zoom. Switch to the eye view and the bow closes into a ring.',
+    fieldHint: 'Drag to orbit, scroll to zoom. In the eye view the bow closes into a ring.',
     fieldClickHint: 'Click a droplet to see the light passing through it, and at what angles.',
     fieldClearHint: 'Click the same droplet again to clear the selection.',
     sceneDropletDesc: 'Cross-section of one spherical droplet. The ray is computed, not drawn.',
@@ -481,24 +519,24 @@ export const translations = {
     graphCollapsedHint:
       'Exit angle and ray distribution — the numbers the rainbow angle comes out of.',
     graphExitExplain:
-      'Every incoming ray is labelled by where it hits the droplet: b/R = 0 is dead centre, b/R = 1 grazes the edge. The curve gives the direction that ray leaves in. Near its turning point the curve is almost flat, so a whole band of impact parameters exits at nearly the same angle — that pile-up is the rainbow, and the angle it happens at is the bow’s angular radius. Each wavelength has its own curve, each turning over at a slightly different angle; that is where the colours come from.',
+      "Every incoming ray is labelled by where it hits the droplet: b/R = 0 is dead centre, b/R = 1 grazes the edge. The curve gives the direction that ray leaves in. Near its turning point the curve is almost flat, so a whole band of impact parameters exits at nearly the same angle — that pile-up is the rainbow, and the angle it happens at is the bow's angular radius. Each wavelength has its own curve, each turning over at a slightly different angle; that is where the colours come from.",
     graphDistExplain:
-      'Rays are fired at random across the whole face of the droplet and counted by the direction they leave in. Most directions get a similar modest share; one does not. At the angle where the exit-angle curve turns over the count spikes — and since this plot is brightness against angle, exactly what an eye measures sweeping across the sky, that spike is the bow, sitting at the angle you have to look at. Raise the ray count and it sharpens out of the noise on its own.',
+      'Rays are fired at random across the whole face of the droplet and counted by the direction they leave in. Most directions get a similar modest share. One does not: at the angle where the exit-angle curve turns over, the count spikes. The vertical axis is brightness and the horizontal one is angle — exactly what an eye measures sweeping the sky — so that spike is the bow, sitting at the angle you have to look at. Raise the ray count and it sharpens out of the noise on its own.',
     extremumLabel: 'extremum → rainbow',
     rayCount: 'Number of rays',
     accumulate: 'Accumulate rays',
 
     /* ---- controls: sun ---- */
     sun: 'Sun',
-    sunElevation: 'Height of Sun above horizon',
+    sunElevation: 'Height of the Sun above the horizon',
     sunAzimuth: 'Sun azimuth',
     observer: 'Observer',
     observerHeight: 'Observer height',
     viewMode: 'View',
     viewOrbit: 'From outside',
     viewEye: "Observer's eye",
-    lookAzimuth: 'Looking towards',
-    lookElevation: 'Look elevation',
+    lookAzimuth: 'View direction',
+    lookElevation: 'View tilt',
     fieldOfView: 'Field of view',
 
     /* ---- controls: light ---- */
@@ -525,7 +563,7 @@ export const translations = {
     indexModel: 'Refractive-index model',
     indexTable: 'table (6 colours)',
     indexCauchy: 'Cauchy relation',
-    indexScale: 'Refractive index multiplier',
+    indexScale: 'Refractive-index multiplier',
     optics: 'Optics',
 
     /* ---- controls: rays ---- */
@@ -605,26 +643,63 @@ export const translations = {
     classPrimary: 'PRIMARY RAINBOW FAMILY',
     classSecondary: 'SECONDARY RAINBOW FAMILY',
     classHigherOrder: 'HIGHER-ORDER RAINBOW',
-    classNonCaustic: 'OTHER / NON-CAUSTIC RAY',
+    classNonCaustic: 'ORDINARY SCATTERED RAY',
 
     /* ---- labelled explanations required by the brief ---- */
     explPrimary:
-      'The primary rainbow is produced by rays that undergo one internal reflection inside the droplet.',
+      'One internal reflection inside the droplet, and only one. That is the primary bow, the brightest of them, because nothing further has been thrown away yet.',
     explSecondary:
-      'The secondary rainbow is produced after two internal reflections. It is fainter, has a larger angular radius, and its color order is reversed.',
+      'The secondary bow comes from two internal reflections. It is fainter, its angular radius is larger, and its colour order runs the other way. The one extra bounce is what does all three.',
     explNoReflection: 'No internal reflection — does not contribute to the primary rainbow.',
-    explNonCaustic: 'One internal reflection, but a different exit angle — an ordinary scattered ray.',
-    explHigherOrder: 'Higher-order rainbow — very faint.',
+    explNonCaustic:
+      'The bounces are there, the exit angle is not. This ray leaves nowhere near the extremum, so it scatters like any other and adds to no bow at all.',
+    explHigherOrder:
+      'Three bounces or more. What is left is a fraction of the primary, and it comes back on the wrong side of the sky — beside the Sun rather than opposite it.',
     explCaustic:
       'Near this extremum, many different incoming rays leave the droplet in nearly the same direction. Light therefore becomes strongly concentrated in this direction. This concentration is called a caustic.',
     explObserverHeight:
-      "The angular radius of the rainbow is not determined by the observer's height. Observer height mainly changes how much of the circular rainbow can be visible above the horizon.",
+      "The angular radius of the rainbow does not depend on the observer's height. Height only changes how much of the circle the horizon can hide.",
     explNotOneReflection:
       'One internal reflection alone does not make a rainbow. The bright bow appears only when one internal reflection is combined with the angular concentration of rays near the extremum.',
     explAlexander:
       'Between the two bows lies a band into which geometric optics sends no once- or twice-reflected rays, so it looks darker. It is not truly black: higher orders, reflection from droplet surfaces and ordinary atmospheric scattering all put some light there.',
     explNotAnObject:
       'A rainbow is not an object at some distance. Every observer receives light from a different set of droplets — the ones that happen to lie in the right angular direction.',
+
+    /* ---- which reflection count makes which bow ---- */
+    bowName0: 'no bow',
+    bowName1: 'primary bow',
+    bowName2: 'secondary bow',
+    bowName3: 'tertiary bow',
+    bowNameK: 'order-{k} bow',
+    bowFromAntisolar: 'from the antisolar point',
+    bowFromSun: 'from the Sun',
+    dropletBowLine: 'k = {k} → {bow} · {angle} {side}',
+    dropletBowNone: 'k = 0 → no internal reflection, no bow',
+    bowLedgerTitle: 'Which bounce makes which bow',
+    bowLedgerLight: 'light left',
+    bowLedgerVs: 'vs primary',
+    bowLedgerNote:
+      "The percentage is pure Fresnel: (1−R)²·Rᵏ at that bow's own angle of incidence. Spreading over a wider band and a bigger ring takes more on top.",
+    explWhyFainter:
+      "Count the bounces. One gives the primary bow, two the secondary, three the tertiary. Every extra bounce costs light, and the price is steep — seen from the inside, a water surface is a poor mirror. At the primary bow's angle it turns back only {r1} of what reaches it and lets the rest straight out. The whole primary rainbow stands on that sliver. Ask for a second bounce and you keep a fraction of a fraction: {rel2} of the primary's light. Then geometry takes its own cut, because the secondary sits on a bigger ring and smears the same colours across nearly twice the angle.",
+    explReflectionIsWeak:
+      "Nothing in the droplet bounces because it has to. Water's critical angle is {crit}, and the rainbow ray meets the back wall from inside at {theta} — well under it, so the surface is free to let light through, and it does. Most of it leaves on the spot. What stays behind is the rainbow.",
+
+    /* ---- 3-D field: why this droplet and not the one beside it ---- */
+    fieldPickInfo: 'Selected droplet',
+    fieldBandsTitle: 'Where each order comes out',
+    bowLedgerBow: 'bow',
+    fieldTestNote:
+      'The whole test is one question: at what angle from the antisolar point do you see this droplet? If some wavelength comes out at exactly that angle (±{tol}), the droplet is coloured. Nobody asks about distance — it is in the table out of curiosity, nothing more.',
+    fieldDelivers: 'Sends you {nm} nm ({color}) — the {bow}.',
+    fieldDeliversNone: 'Sends you nothing. The nearest bow band misses by {delta}.',
+    fieldHiddenOrder:
+      'The angle would work, but you have the {bow} switched off. Turn it on and this droplet lights up.',
+    fieldWhyNote:
+      'The droplet just beside this one is seen at a slightly different angle, so a different wavelength comes out of it — or none does. That is where the coloured ring comes from. Nothing draws it; it is simply every direction that makes the same angle with the axis.',
+    fieldLitOfShown: '{lit} of {shown} droplets are lit',
+    fieldTestLine: 'The test: angle from the antisolar point, ±{tol}. Distance does not enter it.',
 
     /* ---- mathematics panel ---- */
     mathematics: 'Mathematics',
@@ -681,7 +756,7 @@ export const translations = {
       "Drag the impact-parameter slider (or drag inside the droplet). The ray bends according to Snell's law: sin θᵢ = n · sin θᵣ. Nothing here is drawn in advance.",
     s3title: 'Add internal reflection',
     s3body:
-      'At the back of the droplet part of the light reflects back inside. Set the number of internal reflections to 1 and follow the path R0 → R1 → R2 → R3.',
+      'At the back of the droplet part of the light reflects back inside. One internal reflection is switched on now — follow the path R0 → R1 → R2 → R3.',
     s4title: 'Where does the outgoing ray point?',
     s4body:
       'Measure the angle between the outgoing ray and the direction away from the Sun. The panel on the right shows φ, the angle from the antisolar direction.',
@@ -690,10 +765,10 @@ export const translations = {
       'Sweep the whole range of the impact parameter and watch the graph below. The exit angle is not constant — but it does not grow without limit either.',
     s7title: 'Why is there a bright direction?',
     s7body:
-      'The curve has an extremum. Near it the curve is almost flat, so many different incoming rays leave in almost the same direction. Switch the graph to the ray distribution and add rays.',
+      'The curve has an extremum. Near it the curve is almost flat, so many different incoming rays leave in almost the same direction. The graph below now counts rays by direction — raise the ray count and watch the spike grow.',
     s8title: 'Now add thousands of droplets',
     s8body:
-      'Every droplet does the same thing. Light reaches the observer only from those droplets that lie at the right angle. Turn on droplet accumulation.',
+      'Every droplet does the same thing. Light reaches the observer only from droplets that lie at the right angle. Raise the droplet count and watch the bow fill in.',
     s10title: 'The same droplets, now in space',
     s10body:
       'The same question with the cross-section removed: every droplet around you is asked what angle you see it at, and whether some wavelength comes out exactly there. No circle is drawn — only the droplets that passed are coloured, and an arc comes out of them anyway.',
@@ -702,18 +777,18 @@ export const translations = {
     s11title: 'Why does it look like an arc?',
     s11body:
       'In three dimensions all those directions form a cone around the antisolar point. The cone meets the sky in a circle. Switch the horizon on and the lower part disappears.',
-    s12title: 'Where do the colors come from?',
+    s12title: 'Where do the colours come from?',
     s12body:
-      "Water's refractive index depends on wavelength. Move dispersion from 0 % to 100 % and watch a single angle split into a band of colours — and the graph below splits with it, one curve per wavelength.",
+      "Water's refractive index depends on wavelength. Move dispersion from 0 % to 100 % and a single angle splits into a band of colours. The graph below splits with it, one curve per wavelength.",
     s13title: 'Can there be another rainbow?',
     s13body:
-      "Set two internal reflections. A fainter bow appears with a larger radius and reversed colour order, with Alexander's dark band between them.",
+      "Two internal reflections make a second bow. It is fainter, its radius is larger, and its colours run the other way. The gap between the two bows is Alexander's dark band.",
 
 /* ---- controls: the observer ---- */
     observerGroup: 'Observer',
     observerPlacement: 'Eye placement',
     observerAuto: 'automatic',
-    observerManual: 'by hand',
+    observerManual: 'manual',
     observerAngle: 'Observer angle φ',
     observerAngleHint:
       'Where the observer stands, measured from the antisolar direction. Drag the eye in the picture, or use this slider, and hunt for the angle where the most rays arrive.',
@@ -722,11 +797,11 @@ export const translations = {
     observerRise: 'Observer — up / down',
     observerMoveHint:
       'Moving the observer changes the angle to every droplet, so a different set of droplets forms the bow. The observer can also be dragged in the picture.',
-    observerRecentre: 'Back to the start',
+    observerRecentre: 'Back to the starting point',
     indexGroup: 'Refractive index (advanced)',
     observerOnBow: '✓ exactly on the bow',
     observerManualHint:
-      'Highlighted rays leave at exactly the angle the eye is standing at. The more of them there are, the brighter that direction.',
+      'Highlighted rays leave at exactly the angle the eye sits at. The more of them there are, the brighter that direction.',
     dropsMoveHint: 'Drag the observer — the bow moves with you, onto different droplets.',
     obsChipForward: 'further into the rain',
     obsChipUp: 'higher',
@@ -735,12 +810,12 @@ export const translations = {
     /* ---- tutorial: the two observer steps ---- */
     s6title: 'Where does the observer have to stand?',
     s6body:
-      'The eye is yours now. Drag it across the picture (or use the angle slider) and watch the ray tally in the top right. At most angles one or two rays arrive. At one angle a whole bundle arrives at once — and that is the angle a rainbow is seen at.',
+      'The eye is yours now. Drag it across the picture (or use the angle slider) and watch the ray tally in the top right. Most angles give one or two rays. One angle gives a whole bundle at once — and that is the angle a rainbow is seen at.',
     explObserverAngle:
       'φ is measured at the observer: between the line of sight to the droplet and the antisolar direction, the direction the sunlight was already travelling. It is the same φ the exit readout prints.',
     s9title: 'A rainbow is not in a place',
     s9body:
-      'Not one droplet moves here. Only where you are standing does. Move the observer, and a completely different set of droplets forms the bow — because the only thing that decides is the angle you see them at.',
+      'Not one droplet moves. The only thing that changes is where you stand. Move the observer and a completely different set of droplets forms the bow, because the only thing that decides is the angle you see them at.',
     explBowFollowsYou:
       'This is why you can never walk up to a rainbow, and why no two people see theirs on the same droplets. Yours is yours alone.',
     explDispersionZoom:
@@ -760,7 +835,7 @@ export const translations = {
     quizIntro: 'You can check every answer in the simulation itself.',
     showAnswer: 'Show answer',
     hideAnswer: 'Hide answer',
-    q1: 'What happens if the ray enters the droplet without an internal reflection?',
+    q1: 'What happens if a ray passes through the droplet without an internal reflection?',
     a1: 'It carries on forwards, only slightly deflected. It heads away from an observer who has the Sun behind them, and contributes nothing to the primary bow.',
     q2: 'Does every one-reflection ray produce a rainbow?',
     a2: 'No. The bright rainbow results from angular concentration near the caustic.',
@@ -769,8 +844,8 @@ export const translations = {
     q4: 'Why is the rainbow circular?',
     a4: 'Because the relevant outgoing directions form a cone around the antisolar direction.',
     q5: 'Why do we usually see only an arc?',
-    a5: 'Because the horizon and ground hide the lower part of the circle.',
-    q6: 'Why are there colors?',
+    a5: 'Because the horizon and the ground hide the lower part of the circle.',
+    q6: 'Why are there colours?',
     a6: 'Because water has different refractive indices for different wavelengths.',
     q7: 'Why is the secondary rainbow outside the primary?',
     a7: 'Two internal reflections produce a larger angular deviation.',
@@ -780,14 +855,14 @@ export const translations = {
     dropsHint:
       'Green droplets send light to the observer, grey ones do not. Only the angle matters, not the distance.',
     dropsSunHint:
-      "Drag the Sun's height — different droplets light up. A rainbow isn't an object at one place, only an angle; another observer would have their own.",
-    dropsLegendReaches: 'reaches the observer’s eye',
+      "Change the Sun's height — different droplets light up. A rainbow is not an object at one place, only an angle. Another observer would have their own.",
+    dropsLegendReaches: "reaches the observer's eye",
     dropsLegendMisses: 'lit too, but misses — wrong angle',
     dropsContributing: 'Droplets reaching the observer',
 
     /* ---- many droplets: inspecting one of them ---- */
     dropsClickHint: 'Click a droplet to see every ray it sends out, and at what angle.',
-    dropsClearHint: 'Click empty sky to clear the selection.',
+    dropsClearHint: 'Click away from any droplet to clear the selection.',
     dropIncoming: 'sunlight',
     dropHits: 'φ {angle} — reaches the eye',
     dropMisses: 'φ {angle} — misses the eye',
@@ -797,7 +872,7 @@ export const translations = {
     dropDistanceNote:
       'Distance appears nowhere in the test. Only the direction counts — which is why a rainbow is not an object sitting in a place.',
     dropOrdersTitle: 'Where this droplet sends its concentrated light',
-    dropDelivers: 'Delivers {color} to your eye (k = {k}).',
+    dropDelivers: 'Sends you {color} — the {bow}.',
     dropDeliversNone: 'Delivers nothing to your eye — the nearest bow direction misses by {delta}.',
     dropPhiThetaNote:
       'Θ is the angle the droplet turns the light through; φ = 180° − Θ is the angle the droplet has to be seen at. So the figure draws Θ at the droplet and φ at the eye.',
@@ -805,7 +880,7 @@ export const translations = {
       'The third reflection only comes out at φ ≈ {phi}, about {fromSun} from the Sun — forward into the rain, not back towards the observer. That is why you never find a tertiary bow in the sky opposite the Sun.',
     dropInfoHint: 'Click another droplet in the figure to select that one instead.',
     dropClear: 'Clear selection',
-    animateDrops: 'Animate accumulation',
+    animateDrops: 'Add droplets gradually',
 
     /* ---- sky scene ---- */
     skyHint: 'Drag to rotate, scroll to zoom.',
@@ -818,7 +893,7 @@ export const translations = {
     skyPickElevation: 'Elevation above the horizon',
     skyPickRoll: 'Position around the circle',
     skyPickNote:
-      'The droplet in this direction receives sunlight like every other one. Order k = {k} leaves it at exactly the angle you are standing at, so that light reaches your eye. The other orders leave the same droplet in other directions — which is why you only ever see one order in a given direction, and why the secondary bow is made of entirely different droplets.',
+      'The droplet in this direction receives sunlight like every other one. Order k = {k} leaves it at exactly the angle you are looking from, so that light reaches your eye. The other orders leave the same droplet in other directions — which is why you only ever see one order in a given direction, and why the secondary bow is made of entirely different droplets.',
     skyPickOthers: 'Where the other orders leave the same droplet',
     skyPickMiss: 'misses your eye by {delta}',
     skyPickReaches: 'reaches your eye',
@@ -827,7 +902,7 @@ export const translations = {
       'This direction is below the horizon, so there is no rain to see there and the beam is not drawn. Lower the Sun, or turn on rain below eye level.',
     coneAngle: 'Cone angle',
     bowVisible: 'Visible part of the bow',
-    rainSeenBelow: 'Rain seen down to',
+    rainSeenBelow: 'Rain below the horizon',
     horizonDip: 'Horizon dip',
     horizonOfObserver: "observer's horizon",
     groundLevel: 'ground level',
@@ -848,7 +923,7 @@ export const translations = {
     reconstructBody:
       'individual rays → distribution of exit angles → caustic → many droplets → 3D cone → circular rainbow → horizon → visible arc',
     warningNoRender:
-      'Rendering of the bow is switched off. Turn it on once you can already predict where it will be.',
+      'Rendering of the bow is switched off. Turn it on once you can predict where it will be.',
   },
 };
 

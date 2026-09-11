@@ -18,7 +18,7 @@ import { t, deg, num } from './i18n.js';
 import { fitCanvas, strokePath, label, capture, arrowHead } from './ui.js';
 import { NEAR, SUN_FAR, CLICK_SLOP, makeCamera, clipPolyline, clampToCanvas } from './camera3d.js';
 import { drawDropletBeam } from './beam3d.js';
-import { colorFor, bowSpectrum, BOW_MATCH_DEG } from './rays.js';
+import { colorFor, fieldTest, BOW_MATCH_DEG } from './rays.js';
 
 /** Near and far edge of the rain volume, in world units. */
 const R_MIN = 0.3;
@@ -35,7 +35,7 @@ const R_MAX = 6;
  * beneath the eye, while at 15 km it is 7.5 units down -- below the whole
  * volume, so nothing is cut and the ring closes.
  */
-const WORLD_SCALE_M = 2000;
+export const WORLD_SCALE_M = 2000;
 
 /** Wavelength bucket for batching droplet fills, in nm. */
 const LAMBDA_BUCKET = 5;
@@ -122,23 +122,13 @@ export function createFieldView(canvas) {
     const key = classKey();
     if (cls.key === key) return cls;
 
+    // The test itself lives in rays.js, so the readout describing a clicked
+    // droplet runs the identical object rather than a second copy of these
+    // few lines. With one colour selected there is no band to invert: that
+    // wavelength has one bow angle per order, and a droplet lights up within
+    // the same tolerance the flat scene matches with.
     const idx = indexModel();
-    const orders = [];
-    if (state.show.primary) orders.push(1);
-    if (state.show.secondary) orders.push(2);
-    if (state.show.higher) orders.push(3);
-    // With one colour selected there is no band to invert: that wavelength
-    // has one bow angle per order, and a droplet lights up within the same
-    // tolerance the flat scene matches with.
-    const single = state.wavelength === 'white' ? null : state.wavelength;
-    const spectra = single === null ? orders.map((k) => bowSpectrum(idx, k)).filter(Boolean) : [];
-    const mono = [];
-    if (single !== null) {
-      for (const k of orders) {
-        const geo = O.rainbowGeometry(idx(single), k);
-        if (geo) mono.push({ k, phi: geo.antisolarDeg });
-      }
-    }
+    const test = fieldTest(idx);
 
     const anti = O.antisolarDirection(state.sunElevation, state.sunAzimuth);
     const floor = rainFloor();
@@ -156,23 +146,11 @@ export function createFieldView(canvas) {
       // The angle the observer sees this droplet at. This is the whole test:
       // distance appears nowhere, exactly as in the flat scene.
       const phi = Math.acos(O.clamp((d.x * anti.x + d.y * anti.y + d.z * anti.z) / len, -1, 1)) * O.DEG;
-      if (single !== null) {
-        for (const m of mono) {
-          if (Math.abs(phi - m.phi) > BOW_MATCH_DEG) continue;
-          lambda[i] = single;
-          order[i] = m.k;
-          lit++;
-          break;
-        }
-      } else {
-        for (const sp of spectra) {
-          const lam = sp.lambdaAt(phi);
-          if (lam === null) continue;
-          lambda[i] = lam;
-          order[i] = sp.k;
-          lit++;
-          break;
-        }
+      const answer = test.at(phi);
+      if (answer) {
+        lambda[i] = answer.lambda;
+        order[i] = answer.k;
+        lit++;
       }
     }
     cls = { key, lambda, order, lit, shown };
@@ -416,6 +394,10 @@ export function createFieldView(canvas) {
     };
     put(`${t('dropCount')}: ${fmt(answers.shown)}`, '#cfe0ff');
     put(`${t('dropsContributing')}: ${fmt(answers.lit)}`, '#6fd3a4');
+    // The scene said which droplets passed and never once said what the test
+    // was, which left "the coloured dots are the ones that passed" as an
+    // assertion the reader had to take on trust.
+    put(t('fieldTestLine', { tol: deg(BOW_MATCH_DEG, 2) }), '#cfa9e8');
     put(`${t('fieldNoCircle')}`, '#8ea3c6');
     if (state.show.labels) {
       const hintFont = '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif';

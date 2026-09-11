@@ -17,7 +17,7 @@ almost certainly how a bug gets in (see "Lessons from bugs found" below).
 
 ```bash
 node server.mjs        # dev server on :5178 (or next free port)
-node --test test/optics.test.mjs   # 45 unit tests over the engine
+node --test test/optics.test.mjs   # 51 unit tests over the engine
 node tools-check-collisions.mjs    # top-level name clashes across the bundle
 node build.mjs          # writes dist/rainbow-lab.html and dist/artifact.html
 ```
@@ -69,7 +69,7 @@ app.js         assembly + render loop
 | `src/fieldView.js` | Mode D — the many-droplets test run on a 3-D volume of rain. |
 | `src/panels.js` | Tutorial script, ray readout, mathematics panel, questions. |
 | `src/app.js` | Shell, controls, the reactive update pipeline (see below), render loop. |
-| `test/optics.test.mjs` | 45 tests over the engine — ray-sphere, Snell, extremum vs. numeric search, classification, sky geometry. |
+| `test/optics.test.mjs` | 51 tests over the engine — ray-sphere, Snell, extremum vs. numeric search, classification, sky geometry, the Fresnel budget per reflection order, the droplet-field test. |
 
 ## Angle conventions — read this before changing any angle-related code
 
@@ -548,6 +548,139 @@ Two differences from the sky view's picking, both forced by the scene:
   own pupil. Θ at the droplet is unaffected and still drawn in both views.
   (The sky view had this too, silently, before the tracer was shared.)
 
+## Which reflection count makes which bow, and why the higher ones are dim
+
+The reflections control is an integer and the bow it produces is a name, and
+nothing on screen joined the two. The classification chip says "secondary
+rainbow family" only for a ray sitting on the caustic, so at any other impact
+parameter the reader had a "2" in one column and no bow anywhere. Three things
+now close that gap, all fed from `rainbowGeometry()`:
+
+- **The droplet canvas names the bow** for the current k, top right, every
+  frame (`drawBowLine()`). Order 3 is quoted from the **Sun**, not from the
+  antisolar point: phi is 137.5 deg, and printing "137.5 deg" beside the
+  primary's 42 deg sends the reader to the wrong half of the sky. The rule is
+  `antisolarDeg > 90` -> sunward.
+- **The bounces are numbered** on the path (`drawBounceNumbers()`). The dots
+  were already drawn; counting them in a folded path is not something anyone
+  gets right twice, and at k=3 two of them sit close enough to read as one.
+  The numbers carry the reflection dot's own colour and are pushed radially
+  outward so they never land on the segment they are counting.
+- **The ledger** (`orderLedger()` in `rays.js`, rendered by
+  `bowLedgerNodes()`) lists k = 1, 2, 3 with the bow each makes and what is
+  left of the light. The row matching the reflections control is highlighted,
+  so turning the knob moves the highlight down the table.
+
+### The Fresnel budget
+
+`bowBrightness(n, k)` in `optics.js` is the one place the brightness claim
+lives. By reversibility the reflectance is identical at every interface on
+the path, so a ray that enters, bounces k times and leaves keeps
+`(1-R)^2 * R^k`, with R taken at **that bow's own** incidence angle.
+
+Two results worth keeping straight, both unit-tested:
+
+| k | bow | theta_i | R | survives | vs primary |
+| --- | --- | --- | --- | --- | --- |
+| 1 | primary | 59.53° | 0.0574 | 5.10 % | ×1.00 |
+| 2 | secondary | 71.91° | 0.1581 | 1.77 % | ×0.35 |
+| 3 | tertiary | 76.89° | 0.2545 | 0.92 % | ×0.18 |
+
+- **The droplet is a poor mirror, and that is the whole answer.** Internal
+  incidence is below the critical angle (48.7°) at every order — 40.4° for the
+  primary — so nothing here is total internal reflection. The back wall passes
+  94 % straight out and keeps 5.7 %. The primary rainbow is built from that
+  5.7 %.
+- **R rises with k while the bow gets fainter.** The bow's incidence angle
+  climbs towards grazing, so each individual bounce is *more* efficient at
+  higher order, and `R^k` still falls faster than R climbs. A reader who
+  expects "more bounces, same loss each time" gets the wrong ratio; the test
+  pins both directions.
+
+`survives` is the Fresnel factor and nothing else. The spreading loss on top
+of it — a wider colour band on a bigger ring — is stated in words rather than
+as a second number, because any single figure for it depends on where you cut
+the band. `explWhyFainter` and `bowLedgerNote` say so explicitly; do not
+quietly turn that sentence into a number.
+
+Percentages in the prose come through **placeholders** (`{r1}`, `{rel2}`,
+`{crit}`, `{theta}`), filled by `noteParams()` in `panels.js`. Same rule as
+the angles: change the index model and the sentence changes with it, while a
+number typed into a translation string never would.
+
+### Verified against theory
+
+`test/optics.test.mjs` checks the published values at the sodium D line:
+primary 42.0°, secondary 51.0° from the antisolar point; tertiary 40.9° and
+quaternary 45.0° **from the Sun**, with k=1/k=2 antisolar and k=3/k=4 sunward.
+The analytic extremum agrees with the golden-section search to 1e-7.
+
+One test does not use the formula at all: it fires 200 000 rays, bins them by
+angle and compares the mean radiance across each bow's own ±2° band. That
+comes out **below** the Fresnel-only 0.35 for the secondary, which is the
+spreading loss showing up on its own — the simulation reaching the same
+conclusion by a different route. Do not tighten that assertion into an
+equality; the binned value moves with the bin count at the third digit.
+
+## Every scene names the bow, and the field says why a droplet is in it
+
+A reflection order is an integer; the bow it makes has a name. The droplet
+scene learned to print that name, and for a while it was the only one -- so a
+reader met "k = 2 means the secondary bow" in the first tab and a bare `k=2`
+in the other three. `bowNameKey(k)` in `rays.js` is the one mapping, and every
+caption and table column now goes through it: the beam tracer's order labels
+and droplet marker, the sky's ring labels, the flat scene's bow guides, and
+the `bow` column in all three inspector tables.
+
+The verdicts read alike too. The flat scene says "sends you green -- the
+primary bow", the field says "sends you 490 nm (blue) -- the secondary bow"
+(it inverts an angle to a continuous wavelength, so `nearestColorId()` gives
+it the same colour vocabulary), and the sky's order row says "2 - secondary
+bow".
+
+### The field readout that was never wired up
+
+`renderRayInfo()` branched on `drops` and `sky` and fell through to
+`rayInfoNodes()` for everything else. In the droplet field that meant clicking
+a droplet drew the beam on the canvas while the panel went on describing a ray
+in the single-droplet cross-section -- another scene, another droplet, an
+impact parameter that means nothing there. `panelKey()` had no field branch
+either, so the column would not have rebuilt on a pick even with a branch to
+run.
+
+Both are fixed, and `fieldPickNodes()` answers the question the scene exists
+for: this droplet is seen at phi, here is every order's band, here is the gap,
+here is what it delivers.
+
+### One test object, two callers
+
+The field's classification and its readout must give the same answer, or a
+panel will call a droplet lit that the scene drew grey. `fieldTest(idx)` in
+`rays.js` is that answer: `at(phi)` returns the wavelength and order, or null.
+`fieldView.classify()` builds it once per physics change and runs it over
+sixty thousand droplets; `fieldReport()` builds it again for the one droplet
+that was clicked. A unit test sweeps phi from 0 to 90 degrees in 0.13 degree
+steps and requires the two to agree at every angle, band edges included.
+
+`shownOrders()` and `DROP_ORDERS` are deliberately different lists.
+`shownOrders()` is what the field is painting right now (the
+`show.primary`/`secondary`/`higher` toggles); `DROP_ORDERS` is what an
+inspection takes apart, which is always all three. The readout's table uses
+the second and marks each row with the first, so a droplet sitting exactly on
+the secondary bow while the secondary is switched off gets told so
+(`rep.hidden`, styled `.math-table tr.off`) rather than being lumped in with
+droplets that are nowhere near a bow. That distinction has its own test.
+
+`WORLD_SCALE_M` is exported from `fieldView.js` so the readout converts world
+units to metres with the same number the scene generates the rain with.
+
+### The test is now stated on the canvas
+
+The field readout counted droplets and said "the coloured dots are the ones
+that passed the test" without ever saying what the test was. `fieldTestLine`
+does: *angle from the antisolar point, +/- BOW_MATCH_DEG, distance does not
+enter it*. The tolerance is interpolated from the constant, not typed in.
+
 ## The bundler puts every module in one scope
 
 `build.mjs` strips `import`/`export` and concatenates, so two files that each
@@ -887,7 +1020,7 @@ Snell's law (scalar and vector forms agree), Fresnel limits, the analytic
 extremum against an independent numeric (golden-section) search, the
 headline 42°/51° values, classification for every ray family, sky/horizon
 geometry, the bow-direction and scattering-angle constructors, and more —
-45 tests, all should stay green.
+51 tests, all should stay green.
 
 View/rendering changes: there is no visual regression suite, so verify by
 driving the actual app:

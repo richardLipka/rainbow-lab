@@ -490,6 +490,11 @@ select {
   border-bottom: 1px solid rgba(120, 145, 190, 0.08);
 }
 .row:last-child { border-bottom: none; }
+/* The ledger row matching the reflections control, so turning that knob
+   visibly moves the highlight down the table. */
+.row-on { color: var(--accent); }
+.row-on .row-key,
+.row-on .row-val { color: var(--accent); }
 .row-key { color: var(--fg-dim); }
 .row-val { color: var(--fg); text-align: right; }
 .row-val.mono { font-family: var(--mono); }
@@ -535,6 +540,12 @@ select {
 .math-table td:first-child, .math-table th:first-child { text-align: left; }
 /* the reflection order that actually reaches the eye, in the droplet readout */
 .math-table tr.hit td { color: var(--accent); border-bottom-color: rgba(224, 168, 63, 0.35); }
+/* An order the scene is not currently painting. Dimmed rather than hidden:
+   "this angle is on the secondary bow and you have the secondary switched
+   off" is an answer, and it needs the row to still be there. */
+.math-table tr.off td { color: var(--fg-faint); opacity: 0.55; }
+/* The bow-name column carries words, not figures, so it reads left. */
+.math-table td:nth-child(2).bow, .math-table th:nth-child(2).bow { text-align: left; }
 
 .qa { border-top: 1px solid var(--line); padding-top: 10px; margin-bottom: 6px; }
 .qa h3 { margin-top: 0; text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--fg); }

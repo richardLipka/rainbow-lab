@@ -7,7 +7,9 @@
  */
 import * as O from './optics.js';
 import { state, set, indexModel, activeOrders, activeLambdas } from './state.js';
-import { buildRays, distanceFromExtremum, colorFor, traceOne, BOW_MATCH_DEG } from './rays.js';
+import {
+  buildRays, distanceFromExtremum, colorFor, traceOne, BOW_MATCH_DEG, bowNameKey,
+} from './rays.js';
 import { t, deg, num } from './i18n.js';
 import { fitCanvas, strokePath, label, arrowHead, angleArc, capture } from './ui.js';
 
@@ -608,6 +610,32 @@ export function createDropletView(canvas) {
         align: 'center', color: '#93a7c9', font: '10px "IBM Plex Mono", ui-monospace, monospace',
       });
     }
+    drawBounceNumbers(ctx, ray);
+  }
+
+  /**
+   * Number the bounces.
+   *
+   * Which bow a ray belongs to is decided by one integer, and the path
+   * already draws a dot at each internal reflection -- but counting dots in
+   * a folded path is not something anyone gets right twice, and at k=3 the
+   * dots sit close enough together to read as two. The numbers carry the
+   * reflection dot's own colour so the pair reads as one mark.
+   */
+  function drawBounceNumbers(ctx, ray) {
+    let n = 0;
+    for (const v of ray.path.vertices) {
+      if (v.type !== 'reflection') continue;
+      n++;
+      const q = project(v.point);
+      // Pushed away from the droplet centre, so the number never lands on
+      // the path it is counting.
+      const away = { x: v.point.x, y: -v.point.y };
+      const len = Math.hypot(away.x, away.y) || 1;
+      label(ctx, String(n), q.x + (away.x / len) * 13, q.y + (away.y / len) * 13, {
+        align: 'center', color: '#ffd166', font: '10px "IBM Plex Mono", ui-monospace, monospace',
+      });
+    }
   }
 
   function drawAngles(ctx, ray) {
@@ -676,8 +704,41 @@ export function createDropletView(canvas) {
     }
   }
 
+  /**
+   * What the current reflection count actually produces.
+   *
+   * The control says "internal reflections: 2" and the classification chip
+   * in the side panel says "secondary rainbow family", but only for a ray
+   * that happens to be sitting on the caustic -- so at any other impact
+   * parameter nothing on screen connected the integer to the bow. This line
+   * always does, straight out of `rainbowGeometry`.
+   *
+   * Order 3 is quoted from the SUN, not from the antisolar point, because
+   * that is where it comes back: phi is 137 deg and reading "137 deg" next
+   * to the primary's 42 deg invites the reader to look for it in the wrong
+   * half of the sky.
+   */
+  function drawBowLine(ctx, w, y) {
+    const k = state.reflections;
+    if (k < 1) {
+      label(ctx, t('dropletBowNone'), w - 12, y, { align: 'right', color: '#8ea3c6' });
+      return y + 18;
+    }
+    const geo = O.rainbowGeometry(indexModel()(activeLambdas()[0]), k);
+    if (!geo) return y;
+    const sunward = geo.antisolarDeg > 90;
+    label(ctx, t('dropletBowLine', {
+      k,
+      bow: t(bowNameKey(k), { k }),
+      angle: deg(sunward ? 180 - geo.antisolarDeg : geo.antisolarDeg, 1),
+      side: t(sunward ? 'bowFromSun' : 'bowFromAntisolar'),
+    }), w - 12, y, { align: 'right', color: k === 1 ? '#6fd3a4' : k === 2 ? '#9b8cf0' : '#f0885d' });
+    return y + 18;
+  }
+
   function drawLegend(ctx, w, h, rays) {
     let y = 18;
+    if (state.show.labels) y = drawBowLine(ctx, w, y) + 4;
     if (state.show.wavelengthLabels) {
       const main = rays.filter((r) => r.role === 'main');
       const seen = new Set();
