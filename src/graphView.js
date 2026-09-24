@@ -193,6 +193,35 @@ export function createGraphView(canvas) {
     lo = Math.max(0, lo - padY);
     hi = hi + padY;
 
+    // With two orders plotted the data span has to cover 180 deg -- k=2 starts
+    // at phi = 180 when b = 0 -- and the turning points, which are the whole
+    // reason to look at this plot, become three-pixel features at the bottom
+    // of it. Measured before this: the primary's hump is 2.4 deg tall, 1.3 %
+    // of a 180 deg axis. Focus on the band the extrema live in instead, wide
+    // enough that each curve still visibly enters the frame from its own
+    // side. One order keeps the full range: there the rise from zero IS the
+    // point (tutorial step 5), and clipping it would remove the lesson.
+    const bows = [];
+    for (const k of orders) {
+      if (k < 1) continue;
+      for (const lam of lambdas) {
+        const geo = O.rainbowGeometry(idx(lam), k);
+        if (!geo) continue;
+        bows.push(state.angleMode === 'deviation'
+          ? geo.deviationDeg
+          : state.angleMode === 'scattering'
+          ? geo.scatteringDeg
+          : geo.antisolarDeg);
+      }
+    }
+    if (orders.filter((k) => k >= 1).length > 1 && bows.length > 1) {
+      const eLo = Math.min(...bows);
+      const eHi = Math.max(...bows);
+      const margin = Math.max(6, (eHi - eLo) * 0.6);
+      lo = Math.max(lo, eLo - margin);
+      hi = Math.min(hi, eHi + margin);
+    }
+
     const fx = (b) => box.x + b * box.w;
     const fy = (v) => box.y + box.h - ((v - lo) / (hi - lo)) * box.h;
     exitMap = { fx, fy, lo, hi };
@@ -242,6 +271,11 @@ export function createGraphView(canvas) {
 
     // label each extremum once (using the longest wavelength present)
     const lamLabel = lambdas.includes(650) ? 650 : lambdas[0];
+    // Both bows turn over within 8 deg of each other on an axis that has to
+    // span 180 (k=2 starts at phi = 180 when b = 0), which at this canvas
+    // height puts the two labels about ten pixels apart -- on top of each
+    // other. Stacked upward instead, in plotted order.
+    let lastLabelY = Infinity;
     for (const k of orders) {
       if (k < 1) continue;
       const geo = O.rainbowGeometry(idx(lamLabel), k);
@@ -253,9 +287,46 @@ export function createGraphView(canvas) {
           ? geo.scatteringDeg
           : geo.antisolarDeg;
       if (v < lo || v > hi) continue;
-      label(ctx, `k=${k} · ${t('extremumLabel')} ${deg(v, 2)}`, fx(geo.impactParameter) + 8, fy(v) - 14, {
-        color: colorFor(lamLabel), font: '10px "IBM Plex Mono", ui-monospace, monospace',
-      });
+      // Which way the curve turns, sampled rather than assumed: the character
+      // of the extremum depends on WHICH angle is plotted. In phi the primary
+      // is a maximum and the secondary a minimum; in Theta they swap; in the
+      // unfolded deviation D both are minima. A hard-coded "k=1 is a maximum"
+      // would be right in one mode out of three.
+      const near = (db) => {
+        const b = O.clamp(geo.impactParameter + db, 0, 1);
+        const D = O.deviation(Math.asin(b), idx(lamLabel), k);
+        if (D === null) return null;
+        return state.angleMode === 'deviation'
+          ? D * O.DEG
+          : state.angleMode === 'scattering'
+          ? O.foldToScattering(D) * O.DEG
+          : O.antisolarAngle(D) * O.DEG;
+      };
+      const before = near(-0.02);
+      const after = near(0.02);
+      const isMax = before !== null && after !== null && v > before && v > after;
+      // The colour side is a fact about phi and does not change with the
+      // plotted mode, so it is only stated where the reader can read it off
+      // this plot directly.
+      const side = state.angleMode === 'antisolar'
+        ? ` · ${t(k === 1 ? 'turnRedOutside' : 'turnRedInside')}`
+        : '';
+      const wantY = fy(v) - 14;
+      const labelY = Math.min(wantY, lastLabelY - 14);
+      lastLabelY = labelY;
+      // A leader line when the label had to move off its own point, so it is
+      // still obvious which turn it belongs to.
+      if (labelY < wantY - 2) {
+        strokePath(ctx, [
+          { x: fx(geo.impactParameter) + 6, y: fy(v) },
+          { x: fx(geo.impactParameter) + 6, y: labelY + 4 },
+        ], colorFor(lamLabel, 0.45), 1, [2, 3]);
+      }
+      label(ctx,
+        `k=${k} · ${t('extremumLabel')} ${deg(v, 2)} · ${t(isMax ? 'turnMax' : 'turnMin')}${side}`,
+        fx(geo.impactParameter) + 8, labelY, {
+          color: colorFor(lamLabel), font: '10px "IBM Plex Mono", ui-monospace, monospace',
+        });
     }
 
     // the moving marker for the ray currently in the droplet

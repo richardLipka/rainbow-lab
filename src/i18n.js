@@ -198,7 +198,7 @@ export const translations = {
     explPrimary:
       'Jeden vnitřní odraz uvnitř kapky, a jenom jeden. To je primární duha — nejjasnější ze všech, protože se z paprsku zatím nic dalšího nezahodilo.',
     explSecondary:
-      'Vedlejší duha vzniká po dvou vnitřních odrazech. Je slabší, má větší úhlový poloměr a obrácené pořadí barev. Za všechno může ten jeden odraz navíc.',
+      'Vedlejší duha vzniká po dvou vnitřních odrazech. Její křivka výstupního úhlu klesá do sedla tam, kde primární stoupá k vrcholu — a odtud je jak větší poloměr, tak obrácené pořadí barev. Odraz navíc stojí zvlášť: zahodí většinu světla.',
     explNoReflection: 'Bez vnitřního odrazu — nepřispívá k primární duze.',
     explNonCaustic:
       'Odrazy tam jsou, výstupní úhel ne. Tenhle paprsek odchází daleko od extrému, takže se rozptýlí jako každý jiný a k žádné duze nepřispívá.',
@@ -211,7 +211,7 @@ export const translations = {
     explNotOneReflection:
       'Jeden vnitřní odraz sám o sobě duhu nedělá. Duha vzniká teprve tehdy, když se k jednomu vnitřnímu odrazu přidá úhlová koncentrace paprsků poblíž extrému.',
     explAlexander:
-      'Mezi oběma duhami leží pás, do kterého geometrická optika neposílá žádné paprsky s jedním ani dvěma vnitřními odrazy. Proto se jeví tmavší. Není však úplně černý — světlo tam přichází z vyšších řádů, z odrazu na povrchu kapek a z běžného rozptylu v atmosféře.',
+      'Mezi oběma duhami leží pás, kam se žádný paprsek s jedním ani dvěma odrazy nedostane. Primární křivka se obrací u {inner} a vedlejší u {outer}, obě pryč od mezery — proto je tmavší. Úplně černý ale není: světlo tam přichází z vyšších řádů, z odrazu na povrchu kapek a z běžného rozptylu v atmosféře.',
     explNotAnObject:
       'Duha není předmět v určité vzdálenosti. Každý pozorovatel dostává světlo od jiných kapek — od těch, které mu leží ve správném úhlovém směru.',
 
@@ -261,6 +261,20 @@ export const translations = {
       'Jeden paprsek ukazuje, jak vedlejší duha vzniká. Neukazuje ji samotnou. Duha je nahromadění paprsků a každý řád se hromadí u svého vlastního parametru dopadu — {b1} pro primární, {b2} pro vedlejší. Přetáhněte posuvník mezi nimi a dívejte se, které oko se rozsvítí. Vždycky jen jedno.',
     explSameSplitInSky:
       'Tentýž rozpad, jenže venku. Každá kapka dělá to co ta jediná v řezu: všechny řády naráz, každý jinam. Který z nich dorazí k vám, rozhoduje jedině to, kde kapka stojí — takže kapka, ze které máte primární duhu, vám tu vedlejší udělat nemůže. Ta je z úplně jiných kapek.',
+
+    /* ---- the secondary, built rather than announced ---- */
+    s13atitle: 'Tentýž paprsek, o odraz dál',
+    s13abody:
+      'Do kapky nevstupuje nic nového. Světlo, které se na první stěně lomem dostalo ven, udělalo primární duhu; to, co zůstalo uvnitř a doletělo na další stěnu, dělá vedlejší. Obě větve jsou na obrázku. Teď najděte paprsek, který vedlejší duze patří — čipy skáčou mezi oběma vstupními polohami a je vidět, které oko se rozsvítí.',
+    s13btitle: 'Proč se barvy obracejí',
+    s13bbody:
+      'Otevřete graf a podívejte se na obě křivky. Primární stoupá k vrcholu, vedlejší klesá do sedla. V tomhle jediném rozdílu je celé obrácení: ve vrcholu se nejdelší vlnová délka obrací nejdál od středu, v sedle nejblíž k němu. Červená tak končí vně primární duhy a uvnitř vedlejší.',
+    explColourFlip:
+      'Červená se v primární duze obrací u {p1} a ve vedlejší u {p2}, fialová u {v1} a u {v2}. Jedna křivka má vrchol, druhá sedlo — a tentýž rozptyl indexu lomu proto naskládá barvy jednou takhle a podruhé obráceně. Mezera mezi nimi, {gap} oblohy, je prázdná ze stejného důvodu: obě křivky se od ní odvracejí, takže do ní žádný paprsek s jedním ani dvěma odrazy nedopadne.',
+    turnMax: 'vrchol',
+    turnMin: 'sedlo',
+    turnRedOutside: 'červená vně',
+    turnRedInside: 'červená uvnitř',
 
     /* ---- mathematics panel ---- */
     mathematics: 'Matematika',
@@ -342,7 +356,7 @@ export const translations = {
       'Index lomu vody závisí na vlnové délce. Posuňte disperzi z 0 % na 100 % a jediný úhel se rozpadne na pás barev. Graf dole se rozpadne s ním — na jednu křivku pro každou vlnovou délku.',
     s13title: 'Může být duh víc?',
     s13body:
-      'Dva vnitřní odrazy dávají druhou duhu. Je slabší, má větší poloměr a obrácené pořadí barev. Mezera mezi oběma duhami je Alexandrův temný pás.',
+      'A takhle to dopadne na obloze. Dva prstence, ten vnější slabší a s obráceným pořadím barev, a mezi nimi Alexandrův temný pás — přesně ta mezera, ze které se obě křivky odvracely.',
 
 /* ---- controls: the observer ---- */
     observerGroup: 'Pozorovatel',
@@ -673,7 +687,7 @@ export const translations = {
     explPrimary:
       'One internal reflection inside the droplet, and only one. That is the primary bow, the brightest of them, because nothing further has been thrown away yet.',
     explSecondary:
-      'The secondary bow comes from two internal reflections. It is fainter, its angular radius is larger, and its colour order runs the other way. The one extra bounce is what does all three.',
+      'The secondary bow comes from two internal reflections. Its exit-angle curve falls to a trough where the primary rises to a peak — which is where both the larger radius and the reversed colours come from. The extra bounce is a separate cost: it throws away most of the light.',
     explNoReflection: 'No internal reflection — does not contribute to the primary rainbow.',
     explNonCaustic:
       'The bounces are there, the exit angle is not. This ray leaves nowhere near the extremum, so it scatters like any other and adds to no bow at all.',
@@ -686,7 +700,7 @@ export const translations = {
     explNotOneReflection:
       'One internal reflection alone does not make a rainbow. The bright bow appears only when one internal reflection is combined with the angular concentration of rays near the extremum.',
     explAlexander:
-      'Between the two bows lies a band into which geometric optics sends no once- or twice-reflected rays, so it looks darker. It is not truly black: higher orders, reflection from droplet surfaces and ordinary atmospheric scattering all put some light there.',
+      'Between the two bows lies a band no once- or twice-reflected ray can reach. The primary curve turns back at {inner} and the secondary at {outer}, both away from the gap, so geometric optics sends nothing into it. Not truly black, though: higher orders, reflection off droplet surfaces and ordinary atmospheric scattering all put some light there.',
     explNotAnObject:
       'A rainbow is not an object at some distance. Every observer receives light from a different set of droplets — the ones that happen to lie in the right angular direction.',
 
@@ -736,6 +750,20 @@ export const translations = {
       "One ray shows how the secondary happens. It does not show the secondary bow. A bow is a pile-up, and each order piles up at its own impact parameter — {b1} for the primary, {b2} for the secondary. Drag the slider between them and watch which eye lights up. Only ever one at a time.",
     explSameSplitInSky:
       "The same split, out here. Every droplet does what the single one did: every order at once, each leaving in its own direction. Which one reaches you depends only on where the droplet sits — so the droplet giving you the primary cannot also give you the secondary. That one comes from entirely different droplets.",
+
+    /* ---- the secondary, built rather than announced ---- */
+    s13atitle: 'The same ray, one bounce further',
+    s13abody:
+      'Nothing new enters the droplet. The light that refracted out at the first wall made the primary; what stayed inside and reached the next wall makes the secondary. Both branches are on screen. Now find the ray the secondary belongs to — the chips jump between the two entry positions, and you can watch which eye lights up.',
+    s13btitle: 'Why the colours flip',
+    s13bbody:
+      'Open the plot and look at the two curves. The primary rises to a peak; the secondary falls to a trough. That single difference is the whole reversal: at a peak the longest wavelength turns over furthest out, at a trough it turns over furthest in. So red ends up outside the primary and inside the secondary.',
+    explColourFlip:
+      'Red turns over at {p1} in the primary and {p2} in the secondary; violet at {v1} and {v2}. One curve peaks and the other troughs, so the same spread of refractive index stacks the colours one way and then the other. The gap between them — {gap} of sky — is empty for the same reason: both curves turn away from it, so no once- or twice-reflected ray can land there.',
+    turnMax: 'peak',
+    turnMin: 'trough',
+    turnRedOutside: 'red outside',
+    turnRedInside: 'red inside',
 
     /* ---- mathematics panel ---- */
     mathematics: 'Mathematics',
@@ -818,7 +846,7 @@ export const translations = {
       "Water's refractive index depends on wavelength. Move dispersion from 0 % to 100 % and a single angle splits into a band of colours. The graph below splits with it, one curve per wavelength.",
     s13title: 'Can there be another rainbow?',
     s13body:
-      "Two internal reflections make a second bow. It is fainter, its radius is larger, and its colours run the other way. The gap between the two bows is Alexander's dark band.",
+      "And here is how it lands in the sky. Two rings, the outer one fainter and with its colours reversed, and between them Alexander's dark band — the very gap both curves were turning away from.",
 
 /* ---- controls: the observer ---- */
     observerGroup: 'Observer',

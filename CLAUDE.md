@@ -819,6 +819,69 @@ bounce twice, but that second-order light leaves at 56.9 deg carrying 0.29 %,
 nowhere near the bow and six times fainter than the secondary's own rainbow
 ray.
 
+## The secondary, built instead of announced
+
+The tutorial used to mention the secondary bow exactly once: the last step,
+in the sky, with the answer already assembled -- *"two internal reflections
+make a second bow, it is fainter, its colours run the other way."* Everything
+the droplet scene had learned to show (the cascade, the bow marks, the
+impact-parameter chips) was free-mode only, so a reader who followed the
+guided path never met any of it.
+
+It is three steps now. **13a** puts the cascade on the droplet with chips that
+jump between the two entry positions; **13b** opens the exit-angle plot with
+both orders on it; **13c** (the old step 13) is the payoff in the sky, reworded
+from a summary into "and here is how it lands".
+
+### The colour reversal was asserted four times and derived never
+
+`explSecondary`, `s13body` and two others all said some form of "its colour
+order runs the other way" and none said why. In a project whose rule is that
+the answer must emerge from the simulation, that was the one claim still
+behaving like a decorative arc.
+
+The reason is one sign, and the engine already had it:
+
+| | φ(b) has a… | red turns at | violet turns at | so red is |
+| --- | --- | --- | --- | --- |
+| k=1 | **maximum** | 42.37° | 40.65° | **outside** |
+| k=2 | **minimum** | 50.37° | 53.48° | **inside** |
+
+That single flip explains the reversed colours, the larger radius, *and*
+Alexander's band -- both curves turn **away** from the 42.4-50.4 gap, so
+nothing of either order can land in it. `explColourFlip` says it with those
+four numbers from the engine; `explSecondary` and `explAlexander` were
+rewritten to derive rather than assert, the latter now quoting both turning
+points.
+
+### Two things the plot needed before it could carry that
+
+- **The extremum marker now says which way the curve turns**, sampled either
+  side of the turning point rather than hard-coded. The character depends on
+  which angle is plotted: in φ the primary is a maximum and the secondary a
+  minimum, in Θ they swap, and in the unfolded D **both are minima**. A
+  hard-coded "k=1 is a maximum" would be right in one mode out of three. The
+  colour side (`red outside` / `red inside`) is only appended in φ mode,
+  where the reader can read it off the plot directly.
+- **The y-range focuses on the extrema when two orders share the plot.**
+  k=2 starts at φ = 180° when b = 0, so the data span is the full 180° and
+  the turning points become three-pixel features at the bottom -- measured,
+  the primary's hump is 2.4° tall, 1.3 % of the axis. With two orders the
+  range tightens to the band the extrema live in, wide enough that each curve
+  still visibly enters the frame from its own side. **One order keeps the
+  full range**: there the rise from zero *is* the point (step 5), and
+  clipping it would remove the lesson. Only step 14 plots two orders, so no
+  earlier step moved.
+- Both labels are stacked upward when they would collide (they sit ~10 px
+  apart at this canvas height), with a dashed leader back to the point.
+
+### One bug this turned up
+
+Step 13a was written with `panel: 'ray'`, to put the readout in front of the
+reader. The tutorial text lives in the **guide** panel, so that hid the step's
+own title and body. `panel: 'guide'` with `showRay: true` is the pattern --
+step 4 already used it -- and it embeds the compact readout instead.
+
 ## Checked against Nussenzveig
 
 H. M. Nussenzveig, "The Theory of the Rainbow", *Scientific American* 236(4),
@@ -1052,8 +1115,9 @@ plotted coordinate would be meaningless. It also guards on
 class is taken off the section.
 
 Every `TUTORIAL` step sets `graphOpen` explicitly rather than inheriting it.
-True only at steps 5 ("watch the graph below"), 7 (focuses `rayCount`) and
-11 (dispersion splits one curve into six); false everywhere else. When a step
+True only at steps 5 ("watch the graph below"), 7 (focuses `rayCount`), 12
+(dispersion splits one curve into six) and 14 (the two curves turn opposite
+ways); false everywhere else. When a step
 opens a plot, the paragraph under the tabs (`graphExitExplain` /
 `graphDistExplain`) says what the axes are and how the shape relates to the
 bow, so a reader who arrives there mid-tutorial is not left to infer it.
@@ -1272,7 +1336,7 @@ driving the actual app:
    15 digits; pixel heuristics have already produced noise here. Pixel
    counting is still the right tool for "did the *set* of highlighted things
    change" questions — count saturated pixels and compare centroids.
-8. Full 13-step tutorial script in **both languages** + free-mode sweeps
+8. Full 15-step tutorial script in **both languages** + free-mode sweeps
    (every scene, sky orbit and eye view, zoom extremes, reset) with zero
    thrown errors **and zero console warnings** is the practical regression
    bar. The warnings matter: `applyFocus()` reports tutorial steps whose

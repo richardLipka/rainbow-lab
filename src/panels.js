@@ -239,6 +239,52 @@ export const TUTORIAL = [
     note: 'explDispersionZoom',
   },
   {
+    /* The secondary, built rather than announced. Step 13 used to be the only
+       step that mentioned it, in the sky, with the answer already assembled --
+       so a reader who followed the tutorial never met the cascade, the bow
+       marks or the impact-parameter chips at all. These two steps put the
+       droplet work in the guided path, and the sky step becomes the payoff. */
+    title: 's13atitle', body: 's13abody',
+    apply: {
+      // panel: 'guide' with showRay, not panel: 'ray' -- the tutorial text
+      // lives in the guide, so selecting the ray panel hides the very step
+      // the reader is on. showRay embeds the compact readout instead.
+      scene: 'droplet', panel: 'guide', wavelength: 650, dispersion: 1,
+      reflections: 2, fanCount: 0, dropletZoom: 1, observerMode: 'auto',
+      graphOpen: false, showNonRainbow: false,
+      families: { 0: false, 1: true, 2: true, 3: false },
+      show: { angles: false, normals: false, labels: true, renderedBow: false },
+    },
+    focus: ['impactParameter', 'bowRays'],
+    actions: [
+      {
+        labelKey: 'bowName1',
+        patch: () => ({ impact: O.rainbowGeometry(indexModel()(650), 1).impactParameter }),
+      },
+      {
+        labelKey: 'bowName2',
+        patch: () => ({ impact: O.rainbowGeometry(indexModel()(650), 2).impactParameter }),
+      },
+    ],
+    note: 'coneSliceNote',
+    showRay: true,
+  },
+  {
+    /* Why the colours run the other way -- the one claim the app used to
+       assert four times and derive never. Both curves are already on the plot
+       the moment two orders are active; this step opens it and says what to
+       look at. */
+    title: 's13btitle', body: 's13bbody',
+    apply: {
+      scene: 'droplet', graph: 'exit', graphOpen: true, angleMode: 'antisolar',
+      wavelength: 'white', dispersion: 1, reflections: 2, fanCount: 0,
+      families: { 0: false, 1: true, 2: true, 3: false },
+      panel: 'guide', show: { labels: true, wavelengthLabels: true },
+    },
+    focus: ['angleConvention', 'dispersion'],
+    note: 'explColourFlip',
+  },
+  {
     title: 's13title', body: 's13body',
     apply: {
       scene: 'sky', view: 'eye', dispersion: 1, wavelength: 'white', reflections: 2,
@@ -372,6 +418,24 @@ function noteParams(key, k = state.reflections) {
     return {
       phi1: deg(g1.antisolarDeg, 1), phi2: deg(g2.antisolarDeg, 1),
       gap: deg(g2.antisolarDeg - g1.antisolarDeg, 2),
+    };
+  }
+  if (key === 'explColourFlip' || key === 'explAlexander') {
+    // Where each colour turns over, for each order. The whole reversal is in
+    // these four numbers and nothing else, so they come from the engine.
+    const turn = (lam, order) => {
+      const g = O.rainbowGeometry(idx(lam), order);
+      return g ? g.antisolarDeg : null;
+    };
+    const p1 = turn(650, 1);
+    const p2 = turn(650, 2);
+    const v1 = turn(420, 1);
+    const v2 = turn(420, 2);
+    if (p1 === null || p2 === null) return null;
+    if (key === 'explAlexander') return { inner: deg(p1, 2), outer: deg(p2, 2) };
+    return {
+      p1: deg(p1, 2), p2: deg(p2, 2), v1: deg(v1, 2), v2: deg(v2, 2),
+      gap: deg(p2 - p1, 2),
     };
   }
   if (key === 'explBowNeedsOwnRay') {
