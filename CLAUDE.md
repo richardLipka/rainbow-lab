@@ -1487,3 +1487,44 @@ Two things this broke, both fixed:
 
 The wedge's edges come from traced rays, never from the analytic angles, so a
 disagreement between trace and formula would show up as a wrong-sized band.
+
+## One band, one number, four scenes
+
+`alexandersBand()` gained `widthDeg`, and `alexanderCaption(idx)` in rays.js
+returns the band plus its finished caption. Every scene that shades the gap
+now prints that one string. Before this the droplet view derived the width
+from its own traced exits and the rain cross-section wrote the two order
+colours out again as rgba literals — which is how you end up with 8.0 in one
+corner and 8.2 in another, both right for their own reference wavelength and
+both looking like a bug. `orderColor(k)` moved to rays.js for the same reason.
+
+A trap the test found: `alexandersBand()` defaults to the table index model,
+so comparing its width against bows traced with `cauchyIndex` fails for
+reasons that have nothing to do with the thing under test. Pass the same model
+into both. With that fixed the split-entry gap and `widthDeg` agree to 1e-9 —
+they are the same quantity, which is worth asserting rather than assuming.
+
+How each scene draws it:
+
+- **droplet** — hatched ribbon at 2.3–3.2 radii, edges = the two traced bow
+  rays. Needs `splitEntry`, or the "gap" is the 92.8 deg the drawing forces.
+- **drops** — hatched annulus at 0.52–1.0 of the ray length, on both sides of
+  the antisolar axis, labelled once. A wedge from the eye was tried first and
+  buried the observer and the near half of the rain.
+- **field** — two dashed rings at the band edges only. The band shades itself
+  here: no droplet inside it passes `fieldTest`, so none is drawn. The rings
+  turn "a dark ring" into "8 degrees wide, and it has a name".
+- **sky** — already darkened the ring since the scene was written, and never
+  once said what it was. Now captioned.
+
+## The tutorial opens with the destination
+
+Step 1 was a blank slate — one droplet, zero reflections, "we don't yet know
+what happens". Honest, and it told a reader nothing about what they were about
+to spend sixteen steps deriving. It now opens on both bows with split entry:
+two eyes, 42.4 and 50.4, the band between them, and a chip per entry point.
+The blank slate is step 2, unchanged. 17 steps.
+
+Known, pre-existing: with `wavelengthLabels` on, the sky's k=1 and k=2 bow
+captions can collide at low eye elevations. Not caused by the band caption,
+which sits between them at the band's mid angle.

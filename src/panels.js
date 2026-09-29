@@ -37,7 +37,38 @@ import { WORLD_SCALE_M } from './fieldView.js';
  */
 export const TUTORIAL = [
   {
+    /* The destination, first. The opener used to be a blank slate -- one
+       droplet, no reflections, "we don't yet know what happens" -- which is
+       honest but tells a reader nothing about what they are about to spend
+       fifteen steps deriving. Both bows are on screen here, entering through
+       their own halves so the 8 deg between them is the real gap and not the
+       92.8 deg that one entry point forces. Everything after this takes the
+       picture apart; this step only says what the picture is. */
     title: 's1title', body: 's1body',
+    apply: {
+      scene: 'droplet', graph: 'exit', reflections: 2, dispersion: 1, wavelength: 650,
+      impact: 0.861, fanCount: 0, showNonRainbow: false, angleMode: 'antisolar',
+      dropletZoom: 1, observerMode: 'auto', graphOpen: false, splitEntry: true,
+      show: { angles: true, normals: false, labels: true, renderedBow: false },
+      families: { 0: false, 1: true, 2: true, 3: false },
+    },
+    focus: ['splitEntry', 'reflections'],
+    actions: [
+      {
+        labelKey: 'bowName1',
+        patch: () => ({ impact: O.rainbowGeometry(indexModel()(650), 1).impactParameter }),
+      },
+      {
+        labelKey: 'bowName2',
+        patch: () => ({ impact: O.rainbowGeometry(indexModel()(650), 2).impactParameter }),
+      },
+    ],
+  },
+  {
+    /* The blank slate that used to open the tutorial, now that the reader has
+       seen what it is heading towards. Nothing on screen but one droplet and
+       one ray that does not reflect at all. */
+    title: 's1btitle', body: 's1bbody',
     apply: {
       scene: 'droplet', graph: 'exit', reflections: 0, dispersion: 0, wavelength: 'white',
       impact: 0.6, fanCount: 0, showNonRainbow: false, angleMode: 'antisolar',

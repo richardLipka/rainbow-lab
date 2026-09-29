@@ -335,8 +335,14 @@ export const translations = {
     startFree: 'Přejít do volného režimu',
     tutorialDone: 'Hotovo. Zbytek si zkuste sami.',
 
-    s1title: 'Může jedna kapka udělat duhu?',
+    s1title: 'Dvě duhy, osm stupňů',
     s1body:
+      'Tohle je cíl. Jedna kulová kapka v řezu, sluneční světlo zleva a dvě oči: jedno 42,4° od '
+      + 'antisolárního bodu, druhé 50,4°. Mezi nimi je pás, do kterého nevychází nic. Každá duha '
+      + 'přitom potřebuje jiný paprsek — vstupuje jinou výškou a uvnitř se odrazí jinak často. '
+      + 'Zkuste přepnout mezi oběma vstupními body. Zbytek prohlídky rozebírá, proč to tak je.',
+    s1btitle: 'Může jedna kapka udělat duhu?',
+    s1bbody:
       'Vlevo je jediná kulová kapka v řezu. Sluneční paprsek přichází zleva. Zatím nevíme, co se s ním stane — necháme to spočítat.',
     s2title: 'Sledujte paprsek',
     s2body:
@@ -845,8 +851,15 @@ export const translations = {
     startFree: 'Go to free mode',
     tutorialDone: 'Done. Now try the rest yourself.',
 
-    s1title: 'Can one raindrop create a rainbow?',
+    s1title: 'Two bows, eight degrees',
     s1body:
+      'This is where we are going. One spherical drop in cross-section, sunlight from the left, and '
+      + 'two eyes: one 42.4° from the antisolar point, the other 50.4°. Between them sits a band '
+      + 'that receives nothing. Each bow needs its own ray — entering at a different height, '
+      + 'bouncing a different number of times inside. Try the two entry points. Everything after '
+      + 'this takes the picture apart.',
+    s1btitle: 'Can one raindrop create a rainbow?',
+    s1bbody:
       'On the left is a single spherical droplet in cross-section. Sunlight arrives from the left. We do not yet know what happens to it — let the simulation work it out.',
     s2title: 'Trace the ray',
     s2body:

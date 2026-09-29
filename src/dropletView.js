@@ -9,7 +9,7 @@ import * as O from './optics.js';
 import { state, set, indexModel, activeOrders, activeLambdas } from './state.js';
 import {
   buildRays, distanceFromExtremum, colorFor, traceOne, BOW_MATCH_DEG, bowNameKey, sharedPrefix,
-  entrySide,
+  entrySide, orderColor, alexanderCaption,
 } from './rays.js';
 import { t, deg, num } from './i18n.js';
 import { fitCanvas, strokePath, label, arrowHead, angleArc, capture } from './ui.js';
@@ -947,11 +947,6 @@ export function createDropletView(canvas) {
       `Θ=${deg(thetaDeg, 1)} → φ=${deg(phiDeg, 1)}`);
   }
 
-  /** Chrome colour per reflection order, shared with the bow caption. */
-  function orderColor(k) {
-    return k === 1 ? '#6fd3a4' : k === 2 ? '#9b8cf0' : '#f0885d';
-  }
-
   /**
    * Where each bow's own ray enters.
    *
@@ -1053,7 +1048,6 @@ export function createDropletView(canvas) {
     if (edges.length < 2) return;
     const a0 = Math.min(edges[0].ang, edges[1].ang);
     const a1 = Math.max(edges[0].ang, edges[1].ang);
-    const gap = Math.abs(edges[0].phi - edges[1].phi);
 
     // A ribbon rather than a wedge from the centre. A filled wedge was tried
     // and could not be seen: the band is dark, the canvas is dark, and 8 deg
@@ -1100,7 +1094,7 @@ export function createDropletView(canvas) {
     // captions, which sit much further out along this same bearing, and into
     // the hint row at the foot of the canvas.
     const lr = (r0 + r1) / 2;
-    label(ctx, `${t('alexanderBandLabel')} · ${deg(gap, 1)}`,
+    label(ctx, alexanderCaption(indexModel()).text,
       O.clamp(layout.cx + Math.cos(mid) * lr, 84, layout.w - 84),
       O.clamp(layout.cy + Math.sin(mid) * lr, 16, layout.h - 44),
       { align: 'center', color: '#b3c2dc', bg: true });

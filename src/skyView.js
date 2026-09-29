@@ -15,7 +15,7 @@ import { t, deg, num } from './i18n.js';
 import { fitCanvas, strokePath, label, arrowHead, capture } from './ui.js';
 import { NEAR, SUN_FAR, CLICK_SLOP, makeCamera, clipPolyline, clampToCanvas } from './camera3d.js';
 import { drawDropletBeam } from './beam3d.js';
-import { colorFor, bowNameKey } from './rays.js';
+import { colorFor, bowNameKey, alexanderCaption } from './rays.js';
 
 /**
  * How many wavelengths the bow is drawn from, and how many points per circle.
@@ -475,6 +475,17 @@ export function createSkyView(canvas) {
         strokePath(ctx, seg, 'rgba(0,0,0,0.22)', 6);
       }
     }
+
+    // Named, with its width, the way the droplet scene and the rain
+    // cross-section name it. The sky has darkened this ring since the scene
+    // was written and never once said what it was.
+    if (!state.show.labels) return;
+    const mid = (band.innerDeg + band.outerDeg) / 2;
+    const top = topOfBow(anti, mid);
+    if (!top || cam.depth(top) <= NEAR) return;
+    const p = cam.project(top);
+    label(ctx, alexanderCaption(indexModel()).text, p.x, p.y + 4,
+      { align: 'center', color: '#b3c2dc', bg: true });
   }
 
   function drawRenderedBow(ctx, anti) {

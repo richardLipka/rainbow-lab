@@ -967,9 +967,15 @@ export function alexandersBand(indexModel = defaultIndex) {
   const p1v = rainbowGeometry(nViolet, 1);
   const p2r = rainbowGeometry(nRed, 2);
   const p2v = rainbowGeometry(nViolet, 2);
+  const innerDeg = Math.max(p1r.antisolarDeg, p1v.antisolarDeg);
+  const outerDeg = Math.min(p2r.antisolarDeg, p2v.antisolarDeg);
   return {
-    innerDeg: Math.max(p1r.antisolarDeg, p1v.antisolarDeg),
-    outerDeg: Math.min(p2r.antisolarDeg, p2v.antisolarDeg),
+    innerDeg,
+    outerDeg,
+    // The gap every scene quotes. Derived here once so the droplet's wedge,
+    // the rain cross-section, the 3-D field and the sky cannot print four
+    // slightly different numbers for the same band.
+    widthDeg: outerDeg - innerDeg,
     primary: p1r,
     secondary: p2r,
   };

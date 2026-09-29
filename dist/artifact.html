@@ -1580,9 +1580,15 @@ function alexandersBand(indexModel = defaultIndex) {
   const p1v = rainbowGeometry(nViolet, 1);
   const p2r = rainbowGeometry(nRed, 2);
   const p2v = rainbowGeometry(nViolet, 2);
+  const innerDeg = Math.max(p1r.antisolarDeg, p1v.antisolarDeg);
+  const outerDeg = Math.min(p2r.antisolarDeg, p2v.antisolarDeg);
   return {
-    innerDeg: Math.max(p1r.antisolarDeg, p1v.antisolarDeg),
-    outerDeg: Math.min(p2r.antisolarDeg, p2v.antisolarDeg),
+    innerDeg,
+    outerDeg,
+    // The gap every scene quotes. Derived here once so the droplet's wedge,
+    // the rain cross-section, the 3-D field and the sky cannot print four
+    // slightly different numbers for the same band.
+    widthDeg: outerDeg - innerDeg,
     primary: p1r,
     secondary: p2r,
   };
@@ -1955,8 +1961,14 @@ const translations = {
     startFree: 'Přejít do volného režimu',
     tutorialDone: 'Hotovo. Zbytek si zkuste sami.',
 
-    s1title: 'Může jedna kapka udělat duhu?',
+    s1title: 'Dvě duhy, osm stupňů',
     s1body:
+      'Tohle je cíl. Jedna kulová kapka v řezu, sluneční světlo zleva a dvě oči: jedno 42,4° od '
+      + 'antisolárního bodu, druhé 50,4°. Mezi nimi je pás, do kterého nevychází nic. Každá duha '
+      + 'přitom potřebuje jiný paprsek — vstupuje jinou výškou a uvnitř se odrazí jinak často. '
+      + 'Zkuste přepnout mezi oběma vstupními body. Zbytek prohlídky rozebírá, proč to tak je.',
+    s1btitle: 'Může jedna kapka udělat duhu?',
+    s1bbody:
       'Vlevo je jediná kulová kapka v řezu. Sluneční paprsek přichází zleva. Zatím nevíme, co se s ním stane — necháme to spočítat.',
     s2title: 'Sledujte paprsek',
     s2body:
@@ -2465,8 +2477,15 @@ const translations = {
     startFree: 'Go to free mode',
     tutorialDone: 'Done. Now try the rest yourself.',
 
-    s1title: 'Can one raindrop create a rainbow?',
+    s1title: 'Two bows, eight degrees',
     s1body:
+      'This is where we are going. One spherical drop in cross-section, sunlight from the left, and '
+      + 'two eyes: one 42.4° from the antisolar point, the other 50.4°. Between them sits a band '
+      + 'that receives nothing. Each bow needs its own ray — entering at a different height, '
+      + 'bouncing a different number of times inside. Try the two entry points. Everything after '
+      + 'this takes the picture apart.',
+    s1btitle: 'Can one raindrop create a rainbow?',
+    s1bbody:
       'On the left is a single spherical droplet in cross-section. Sunlight arrives from the left. We do not yet know what happens to it — let the simulation work it out.',
     s2title: 'Trace the ray',
     s2body:
@@ -3358,6 +3377,7 @@ function clampToCanvas(p, w, h, margin) {
  */
 
 
+
 /** A demonstrably off-caustic impact parameter for the "ordinary ray" case. */
 const NON_CAUSTIC_B = 0.35;
 
@@ -3488,6 +3508,29 @@ function entrySide(k, n) {
   const ref = orders.length ? orders[0] : 1;
   if (k < 1 || k === ref) return 1;
   return bowExitSide(n, ref) * bowExitSide(n, k);
+}
+
+/**
+ * Chrome colour for reflection order k, shared by every scene.
+ *
+ * It started out private to the droplet view while the rain cross-section
+ * carried the same two colours written out again as rgba literals. Two copies
+ * of a colour is one copy too many the moment a third scene wants it.
+ */
+function orderColor(k) {
+  return k === 1 ? '#6fd3a4' : k === 2 ? '#9b8cf0' : '#f0885d';
+}
+
+/**
+ * Alexander's band as one caption: the name, and the width from the engine.
+ *
+ * Four scenes draw this gap. Deriving the number in each of them is how you
+ * end up with 8.0 in one corner and 8.2 in another, both correct for their
+ * own reference wavelength and both looking like a bug.
+ */
+function alexanderCaption(idx = indexModel()) {
+  const band = O.alexandersBand(idx);
+  return { band, text: `${t('alexanderBandLabel')} · ${deg(band.widthDeg, 1)}` };
 }
 
 /**
@@ -5033,11 +5076,6 @@ function createDropletView(canvas) {
       `Θ=${deg(thetaDeg, 1)} → φ=${deg(phiDeg, 1)}`);
   }
 
-  /** Chrome colour per reflection order, shared with the bow caption. */
-  function orderColor(k) {
-    return k === 1 ? '#6fd3a4' : k === 2 ? '#9b8cf0' : '#f0885d';
-  }
-
   /**
    * Where each bow's own ray enters.
    *
@@ -5139,7 +5177,6 @@ function createDropletView(canvas) {
     if (edges.length < 2) return;
     const a0 = Math.min(edges[0].ang, edges[1].ang);
     const a1 = Math.max(edges[0].ang, edges[1].ang);
-    const gap = Math.abs(edges[0].phi - edges[1].phi);
 
     // A ribbon rather than a wedge from the centre. A filled wedge was tried
     // and could not be seen: the band is dark, the canvas is dark, and 8 deg
@@ -5186,7 +5223,7 @@ function createDropletView(canvas) {
     // captions, which sit much further out along this same bearing, and into
     // the hint row at the foot of the canvas.
     const lr = (r0 + r1) / 2;
-    label(ctx, `${t('alexanderBandLabel')} · ${deg(gap, 1)}`,
+    label(ctx, alexanderCaption(indexModel()).text,
       O.clamp(layout.cx + Math.cos(mid) * lr, 84, layout.w - 84),
       O.clamp(layout.cy + Math.sin(mid) * lr, 16, layout.h - 44),
       { align: 'center', color: '#b3c2dc', bg: true });
@@ -6095,13 +6132,54 @@ function createDropsView(canvas) {
       });
     }
 
+    // Alexander's band, in the same hatch the single-droplet scene uses. Both
+    // bows have to be on screen for it to mean anything: on its own the
+    // primary has an outside, not a gap. Drawn before the direction lines so
+    // they read as its edges.
+    if (state.show.primary && state.show.secondary) {
+      const { band: ab, text } = alexanderCaption(idx);
+      if (ab.outerDeg > ab.innerDeg) {
+        const R = s * 1.35;
+        for (const sign of [1, -1]) {
+          const a0 = Math.atan2(-anti.y, anti.x) + sign * ab.innerDeg * O.RAD;
+          const a1 = Math.atan2(-anti.y, anti.x) + sign * ab.outerDeg * O.RAD;
+          ctx.save();
+          // An annulus, not a wedge from the eye: the same ribbon shape the
+          // single-droplet scene uses, and it keeps the hatch off the
+          // observer and off the near half of the rain.
+          const lo = Math.min(a0, a1);
+          const hi = Math.max(a0, a1);
+          ctx.beginPath();
+          ctx.arc(o.x, o.y, R, lo, hi);
+          ctx.arc(o.x, o.y, R * 0.52, hi, lo, true);
+          ctx.closePath();
+          ctx.clip();
+          ctx.strokeStyle = 'rgba(152,174,218,0.24)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          for (let q = -R * 2; q < R * 2; q += 8) {
+            ctx.moveTo(o.x + q, o.y - R * 2);
+            ctx.lineTo(o.x + q + R * 4, o.y + R * 2);
+          }
+          ctx.stroke();
+          ctx.restore();
+          if (state.show.labels && sign === -1) {
+            const mid = (a0 + a1) / 2;
+            label(ctx, text,
+              O.clamp(o.x + Math.cos(mid) * R * 0.76, 84, w - 84),
+              O.clamp(o.y + Math.sin(mid) * R * 0.76, 16, h - 30),
+              { align: 'center', color: '#b3c2dc', bg: true });
+          }
+        }
+      }
+    }
+
     // the two directions that can deliver bow light, in this cross-section
     for (const band of bs) {
       for (const sign of [1, -1]) {
         for (const edge of [band.lo, band.hi]) {
           const dir = rotate(anti, sign * edge * O.RAD);
-          strokePath(ctx, [o, P(off(obs, dir, 1.35))],
-            band.k === 1 ? 'rgba(111,211,164,0.22)' : 'rgba(155,140,240,0.2)', 1,
+          strokePath(ctx, [o, P(off(obs, dir, 1.35))], orderColor(band.k) + '3a', 1,
             band.k === 1 ? [3, 4] : [2, 5]);
         }
       }
@@ -7056,6 +7134,17 @@ function createSkyView(canvas) {
         strokePath(ctx, seg, 'rgba(0,0,0,0.22)', 6);
       }
     }
+
+    // Named, with its width, the way the droplet scene and the rain
+    // cross-section name it. The sky has darkened this ring since the scene
+    // was written and never once said what it was.
+    if (!state.show.labels) return;
+    const mid = (band.innerDeg + band.outerDeg) / 2;
+    const top = topOfBow(anti, mid);
+    if (!top || cam.depth(top) <= NEAR) return;
+    const p = cam.project(top);
+    label(ctx, alexanderCaption(indexModel()).text, p.x, p.y + 4,
+      { align: 'center', color: '#b3c2dc', bg: true });
   }
 
   function drawRenderedBow(ctx, anti) {
@@ -7609,12 +7698,41 @@ function createFieldView(canvas) {
     if (state.show.horizon) drawHorizon(ctx);
 
     const answers = classify();
+    drawAlexander(ctx, anti);
     drawDroplets(ctx, answers, w, h);
     drawPick(ctx, answers, anti, sun, w, h);
 
     drawAxis(ctx, sun, anti, w, h);
     if (state.view === 'orbit') drawObserver(ctx);
     drawReadout(ctx, answers, w, h);
+  }
+
+  /**
+   * The two edges of Alexander's band, as rings, with the gap named.
+   *
+   * Every other scene had to shade this band; here it shades itself, because
+   * no droplet inside it passes the test and so none is drawn. The rings only
+   * say where the emptiness starts and stops -- which is the difference
+   * between a reader seeing a dark ring and a reader knowing it is 8 degrees
+   * wide and has a name.
+   */
+  function drawAlexander(ctx, anti) {
+    if (!state.show.primary || !state.show.secondary) return;
+    const { band, text } = alexanderCaption(indexModel());
+    if (!(band.outerDeg > band.innerDeg)) return;
+    for (const [phi, k] of [[band.innerDeg, 1], [band.outerDeg, 2]]) {
+      const circle = O.rainbowCircle(anti, phi, 180);
+      for (const seg of clipPolyline(cam, circle)) {
+        strokePath(ctx, seg, orderColor(k) + '55', 1, [4, 6]);
+      }
+    }
+    if (!state.show.labels) return;
+    const mid = (band.innerDeg + band.outerDeg) / 2;
+    let top = null;
+    for (const d of O.rainbowCircle(anti, mid, 128)) if (!top || d.y > top.y) top = d;
+    if (!top || cam.depth(top) <= NEAR) return;
+    const p = cam.project(top);
+    label(ctx, text, p.x, p.y + 4, { align: 'center', color: '#b3c2dc', bg: true });
   }
 
   function drawGround(ctx) {
@@ -7966,7 +8084,38 @@ function createFieldView(canvas) {
  */
 const TUTORIAL = [
   {
+    /* The destination, first. The opener used to be a blank slate -- one
+       droplet, no reflections, "we don't yet know what happens" -- which is
+       honest but tells a reader nothing about what they are about to spend
+       fifteen steps deriving. Both bows are on screen here, entering through
+       their own halves so the 8 deg between them is the real gap and not the
+       92.8 deg that one entry point forces. Everything after this takes the
+       picture apart; this step only says what the picture is. */
     title: 's1title', body: 's1body',
+    apply: {
+      scene: 'droplet', graph: 'exit', reflections: 2, dispersion: 1, wavelength: 650,
+      impact: 0.861, fanCount: 0, showNonRainbow: false, angleMode: 'antisolar',
+      dropletZoom: 1, observerMode: 'auto', graphOpen: false, splitEntry: true,
+      show: { angles: true, normals: false, labels: true, renderedBow: false },
+      families: { 0: false, 1: true, 2: true, 3: false },
+    },
+    focus: ['splitEntry', 'reflections'],
+    actions: [
+      {
+        labelKey: 'bowName1',
+        patch: () => ({ impact: O.rainbowGeometry(indexModel()(650), 1).impactParameter }),
+      },
+      {
+        labelKey: 'bowName2',
+        patch: () => ({ impact: O.rainbowGeometry(indexModel()(650), 2).impactParameter }),
+      },
+    ],
+  },
+  {
+    /* The blank slate that used to open the tutorial, now that the reader has
+       seen what it is heading towards. Nothing on screen but one droplet and
+       one ray that does not reflect at all. */
+    title: 's1btitle', body: 's1bbody',
     apply: {
       scene: 'droplet', graph: 'exit', reflections: 0, dispersion: 0, wavelength: 'white',
       impact: 0.6, fanCount: 0, showNonRainbow: false, angleMode: 'antisolar',

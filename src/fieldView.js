@@ -18,7 +18,7 @@ import { t, deg, num } from './i18n.js';
 import { fitCanvas, strokePath, label, capture, arrowHead } from './ui.js';
 import { NEAR, SUN_FAR, CLICK_SLOP, makeCamera, clipPolyline, clampToCanvas } from './camera3d.js';
 import { drawDropletBeam } from './beam3d.js';
-import { colorFor, fieldTest, BOW_MATCH_DEG } from './rays.js';
+import { colorFor, fieldTest, BOW_MATCH_DEG, orderColor, alexanderCaption } from './rays.js';
 
 /** Near and far edge of the rain volume, in world units. */
 const R_MIN = 0.3;
@@ -195,12 +195,41 @@ export function createFieldView(canvas) {
     if (state.show.horizon) drawHorizon(ctx);
 
     const answers = classify();
+    drawAlexander(ctx, anti);
     drawDroplets(ctx, answers, w, h);
     drawPick(ctx, answers, anti, sun, w, h);
 
     drawAxis(ctx, sun, anti, w, h);
     if (state.view === 'orbit') drawObserver(ctx);
     drawReadout(ctx, answers, w, h);
+  }
+
+  /**
+   * The two edges of Alexander's band, as rings, with the gap named.
+   *
+   * Every other scene had to shade this band; here it shades itself, because
+   * no droplet inside it passes the test and so none is drawn. The rings only
+   * say where the emptiness starts and stops -- which is the difference
+   * between a reader seeing a dark ring and a reader knowing it is 8 degrees
+   * wide and has a name.
+   */
+  function drawAlexander(ctx, anti) {
+    if (!state.show.primary || !state.show.secondary) return;
+    const { band, text } = alexanderCaption(indexModel());
+    if (!(band.outerDeg > band.innerDeg)) return;
+    for (const [phi, k] of [[band.innerDeg, 1], [band.outerDeg, 2]]) {
+      const circle = O.rainbowCircle(anti, phi, 180);
+      for (const seg of clipPolyline(cam, circle)) {
+        strokePath(ctx, seg, orderColor(k) + '55', 1, [4, 6]);
+      }
+    }
+    if (!state.show.labels) return;
+    const mid = (band.innerDeg + band.outerDeg) / 2;
+    let top = null;
+    for (const d of O.rainbowCircle(anti, mid, 128)) if (!top || d.y > top.y) top = d;
+    if (!top || cam.depth(top) <= NEAR) return;
+    const p = cam.project(top);
+    label(ctx, text, p.x, p.y + 4, { align: 'center', color: '#b3c2dc', bg: true });
   }
 
   function drawGround(ctx) {

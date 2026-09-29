@@ -6,6 +6,7 @@
  */
 import * as O from './optics.js';
 import { state, activeLambdas, activeOrders, indexModel } from './state.js';
+import { t, deg } from './i18n.js';
 
 /** A demonstrably off-caustic impact parameter for the "ordinary ray" case. */
 export const NON_CAUSTIC_B = 0.35;
@@ -137,6 +138,29 @@ export function entrySide(k, n) {
   const ref = orders.length ? orders[0] : 1;
   if (k < 1 || k === ref) return 1;
   return bowExitSide(n, ref) * bowExitSide(n, k);
+}
+
+/**
+ * Chrome colour for reflection order k, shared by every scene.
+ *
+ * It started out private to the droplet view while the rain cross-section
+ * carried the same two colours written out again as rgba literals. Two copies
+ * of a colour is one copy too many the moment a third scene wants it.
+ */
+export function orderColor(k) {
+  return k === 1 ? '#6fd3a4' : k === 2 ? '#9b8cf0' : '#f0885d';
+}
+
+/**
+ * Alexander's band as one caption: the name, and the width from the engine.
+ *
+ * Four scenes draw this gap. Deriving the number in each of them is how you
+ * end up with 8.0 in one corner and 8.2 in another, both correct for their
+ * own reference wavelength and both looking like a bug.
+ */
+export function alexanderCaption(idx = indexModel()) {
+  const band = O.alexandersBand(idx);
+  return { band, text: `${t('alexanderBandLabel')} · ${deg(band.widthDeg, 1)}` };
 }
 
 /**

@@ -13,6 +13,7 @@ import { t, num, deg } from './i18n.js';
 import { fitCanvas, strokePath, label, capture, arrowHead, angleArc } from './ui.js';
 import {
   colorFor, bowBands, colorAtPhi, dropReport, antisolarAxis, BOW_MATCH_DEG, bowNameKey,
+  orderColor, alexanderCaption,
 } from './rays.js';
 
 const SMALL_FONT = '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif';
@@ -182,13 +183,54 @@ export function createDropsView(canvas) {
       });
     }
 
+    // Alexander's band, in the same hatch the single-droplet scene uses. Both
+    // bows have to be on screen for it to mean anything: on its own the
+    // primary has an outside, not a gap. Drawn before the direction lines so
+    // they read as its edges.
+    if (state.show.primary && state.show.secondary) {
+      const { band: ab, text } = alexanderCaption(idx);
+      if (ab.outerDeg > ab.innerDeg) {
+        const R = s * 1.35;
+        for (const sign of [1, -1]) {
+          const a0 = Math.atan2(-anti.y, anti.x) + sign * ab.innerDeg * O.RAD;
+          const a1 = Math.atan2(-anti.y, anti.x) + sign * ab.outerDeg * O.RAD;
+          ctx.save();
+          // An annulus, not a wedge from the eye: the same ribbon shape the
+          // single-droplet scene uses, and it keeps the hatch off the
+          // observer and off the near half of the rain.
+          const lo = Math.min(a0, a1);
+          const hi = Math.max(a0, a1);
+          ctx.beginPath();
+          ctx.arc(o.x, o.y, R, lo, hi);
+          ctx.arc(o.x, o.y, R * 0.52, hi, lo, true);
+          ctx.closePath();
+          ctx.clip();
+          ctx.strokeStyle = 'rgba(152,174,218,0.24)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          for (let q = -R * 2; q < R * 2; q += 8) {
+            ctx.moveTo(o.x + q, o.y - R * 2);
+            ctx.lineTo(o.x + q + R * 4, o.y + R * 2);
+          }
+          ctx.stroke();
+          ctx.restore();
+          if (state.show.labels && sign === -1) {
+            const mid = (a0 + a1) / 2;
+            label(ctx, text,
+              O.clamp(o.x + Math.cos(mid) * R * 0.76, 84, w - 84),
+              O.clamp(o.y + Math.sin(mid) * R * 0.76, 16, h - 30),
+              { align: 'center', color: '#b3c2dc', bg: true });
+          }
+        }
+      }
+    }
+
     // the two directions that can deliver bow light, in this cross-section
     for (const band of bs) {
       for (const sign of [1, -1]) {
         for (const edge of [band.lo, band.hi]) {
           const dir = rotate(anti, sign * edge * O.RAD);
-          strokePath(ctx, [o, P(off(obs, dir, 1.35))],
-            band.k === 1 ? 'rgba(111,211,164,0.22)' : 'rgba(155,140,240,0.2)', 1,
+          strokePath(ctx, [o, P(off(obs, dir, 1.35))], orderColor(band.k) + '3a', 1,
             band.k === 1 ? [3, 4] : [2, 5]);
         }
       }

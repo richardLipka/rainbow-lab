@@ -927,6 +927,9 @@ test("entering through opposite halves puts the two bows Alexander's band apart"
   const expected = Math.abs(g1.antisolarDeg - g2.antisolarDeg);
   close(split, expected, 1e-9, "the drawn wedge is Alexander's band");
 
-  const band = O.alexandersBand();
-  close(split, band.widthDeg ?? expected, 0.2, 'and agrees with the band the sky scene shades');
+  // The same index model the traces above used, or this compares the band of
+  // one dispersion curve against the bows of another and fails for a reason
+  // that has nothing to do with entry halves.
+  const band = O.alexandersBand(O.cauchyIndex);
+  close(split, band.widthDeg, 1e-9, 'and agrees with the band every scene shades');
 });
