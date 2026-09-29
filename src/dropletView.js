@@ -122,6 +122,7 @@ export function createDropletView(canvas) {
       if (state.show.angles && ref.path.dirOut) drawExitAngle(ctx, ref);
       if (state.show.normals) for (const r of main) drawNormals(ctx, r);
     }
+    drawArrivalArc(ctx);
     drawImpactHandle(ctx);
     for (const observer of observers) drawObserver(ctx, observer, reachingKs.has(observer.kRef));
     drawLegend(ctx, w, h, rays);
@@ -460,6 +461,196 @@ export function createDropletView(canvas) {
         align: 'right', color: '#c3b6ff', font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
       });
     }
+  }
+
+  /** Where the ticks sit, in droplet radii. Outside the sphere, inside the
+   *  eyes, and far enough out that neighbouring exits separate. */
+  const ARRIVAL_R = 1.62;
+  /**
+   * How many impact parameters the arc samples.
+   *
+   * Deliberately NOT the fan count. The fan is drawn, so its size is a
+   * legibility choice; the arc is a density display, and density needs
+   * samples. Measured for the secondary: at 45 the busiest 3-degree bucket
+   * holds 3 ticks against a typical 1, which reads as noise; at 200 it holds
+   * 15 against 4, which reads as a caustic.
+   */
+  const ARRIVAL_SAMPLES = 200;
+
+  /* Cached against the physics, never the camera: the exit directions depend
+     on the index model and the orders, and nothing else. */
+  let arrival = { key: '', groups: [] };
+
+  function arrivalKey() {
+    return [
+      state.wavelength, state.dispersion, state.indexMode, state.indexScale,
+      activeOrders().join(','),
+    ].join('|');
+  }
+
+  /**
+   * Every impact parameter across the droplet face, reduced to the one thing
+   * that decides whether it is a rainbow: the direction it leaves in.
+   *
+   * Uniform in b, so the DENSITY of the ticks is the density of exit
+   * directions -- and that density is the whole of a caustic. Where they pile
+   * up, a band of entry points is leaving along one direction. Everywhere
+   * else they spread, because the exit direction is still swinging: measured,
+   * about 1.4 deg per 0.01 of b for the secondary against 0.02 deg at its own
+   * bow.
+   *
+   * This is the angular distribution plot drawn where the rays are, and it is
+   * the bridge the scene was missing. A single traced ray can only ever show
+   * one direction, which is why the secondary looks like it points somewhere
+   * arbitrary until you see the population it belongs to.
+   */
+  function buildArrival() {
+    const key = arrivalKey();
+    if (arrival.key === key) return arrival;
+    const idx = indexModel();
+    const groups = [];
+    // One curve per ORDER, not per order and wavelength. Six wavelengths put
+    // 24 translucent polygons on screen at k=4 and cost 113 ms a frame, for a
+    // bulge whose position moves less than two degrees across the spectrum --
+    // invisible at this radius. The longest active wavelength is the same
+    // convention graphView uses to label its extrema.
+    const lambda = activeLambdas().includes(650) ? 650 : activeLambdas()[0];
+    const n = idx(lambda);
+    for (const k of activeOrders()) {
+      if (k < 1) continue;
+      const angs = [];
+      for (let i = 0; i < ARRIVAL_SAMPLES; i++) {
+        const b = (i + 0.5) / ARRIVAL_SAMPLES;
+        const path = traceOne(lambda, n, k, b).path;
+        if (!path.dirOut) continue;
+        angs.push(Math.atan2(-path.dirOut.y, path.dirOut.x));
+      }
+      if (angs.length > 8) groups.push({ k, lambda, angs });
+    }
+    arrival = { key, groups };
+    return arrival;
+  }
+
+  /**
+   * The exit directions, drawn as a profile rather than as separate ticks.
+   *
+   * Ticks were tried first and only half worked: measured against the median
+   * brightness along the arc, the primary's pile-up came out 3.3x brighter
+   * and the secondary's only 1.7x. That asymmetry is real -- the secondary
+   * spreads its exits over 128 degrees of screen against the primary's much
+   * narrower span, so the same 200 samples land thinner -- and it is exactly
+   * the thing this display exists to defeat. A bar per bin, scaled to the
+   * group's own busiest bin, measures density instead of relying on ink
+   * piling up, so a narrow caustic on a wide spread reads as strongly as a
+   * tight one.
+   */
+  const ARRIVAL_BIN = 1.2 * Math.PI / 180;
+  const ARRIVAL_BAR = 26;
+
+  function drawArrivalArc(ctx) {
+    // Pointless with one ray on screen: a pile-up needs a population, and the
+    // reader has not asked to see one.
+    if (state.fanCount <= 0) return;
+    const r = layout.s * ARRIVAL_R;
+    if (r < 40) return;
+    const { groups } = buildArrival();
+    if (!groups.length) return;
+
+    ctx.save();
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (const g of groups) for (const a of g.angs) { if (a < lo) lo = a; if (a > hi) hi = a; }
+    ctx.strokeStyle = 'rgba(126,150,196,0.28)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(layout.cx, layout.cy, r, lo - 0.04, hi + 0.04);
+    ctx.stroke();
+
+    for (const g of groups) {
+      const bins = new Map();
+      for (const a of g.angs) {
+        const b = Math.round(a / ARRIVAL_BIN);
+        bins.set(b, (bins.get(b) || 0) + 1);
+      }
+      const keys = [...bins.keys()].sort((x, y) => x - y);
+      const peak = Math.max(...bins.values());
+      if (!(peak > 0) || keys.length < 3) continue;
+      // Filled, not hatched. Two hundred separate bars read as texture; the
+      // same numbers as one filled curve read as a shape with a spike on it,
+      // which is the entire message.
+      const dens = (i) => {
+        const c0 = bins.get(keys[i]) || 0;
+        const cm = bins.get(keys[i - 1]) || c0;
+        const cp = bins.get(keys[i + 1]) || c0;
+        return (cm + 2 * c0 + cp) / 4;
+      };
+      const rad = (i) => r + 3 + ARRIVAL_BAR * Math.sqrt(dens(i) / peak);
+      ctx.beginPath();
+      for (let i = 0; i < keys.length; i++) {
+        const a = keys[i] * ARRIVAL_BIN;
+        const x = layout.cx + Math.cos(a) * rad(i);
+        const y = layout.cy + Math.sin(a) * rad(i);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      for (let i = keys.length - 1; i >= 0; i--) {
+        const a = keys[i] * ARRIVAL_BIN;
+        ctx.lineTo(layout.cx + Math.cos(a) * r, layout.cy + Math.sin(a) * r);
+      }
+      ctx.closePath();
+      ctx.fillStyle = colorFor(g.lambda, 0.22);
+      ctx.fill();
+      ctx.strokeStyle = colorFor(g.lambda, 0.9);
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      for (let i = 0; i < keys.length; i++) {
+        const a = keys[i] * ARRIVAL_BIN;
+        const x = layout.cx + Math.cos(a) * rad(i);
+        const y = layout.cy + Math.sin(a) * rad(i);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // The bulge needs naming. Left to inference it reads as "the band happens
+    // to end thick here" rather than "this is the direction the bow is in".
+    const idx2 = indexModel();
+    for (const k of activeOrders()) {
+      if (k < 1) continue;
+      const geo = O.rainbowGeometry(idx2(activeLambdas()[0]), k);
+      if (!geo) continue;
+      const canon = traceOne(activeLambdas()[0], idx2(activeLambdas()[0]), k, geo.impactParameter);
+      if (!canon.path.dirOut) continue;
+      const a3 = Math.atan2(-canon.path.dirOut.y, canon.path.dirOut.x);
+      const c3 = Math.cos(a3);
+      const s3 = Math.sin(a3);
+      ctx.save();
+      ctx.strokeStyle = orderColor(k);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(layout.cx + c3 * (r - 10), layout.cy + s3 * (r - 10));
+      ctx.lineTo(layout.cx + c3 * (r + ARRIVAL_BAR + 8), layout.cy + s3 * (r + ARRIVAL_BAR + 8));
+      ctx.stroke();
+      ctx.restore();
+      if (!state.show.labels) continue;
+      label(ctx, t(bowNameKey(k), { k }),
+        O.clamp(layout.cx + c3 * (r + ARRIVAL_BAR + 24), 54, layout.w - 54),
+        O.clamp(layout.cy + s3 * (r + ARRIVAL_BAR + 24), 14, layout.h - 26), {
+          align: 'center', color: orderColor(k),
+          font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
+        });
+    }
+
+    if (!state.show.labels) return;
+    const mid = (lo + hi) / 2;
+    label(ctx, t('arrivalArcLabel'),
+      O.clamp(layout.cx + Math.cos(mid) * (r + ARRIVAL_BAR + 18), 62, layout.w - 62),
+      O.clamp(layout.cy + Math.sin(mid) * (r + ARRIVAL_BAR + 18), 14, layout.h - 26), {
+        align: 'center', color: '#8ea3c6',
+        font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
+      });
   }
 
   function flushBatch(ctx, batch) {

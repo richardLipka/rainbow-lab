@@ -359,6 +359,28 @@ export function rainbowGeometry(n, k) {
 }
 
 /**
+ * How fast the exit direction swings as the entry point moves: |dphi/db|, in
+ * degrees of antisolar angle per unit impact parameter.
+ *
+ * This is the caustic with a number on it. A bow is not where a ray goes -- it
+ * is where this falls to zero, so a whole band of entry points piles into one
+ * direction. Away from its own bow the secondary swings about two and a half
+ * times faster than the primary, which is exactly why a single traced k=2 ray
+ * appears to point somewhere unrelated to the secondary bow: at b = 0.6 it
+ * leaves at phi = 93 deg, and only at b = 0.951 does it stop moving at all.
+ */
+export function exitSwing(n, k, b, h = 5e-4) {
+  const at = (x) => {
+    const D = deviation(Math.asin(clamp(x, 0, 0.999999)), n, k);
+    return D === null ? null : antisolarAngle(D) * DEG;
+  };
+  const lo = at(clamp(b - h, 0, 1));
+  const hi = at(clamp(b + h, 0, 1));
+  if (lo === null || hi === null) return null;
+  return Math.abs(hi - lo) / (2 * h);
+}
+
+/**
  * What one bow's light costs, in Fresnel terms.
  *
  * By reversibility the reflectance is identical at every interface on the

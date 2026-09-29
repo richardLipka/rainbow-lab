@@ -882,6 +882,80 @@ reader. The tutorial text lives in the **guide** panel, so that hid the step's
 own title and body. `panel: 'guide'` with `showRay: true` is the pattern --
 step 4 already used it -- and it embeds the compact readout instead.
 
+## Why a single ray of order 2 looks like it points nowhere
+
+Reported: "the angle of other reflections seems to lead in very different
+directions." It does, and the numbers are the answer rather than a defence.
+
+Exit angle phi as the impact parameter is dragged, at 650 nm:
+
+| b/R | k=1 | k=2 |
+| --- | --- | --- |
+| 0.20 | 11.5° | **151.2°** |
+| 0.60 | 33.4° | 93.0° |
+| 0.86 | 42.4° | 56.9° |
+| 0.95 | 38.4° | **50.4°** |
+| 0.99 | 28.4° | 55.4° |
+
+The secondary sweeps **100 degrees** across the range against the primary's
+31. At b = 0.6 its light leaves at 93 deg, nowhere near its own bow.
+
+**That swing is the point, and the scene never showed the punchline.** The
+rate, in degrees of phi per 0.01 of b:
+
+| b/R | k=1 | k=2 |
+| --- | --- | --- |
+| 0.20 | 0.57 | 1.44 |
+| 0.70 | 0.42 | 1.43 |
+| **0.862** | **0.00** | 1.13 |
+| **0.951** | 1.25 | **0.02** |
+| 0.98 | 3.26 | 1.99 |
+
+A bow is not where a ray goes. It is where the exit direction stops
+responding to the entry point, so a band of rays piles into one direction.
+`exitSwing(n, k, b)` in `optics.js` is that number, and the readout prints it
+with "stopped -- this is the bow" once it drops below 0.05 deg.
+
+### The arrival arc
+
+`drawArrivalArc()` samples **200** impact parameters, bins their exit bearings
+and fills the density as a curve on an arc around the droplet, with each
+order's own bow bearing ticked and named. The bulge is the caustic, drawn by
+the rays themselves, and the marker says which bow it is -- left unlabelled it
+reads as "the band happens to end thick here".
+
+Four things it needed, each found by measuring rather than by looking:
+
+- **Sampled independently of `fanCount`.** The fan is drawn, so its size is a
+  legibility choice; the arc is a density display and density needs samples.
+  At 45 the busiest 1.2-degree bin held 3 ticks against a typical 1 (noise);
+  at 200 it holds 15 against 4.
+- **Filled, not hatched.** Discrete ticks measured 3.3x the median brightness
+  at the primary's pile-up but only **1.7x** at the secondary's -- the
+  secondary spreads its exits over 128 degrees of screen, so the same samples
+  land thinner. That asymmetry is exactly what the display exists to defeat.
+  A filled curve scaled to each group's own busiest bin measures density
+  instead of relying on ink accumulating.
+- **One curve per ORDER, not per order and wavelength.** Six wavelengths put
+  24 translucent polygons on screen at k=4 and cost **113 ms a frame**, for a
+  bulge whose position moves under two degrees across the spectrum. The
+  longest active wavelength is the same convention `graphView` uses for its
+  extremum labels.
+- **Cached against the physics**, never the camera, like every other cache
+  here. Isolated cost after all of that: **1.4 ms** (measured as fan 1 with
+  the arc against fan 0 without it).
+
+It draws only when `fanCount > 0`: a pile-up needs a population, and with one
+ray on screen the reader has not asked for one. Tutorial step 13 therefore
+opens with the fan already on.
+
+**A caution about frame timings in this repo.** Two separate sessions have now
+produced absolute numbers that could not be reproduced an hour later -- the
+sky scene, whose code was untouched, measured 6.4 ms and then 20 ms and then
+37 ms on the same build. Always measure a control (an untouched scene) in the
+same run and quote the ratio, or isolate the feature by toggling it. Absolute
+milliseconds from a single run are not evidence here.
+
 ## Checked against Nussenzveig
 
 H. M. Nussenzveig, "The Theory of the Rainbow", *Scientific American* 236(4),

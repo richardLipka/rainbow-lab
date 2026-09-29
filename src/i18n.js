@@ -184,6 +184,11 @@ export const translations = {
     infoIntensity: 'Relativní podíl energie',
     infoIndex: 'Index lomu n',
     infoDistanceFromBow: 'Vzdálenost od extrému',
+    infoSwing: 'O kolik se φ pohne na 0,01 b',
+    infoSwingStopped: 'stojí — tady je duha',
+    arrivalArcLabel: 'kam paprsky odcházejí',
+    arrivalArcHint:
+      'Každá čárka je jeden paprsek ze svazku, položená na směr, kterým odešel. Tam, kde se čárky nakupí, se směr přestal měnit — a právě to je duha. Jinde se rozestupují, protože každý paprsek míří jinam.',
 
     /* ---- classifications ---- */
     classMiss: 'MIMO KAPKU',
@@ -673,6 +678,11 @@ export const translations = {
     infoIntensity: 'Relative share of energy',
     infoIndex: 'Refractive index n',
     infoDistanceFromBow: 'Distance from the extremum',
+    infoSwing: 'φ moves, per 0.01 of b',
+    infoSwingStopped: 'stopped — this is the bow',
+    arrivalArcLabel: 'where the rays go',
+    arrivalArcHint:
+      'One tick per ray in the fan, placed on the direction it left in. Where the ticks pile up the direction has stopped changing, and that is the bow. Everywhere else they spread out, because every ray heads somewhere different.',
 
     /* ---- classifications ---- */
     classMiss: 'MISSES THE DROPLET',

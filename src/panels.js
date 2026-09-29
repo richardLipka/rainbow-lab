@@ -249,8 +249,11 @@ export const TUTORIAL = [
       // panel: 'guide' with showRay, not panel: 'ray' -- the tutorial text
       // lives in the guide, so selecting the ray panel hides the very step
       // the reader is on. showRay embeds the compact readout instead.
+      // The fan is on, because a single ray cannot show a pile-up and the
+      // arrival arc is the point of this step. 45 gives the secondary's
+      // narrower caustic enough rays to bunch visibly.
       scene: 'droplet', panel: 'guide', wavelength: 650, dispersion: 1,
-      reflections: 2, fanCount: 0, dropletZoom: 1, observerMode: 'auto',
+      reflections: 2, fanCount: 45, dropletZoom: 1, observerMode: 'auto',
       graphOpen: false, showNonRainbow: false,
       families: { 0: false, 1: true, 2: true, 3: false },
       show: { angles: false, normals: false, labels: true, renderedBow: false },
@@ -524,7 +527,19 @@ function rayInfoNodes(opts = {}) {
       row('infoScattering', p.scattering === null ? '—' : deg(p.scattering * O.DEG, 2)),
       row('infoDeviation', p.deviation === null ? '—' : deg(p.deviation * O.DEG, 2)),
       row('infoIntensity', `${num(p.intensity * 100, 2)} %`),
-      dist === null ? null : row('infoDistanceFromBow', `${dist >= 0 ? '+' : ''}${num(dist, 2)}°`)
+      dist === null ? null : row('infoDistanceFromBow', `${dist >= 0 ? '+' : ''}${num(dist, 2)}°`),
+      // The caustic as a number: this is what falls to zero at the bow, and
+      // it is the answer to "why does the secondary's ray point somewhere
+      // unrelated?" -- away from its own bow it swings about 2.5x faster
+      // than the primary's.
+      (() => {
+        const sw = k >= 1 ? O.exitSwing(n, k, Math.abs(b)) : null;
+        if (sw === null) return null;
+        const per = sw / 100;
+        return row('infoSwing', per < 0.05
+          ? `${num(per, 2)}° · ${t('infoSwingStopped')}`
+          : `${num(per, 2)}°`, { color: per < 0.05 ? 'var(--accent)' : null });
+      })()
     ),
     // Named with its order. With several families on screen the verdict is
     // about one of them, and an unlabelled "ordinary scattered ray" next to a
