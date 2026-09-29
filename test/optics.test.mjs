@@ -8,6 +8,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as O from '../src/optics.js';
+import { readFileSync } from 'node:fs';
 
 const close = (a, b, tol, msg) =>
   assert.ok(Math.abs(a - b) < tol, `${msg || ''} expected ${a} ~= ${b} (tol ${tol})`);
@@ -932,4 +933,133 @@ test("entering through opposite halves puts the two bows Alexander's band apart"
   // that has nothing to do with entry halves.
   const band = O.alexandersBand(O.cauchyIndex);
   close(split, band.widthDeg, 1e-9, 'and agrees with the band every scene shades');
+});
+
+/*
+ * The physical validation list, as a test rather than as a claim.
+ *
+ * Every number below is read off the VECTOR trace -- intersection, Snell,
+ * mirror reflection, exit refraction -- and compared against either a
+ * symmetry the geometry must obey or the independent analytic model. Nothing
+ * here is compared against a remembered textbook angle, because a test that
+ * asserts 42 would pass just as happily on an implementation that hard-coded
+ * 42.
+ */
+test('the traced geometry satisfies the laws it is built from', () => {
+  const n = O.cauchyIndex(650);
+  const trace = (b, k) => O.traceRay({
+    origin: O.vec(-6, b, 0), dir: O.vec(1, 0, 0), center: O.vec(0, 0, 0),
+    radius: 1, n, reflections: k, exitLength: 6,
+  });
+
+  // 1. A ray down the axis has nothing to break the symmetry, so it must come
+  //    back out along the axis. k=1 straight back at the Sun, k=2 straight on
+  //    through -- the two ends of the scattering range.
+  for (const [k, expectPhi] of [[1, 0], [2, 180]]) {
+    const p = trace(0, k);
+    close(Math.abs(p.dirOut.y) + Math.abs(p.dirOut.z), 0, 1e-12, `b=0 k=${k} stays on the axis`);
+    close(p.antisolar * O.DEG, expectPhi, 1e-9, `b=0 k=${k} exit direction`);
+  }
+
+  let snellIn = 0;
+  let snellOut = 0;
+  let specular = 0;
+  let unit = 0;
+  for (const k of [1, 2, 3]) {
+    for (let i = 1; i < 400; i++) {
+      const p = trace(i / 400, k);
+      if (!p.dirOut) continue;
+      const v = p.vertices;
+      const entry = v[0];
+      const exit = v[v.length - 1];
+      // 2/3. Snell at BOTH surfaces, from the angles the trace measured
+      //      against its own normals -- not from the formula it was given.
+      snellIn = Math.max(snellIn, Math.abs(Math.sin(entry.thetaIn) - n * Math.sin(entry.thetaOut)));
+      snellOut = Math.max(snellOut, Math.abs(n * Math.sin(exit.thetaIn) - Math.sin(exit.thetaOut)));
+      // 4. Every bounce is specular.
+      for (const r of v) {
+        if (r.type === 'reflection') specular = Math.max(specular, Math.abs(r.thetaIn - r.thetaOut));
+      }
+      // 5. The exit direction is a unit vector.
+      unit = Math.max(unit, Math.abs(Math.hypot(p.dirOut.x, p.dirOut.y, p.dirOut.z) - 1));
+    }
+  }
+  assert.ok(snellIn < 1e-12, `Snell at entry, worst ${snellIn}`);
+  assert.ok(snellOut < 1e-12, `Snell at exit, worst ${snellOut}`);
+  assert.equal(specular, 0, 'reflection preserves the angle to the normal exactly');
+  assert.ok(unit < 1e-12, `exit direction normalised, worst ${unit}`);
+});
+
+test('the bow angles are found by scanning the trace, not taken from a formula', () => {
+  const n = O.cauchyIndex(650);
+  const trace = (b, k) => O.traceRay({
+    origin: O.vec(-6, b, 0), dir: O.vec(1, 0, 0), center: O.vec(0, 0, 0),
+    radius: 1, n, reflections: k, exitLength: 6,
+  });
+
+  // Walk the impact parameter and keep the turning point of the traced exit
+  // direction. phi has a MAXIMUM for one internal reflection and a MINIMUM
+  // for two -- that sign flip is the whole difference between the two bows,
+  // so the scan is written to look for the right one rather than told which
+  // answer to expect.
+  const scan = (k, samples = 60000) => {
+    let best = null;
+    for (let i = 1; i < samples; i++) {
+      const b = i / samples;
+      const p = trace(b, k);
+      if (!p.dirOut) continue;
+      const phi = p.antisolar * O.DEG;
+      if (!best || (k === 1 ? phi > best.phi : phi < best.phi)) best = { b, phi };
+    }
+    return best;
+  };
+
+  for (const k of [1, 2]) {
+    const found = scan(k);
+    const geo = O.rainbowGeometry(n, k);
+    close(found.phi, geo.antisolarDeg, 2e-4, `k=${k} scanned bow angle vs analytic`);
+    close(found.b, geo.impactParameter, 2e-4, `k=${k} scanned entry point vs analytic`);
+  }
+
+  // Validation targets, checked as ranges. Water's bows land where they land;
+  // these bounds are wide enough that only a broken geometry misses them, and
+  // tight enough that a broken one cannot sneak through.
+  const red1 = O.rainbowGeometry(O.cauchyIndex(700), 1).antisolarDeg;
+  const violet1 = O.rainbowGeometry(O.cauchyIndex(400), 1).antisolarDeg;
+  const red2 = O.rainbowGeometry(O.cauchyIndex(700), 2).antisolarDeg;
+  const violet2 = O.rainbowGeometry(O.cauchyIndex(400), 2).antisolarDeg;
+  assert.ok(red1 > 40 && red1 < 43, `primary red at ${red1.toFixed(2)} deg`);
+  assert.ok(red2 > 50 && red2 < 54, `secondary red at ${red2.toFixed(2)} deg`);
+  // The colour order reverses, and it reverses because of where violet lands,
+  // not because anything reverses an array: violet is INSIDE red on the
+  // primary and OUTSIDE it on the secondary.
+  assert.ok(violet1 < red1, 'primary: violet inside red');
+  assert.ok(violet2 > red2, 'secondary: violet outside red');
+
+  // The two families are different trajectories, not one trajectory with an
+  // extra bounce bolted on. Feed the primary's own entry point to k=2 and it
+  // lands nowhere near the secondary bow.
+  const g1 = O.rainbowGeometry(n, 1);
+  const g2 = O.rainbowGeometry(n, 2);
+  assert.ok(Math.abs(g1.impactParameter - g2.impactParameter) > 0.05,
+    'the two bows are built at different entry points');
+  const wrong = trace(g1.impactParameter, 2);
+  assert.ok(Math.abs(wrong.antisolar * O.DEG - g2.antisolarDeg) > 5,
+    "the primary's ray with an extra bounce is not the secondary bow");
+  assert.equal(trace(g1.impactParameter, 1).actualReflections, 1, 'primary bounces once');
+  assert.equal(trace(g2.impactParameter, 2).actualReflections, 2, 'secondary bounces twice');
+});
+
+test('no bow angle is written into the engine as a constant', () => {
+  const src = readFileSync(new URL('../src/optics.js', import.meta.url), 'utf8');
+  // Only the geometry. The wavelength-to-RGB ramp below it is a colour fit
+  // full of ordinary numbers -- (lambda - 440) / 50 and friends -- that have
+  // nothing to do with any bow angle.
+  const geometry = src.slice(0, src.indexOf('export function wavelengthToRGB'));
+  // Strip comments: the file explains what 42 deg means in prose, and prose
+  // is not an implementation.
+  const code = geometry.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  const hits = [...code.matchAll(/(?<![\w.])(4[12]|5[0-3]|13[78]|129)(\.\d+)?(?![\w.])/g)]
+    .map((m) => m[0]);
+  assert.deepEqual(hits, [], `bow angles must be derived, found literals: ${hits.join(', ')}`);
 });

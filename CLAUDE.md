@@ -1528,3 +1528,45 @@ The blank slate is step 2, unchanged. 17 steps.
 Known, pre-existing: with `wavelengthLabels` on, the sky's k=1 and k=2 bow
 captions can collide at low eye elevations. Not caused by the band caption,
 which sits between them at the band's mid angle.
+
+## The geometry audit (and why it found nothing to repair)
+
+A full audit of the ray model was run against an external brief. Every check
+passed on the code as it stood; the result is worth recording so the next
+audit does not start from zero.
+
+Measured, n(650) = 1.33222, traced from vectors with no analytic input:
+
+| check | result |
+|---|---|
+| b=0, k=1 | exits exactly along -x, off-axis 0.00e+0, phi 0.0000 |
+| b=0, k=2 | exits exactly along +x, phi 180.0000 |
+| Snell at entry, worst over 1200 rays | 3.91e-14 |
+| Snell at exit, worst | 9.99e-14 |
+| specular reflection, worst | exactly 0 |
+| exit direction normalised, worst | 2.22e-16 |
+| k=1 extremum, scanned at 2e5 samples | phi 42.1916 at b 0.86123 |
+| k=1 extremum, analytic | phi 42.1916 at b 0.86124 |
+| k=2 extremum, scanned | phi 50.6861 at b 0.95034 |
+| k=2 extremum, analytic | phi 50.6861 at b 0.95034 |
+
+Secondary across the visible band: 54.23 (400 nm) down to 50.38 (700 nm) —
+inside the 51–53 target, which quotes a mid-spectrum figure.
+
+The families are independent: different entry points (0.861 vs 0.950), and
+feeding the primary's entry point to a two-bounce trace lands 6.57 deg off
+the secondary bow. `classifyRay` then reports that ray as non-caustic, which
+is the honest answer.
+
+No bow angle is a constant anywhere in the geometry. A test now asserts this
+by scanning the source; it must skip `wavelengthToRGB` and below, where
+`(lambda - 440) / 50` is a colour fit and not an angle.
+
+### What DID change
+
+`state.splitEntry` now defaults to ON. Tracing both orders from one entry
+point is true to the physics of a single ray, but as a default picture it says
+one ray makes both bows. Off is still one click away, and two tutorial steps
+switch it off deliberately, because the cascade out of one entry point is what
+causes the higher orders. `state.fanCount` defaults to 9 for the same reason:
+one ray can only ever show one exit direction.

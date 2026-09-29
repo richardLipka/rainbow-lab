@@ -2782,18 +2782,25 @@ const state = {
   /* Let each reflection order enter the droplet through whichever half puts
      its light on the common side.
 
-     Off by default, and deliberately so: one entry point splitting into every
-     order is what the scene exists to show, and a second entry point
-     immediately reads as a second droplet. But it is also the reason the
-     primary and the secondary eyes end up 92.8 deg apart on screen when the
-     sky puts them 8.2 deg apart, and that gap is the one thing the picture
-     cannot otherwise say. Turned on, order 2 enters the top half instead of
-     the bottom -- which is exactly what the real sky does, because sunlight
-     covers the whole face at once -- and the two bow rays leave side by side
-     with Alexander's band measurably between them. */
-  splitEntry: false,
+     ON by default. The primary and the secondary are different trajectories
+     through different entry points -- 0.862 and 0.950 -- and a picture that
+     traces both orders from one entry point says the opposite: that one ray
+     makes both bows. It does split into every order at every wall, which is
+     worth seeing, but only the order whose own caustic it sits on is a bow.
+     Off, the two exits also land 92.8 deg apart on screen, when the sky puts
+     them 8.2 deg apart.
+
+     Turning it off is still offered, because the cascade out of a single
+     entry point is what CAUSES the higher orders, and two tutorial steps
+     switch it off to show exactly that. With one order on screen it changes
+     nothing, so the control only appears once a second order is active. */
+  splitEntry: true,
   families: { 0: false, 1: true, 2: false, 3: false },
-  fanCount: 0, // 0 = a single ray
+  /* 0 draws a single ray. Free mode starts with a small fan instead: one ray
+     can only ever show one exit direction, and the thing worth seeing is that
+     neighbouring entry points leave together near the bow and fan apart away
+     from it. Tutorial steps that want a bare ray ask for 0. */
+  fanCount: 9,
 
   /* graph */
   angleMode: 'antisolar', // 'antisolar' | 'scattering' | 'deviation'
