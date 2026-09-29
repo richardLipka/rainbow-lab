@@ -1746,6 +1746,14 @@ const translations = {
     /* ---- controls: rays ---- */
     rays: 'Paprsky',
     showNonRainbow: 'Zobrazit paprsky mimo duhu',
+    splitEntry: 'Každý řád vlastním vstupem',
+    splitEntryHint:
+      'Slunce osvětluje celou přední stěnu kapky naráz. Sekundární duhu tedy staví paprsky, '
+      + 'které vstupují horní polovinou, zatímco primární staví ty ze spodní. Zapnuto: každý řád '
+      + 'vstupuje tou polovinou, která jeho světlo pošle na společnou stranu, a obě duhy vyjdou '
+      + 'vedle sebe 8,2° od sebe. Vypnuto: jeden vstupní bod, ze kterého se řády odštěpují — '
+      + 'to je příčina sekundární duhy, ale oči pak leží 92,8° od sebe.',
+    alexanderBandLabel: 'Alexandrův temný pás',
     showFamilies: 'Zobrazené rodiny paprsků',
     family0: '0 odrazů',
     family1: '1 odraz (primární)',
@@ -1987,6 +1995,13 @@ const translations = {
     s12title: 'Odkud jsou barvy?',
     s12body:
       'Index lomu vody závisí na vlnové délce. Posuňte disperzi z 0 % na 100 % a jediný úhel se rozpadne na pás barev. Graf dole se rozpadne s ním — na jednu křivku pro každou vlnovou délku.',
+    s13ctitle: 'Osm stupňů, ne devadesát',
+    s13cbody:
+      'Do teď vstupoval každý řád stejným bodem. Zapněte „každý řád vlastním vstupem“ a sekundární '
+      + 'paprsek projde horní polovinou kapky — přesně jak to dělá Slunce, které osvětluje celou '
+      + 'přední stěnu naráz. Oba paprsky pak odcházejí vedle sebe. Mezi nimi je klín, do kterého '
+      + 'nevychází světlo ani prvního, ani druhého řádu, při žádném vstupním bodu. To je Alexandrův '
+      + 'temný pás. Vypněte přepínač a stejné dva paprsky se rozletí 92,8° od sebe.',
     s13title: 'Může být duh víc?',
     s13body:
       'A takhle to dopadne na obloze. Dva prstence, ten vnější slabší a s obráceným pořadím barev, a mezi nimi Alexandrův temný pás — přesně ta mezera, ze které se obě křivky odvracely.',
@@ -2240,6 +2255,14 @@ const translations = {
     /* ---- controls: rays ---- */
     rays: 'Rays',
     showNonRainbow: 'Show non-rainbow rays',
+    splitEntry: 'Each order enters its own half',
+    splitEntryHint:
+      'The Sun lights the whole face of the drop at once. So the secondary bow is built by rays '
+      + 'entering the top half while the primary is built by rays entering the bottom. On: every '
+      + 'order enters through whichever half sends its light to the common side, and the two bows '
+      + 'leave side by side, 8.2° apart. Off: one entry point with the orders peeling off it — '
+      + 'that is what causes the secondary bow, but it puts the two eyes 92.8° apart.',
+    alexanderBandLabel: "Alexander's dark band",
     showFamilies: 'Ray families shown',
     family0: '0 reflections',
     family1: '1 reflection (primary)',
@@ -2482,6 +2505,13 @@ const translations = {
     s12title: 'Where do the colours come from?',
     s12body:
       "Water's refractive index depends on wavelength. Move dispersion from 0 % to 100 % and a single angle splits into a band of colours. The graph below splits with it, one curve per wavelength.",
+    s13ctitle: 'Eight degrees, not ninety',
+    s13cbody:
+      'Every order has entered at the same point until now. Switch on "each order enters its own '
+      + 'half" and the secondary ray goes through the top of the drop — which is what the Sun does, '
+      + 'lighting the whole face at once. Now both rays leave side by side. The wedge between them '
+      + "takes no light of either order, at any entry point. That is Alexander's dark band. Turn "
+      + 'the switch off and those same two rays fly 92.8° apart.',
     s13title: 'Can there be another rainbow?',
     s13body:
       "And here is how it lands in the sky. Two rings, the outer one fainter and with its colours reversed, and between them Alexander's dark band — the very gap both curves were turning away from.",
@@ -2737,6 +2767,20 @@ const state = {
 
   /* rays */
   showNonRainbow: false,
+
+  /* Let each reflection order enter the droplet through whichever half puts
+     its light on the common side.
+
+     Off by default, and deliberately so: one entry point splitting into every
+     order is what the scene exists to show, and a second entry point
+     immediately reads as a second droplet. But it is also the reason the
+     primary and the secondary eyes end up 92.8 deg apart on screen when the
+     sky puts them 8.2 deg apart, and that gap is the one thing the picture
+     cannot otherwise say. Turned on, order 2 enters the top half instead of
+     the bottom -- which is exactly what the real sky does, because sunlight
+     covers the whole face at once -- and the two bow rays leave side by side
+     with Alexander's band measurably between them. */
+  splitEntry: false,
   families: { 0: false, 1: true, 2: false, 3: false },
   fanCount: 0, // 0 = a single ray
 
@@ -3017,7 +3061,10 @@ function toggle(labelKey, get, onChange, opts = {}) {
     { class: 'ctl ctl-toggle' + (opts.strong ? ' strong' : '') },
     input,
     el('span', {}, t(labelKey)),
-    opts.swatch ? el('i', { class: 'swatch', style: `background:${opts.swatch}` }) : null
+    opts.swatch ? el('i', { class: 'swatch', style: `background:${opts.swatch}` }) : null,
+    // A checkbox whose meaning needs a sentence gets one, the same way the
+    // sliders do. Inside the label so clicking the explanation still toggles.
+    opts.hintKey ? el('small', { class: 'ctl-hint block' }, t(opts.hintKey)) : null
   );
   node.dataset.ctl = labelKey;
   node.sync = () => {
@@ -3368,7 +3415,8 @@ function buildRays() {
   for (const k of orders) {
     for (const lambda of lambdas) {
       const n = idx(lambda);
-      const r = traceOne(lambda, n, k, state.impact, 1, rayLength);
+      const side = entrySide(k, n);
+      const r = traceOne(lambda, n, k, side * state.impact, 1, rayLength);
       r.role = 'main';
       out.push(r);
 
@@ -3376,7 +3424,7 @@ function buildRays() {
         for (let i = 0; i < state.fanCount; i++) {
           const b = (i + 0.5) / state.fanCount;
           if (Math.abs(b - state.impact) < 1e-6) continue;
-          const f = traceOne(lambda, n, k, b, 1, rayLength);
+          const f = traceOne(lambda, n, k, side * b, 1, rayLength);
           f.role = 'fan';
           out.push(f);
         }
@@ -3425,6 +3473,29 @@ function bowExitSide(n, k) {
   const canonical = traceOne(650, n, k, geo.impactParameter);
   if (!canonical.path.dirOut) return 1;
   return canonical.path.dirOut.y > 0 ? 1 : -1;
+}
+
+/**
+ * Which half of the droplet face order k enters through.
+ *
+ * +1 always, unless state.splitEntry is on. Then every order enters through
+ * whichever half puts its light on the SAME side as the lowest order on
+ * screen, which is what the sky does anyway: sunlight covers the whole face,
+ * so each bow is built by whichever band of entry points happens to aim at
+ * you. Tracing is mirror-symmetric about the axis, so flipping the sign of b
+ * flips the exit side and nothing else.
+ *
+ * Measured, with n(650): entering at +0.862 the primary leaves along a screen
+ * bearing of 137.72 deg; entering at -0.950 the secondary leaves along
+ * 129.48 deg. 8.24 deg apart -- Alexander's band, at its real size, in a
+ * picture that from one entry point puts those same two rays 92.8 deg apart.
+ */
+function entrySide(k, n) {
+  if (!state.splitEntry) return 1;
+  const orders = activeOrders().filter((j) => j >= 1);
+  const ref = orders.length ? orders[0] : 1;
+  if (k < 1 || k === ref) return 1;
+  return bowExitSide(n, ref) * bowExitSide(n, k);
 }
 
 /**
@@ -4104,6 +4175,8 @@ function createDropletView(canvas) {
 
     const observers = eyes;
 
+    drawAlexanderBand(ctx);
+
     const rays = buildRays();
     // Rays that reach the observer are drawn LAST, above everything else.
     // Sorting by role alone used to bury them: a contributing fan ray would
@@ -4193,7 +4266,10 @@ function createDropletView(canvas) {
     for (const kRef of orders) {
       const geo = O.rainbowGeometry(nRef, kRef);
       if (!geo) continue;
-      const canonical = traceOne(650, nRef, kRef, geo.impactParameter);
+      // The SAME signed entry buildRays() uses, or the eye would be placed
+      // for a ray the scene is not drawing.
+      const canonical = traceOne(650, nRef, kRef,
+        entrySide(kRef, nRef) * geo.impactParameter);
       if (!canonical.path.dirOut) continue;
       // Every active colour's bow for this order. Under white light the bows
       // are 1.7 deg apart, so "the rainbow is at 42.4 deg" is red's edge of a
@@ -4810,7 +4886,26 @@ function createDropletView(canvas) {
       // three-line stack from a bottom-margin eye lands exactly on top of.
       const HINT_BAND = 26;
       const dir = y + 62 > h - HINT_BAND ? -1 : 1;
-      const y1 = dir > 0 ? y + 20 : y - 52;
+      // With split entry on, the two eyes land about 8 deg apart, which at
+      // this scale is a few tens of pixels -- close enough that the two
+      // captions printed straight over each other and neither phi could be
+      // read. The whole point of putting them that close is that you can read
+      // both, so an eye whose caption would collide with one already drawn
+      // steps its stack clear of it.
+      const CAPTION_H = 46;
+      let bump = 0;
+      for (const prev of eyeScreen) {
+        if (Math.abs(prev.x - x) > 108) continue;
+        const py = prev.captionY;
+        if (py === undefined) continue;
+        while (Math.abs((dir > 0 ? y + 20 : y - 52) + dir * bump - py) < CAPTION_H) {
+          bump += CAPTION_H;
+        }
+      }
+      const y1 = (dir > 0 ? y + 20 : y - 52) + dir * bump;
+      // Recorded so the NEXT eye can step clear of this one.
+      const mine = eyeScreen[eyeScreen.length - 1];
+      if (mine) mine.captionY = y1;
       // Centred on the eye, but slid back onto the canvas when that would
       // run it off an edge. The eye's position is dictated by the optics and
       // routinely sits hard against a margin, where the longest caption --
@@ -4973,12 +5068,28 @@ function createDropletView(canvas) {
       if (k < 1) continue;
       const geo = O.rainbowGeometry(nRef, k);
       if (!geo) continue;
-      marks.push({ k, b: geo.impactParameter, y: layout.cy - geo.impactParameter * layout.s });
+      // With split entry on, order k's own ray enters the other half, so its
+      // tick belongs on that half of the track. A tick left on the reference
+      // side would point at an entry point no drawn ray uses.
+      const sb = entrySide(k, nRef) * geo.impactParameter;
+      marks.push({ k, b: geo.impactParameter, sb, y: layout.cy - sb * layout.s });
     }
     marks.sort((a2, b2) => a2.y - b2.y);
     let lastLabelY = -1e9;
     for (const m of marks) {
       const on = Math.abs(state.impact - m.b) < 0.004;
+      if (m.sb !== 0 && Math.sign(m.sb) !== Math.sign(state.impact || 1)) {
+        // Mirrored orders get their own faint dot on the track, so the second
+        // entry point is visible as a position and not only as a ray that
+        // appears from nowhere.
+        ctx.save();
+        ctx.fillStyle = orderColor(m.k);
+        ctx.globalAlpha = on ? 0.9 : 0.4;
+        ctx.beginPath();
+        ctx.arc(x, m.y, on ? 4 : 2.6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
       ctx.save();
       ctx.strokeStyle = orderColor(m.k);
       ctx.globalAlpha = on ? 1 : 0.55;
@@ -5002,6 +5113,91 @@ function createDropletView(canvas) {
         font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
       });
     }
+  }
+
+  /**
+   * Alexander's dark band, as a wedge between two rays rather than a number.
+   *
+   * Only meaningful with split entry on. From one entry point the primary and
+   * the secondary leave 92.8 deg apart on screen, and a wedge drawn between
+   * them would be 92.8 deg of nothing -- a measurement of the drawing, not of
+   * the sky. Let each order enter through its own half and the same two rays
+   * leave 8.2 deg apart, which is the real gap: no light of either order
+   * leaves into it, at any impact parameter. That is the whole reason the
+   * band is dark, and it is the one claim the scene could not previously
+   * make without asking the reader to subtract two captions.
+   *
+   * The edges come from the traced canonical rays, never from the analytic
+   * angles, so if the trace and the formula ever disagreed the wedge would
+   * show it.
+   */
+  function drawAlexanderBand(ctx) {
+    if (!state.splitEntry) return;
+    const orders = activeOrders().filter((k) => k === 1 || k === 2);
+    if (orders.length < 2) return;
+    const nRef = indexModel()(650);
+    const edges = [];
+    for (const k of orders) {
+      const geo = O.rainbowGeometry(nRef, k);
+      if (!geo) continue;
+      const p = traceOne(650, nRef, k, entrySide(k, nRef) * geo.impactParameter).path;
+      if (!p.dirOut) continue;
+      edges.push({ k, ang: Math.atan2(-p.dirOut.y, p.dirOut.x), phi: geo.antisolarDeg });
+    }
+    if (edges.length < 2) return;
+    const a0 = Math.min(edges[0].ang, edges[1].ang);
+    const a1 = Math.max(edges[0].ang, edges[1].ang);
+    const gap = Math.abs(edges[0].phi - edges[1].phi);
+
+    // A ribbon rather than a wedge from the centre. A filled wedge was tried
+    // and could not be seen: the band is dark, the canvas is dark, and 8 deg
+    // of slightly-darker on a nearly-black ground is nothing. Hatching at a
+    // radius the eyes are not sitting at gives the band an edge and a texture
+    // without pretending there is light in it.
+    const r0 = layout.s * 2.3;
+    const r1 = layout.s * 3.2;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(layout.cx, layout.cy, r1, a0, a1);
+    ctx.arc(layout.cx, layout.cy, r0, a1, a0, true);
+    ctx.closePath();
+    ctx.clip();
+    ctx.strokeStyle = 'rgba(152,174,218,0.42)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    const span = r1 + Math.max(layout.w, layout.h);
+    for (let o = -span; o < span; o += 7) {
+      ctx.moveTo(layout.cx + o, layout.cy - span);
+      ctx.lineTo(layout.cx + o + span * 2, layout.cy + span);
+    }
+    ctx.stroke();
+    ctx.restore();
+
+    // The two bow rays themselves, carried out past the droplet so the band
+    // is visibly bounded BY them and not merely near them.
+    ctx.save();
+    ctx.strokeStyle = 'rgba(160,178,214,0.45)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 5]);
+    for (const e of edges) {
+      ctx.beginPath();
+      ctx.moveTo(layout.cx, layout.cy);
+      ctx.lineTo(layout.cx + Math.cos(e.ang) * r1, layout.cy + Math.sin(e.ang) * r1);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    if (!state.show.labels) return;
+    const mid = (a0 + a1) / 2;
+    // ON the ribbon, not beyond it. Beyond it the label ran into the two eye
+    // captions, which sit much further out along this same bearing, and into
+    // the hint row at the foot of the canvas.
+    const lr = (r0 + r1) / 2;
+    label(ctx, `${t('alexanderBandLabel')} · ${deg(gap, 1)}`,
+      O.clamp(layout.cx + Math.cos(mid) * lr, 84, layout.w - 84),
+      O.clamp(layout.cy + Math.sin(mid) * lr, 16, layout.h - 44),
+      { align: 'center', color: '#b3c2dc', bg: true });
   }
 
   function drawImpactHandle(ctx) {
@@ -8029,6 +8225,38 @@ const TUTORIAL = [
     note: 'explColourFlip',
   },
   {
+    /* Two rays, two entry heights, and the gap between them at its real size.
+       Every other droplet step traces one entry point, because the cascade is
+       what causes the secondary -- but that same choice throws the two exits
+       onto opposite sides of the picture, 92.8 deg apart, and the 8 deg the
+       sky actually shows you becomes something only the captions know. Here
+       the secondary is fed through the top half, which is what the Sun does
+       anyway, and the dark band is a wedge you can see instead of a
+       subtraction you have to perform. */
+    title: 's13ctitle', body: 's13cbody',
+    apply: {
+      scene: 'droplet', panel: 'guide', wavelength: 650, dispersion: 1,
+      reflections: 2, fanCount: 0, dropletZoom: 1, observerMode: 'auto',
+      graphOpen: false, showNonRainbow: false, splitEntry: true,
+      families: { 0: false, 1: true, 2: true, 3: false },
+      show: { angles: true, normals: false, labels: true, renderedBow: false },
+    },
+    focus: ['splitEntry', 'impactParameter'],
+    actions: [
+      {
+        labelKey: 'bowName1',
+        patch: () => ({ impact: O.rainbowGeometry(indexModel()(650), 1).impactParameter }),
+      },
+      {
+        labelKey: 'bowName2',
+        patch: () => ({ impact: O.rainbowGeometry(indexModel()(650), 2).impactParameter }),
+      },
+      { labelKey: 'splitEntry', patch: { splitEntry: false } },
+    ],
+    note: 'explAlexander',
+    showRay: true,
+  },
+  {
     title: 's13title', body: 's13body',
     apply: {
       scene: 'sky', view: 'eye', dispersion: 1, wavelength: 'white', reflections: 2,
@@ -8051,7 +8279,11 @@ const TUTORIAL = [
 function applyStep(i) {
   const s = TUTORIAL[i];
   if (!s) return;
-  set({ ...s.apply, step: i });
+  // Split entry is the one droplet setting a step must opt INTO. It changes
+  // where the rays enter, so left sticky it would silently rewrite every
+  // later step's picture -- and a reader who turned it on by hand three steps
+  // ago has long stopped expecting it.
+  set({ splitEntry: false, ...s.apply, step: i });
 }
 
 function renderTutorial() {
@@ -9233,6 +9465,13 @@ function buildControls() {
       c(['droplet'], () =>
         toggle('showNonRainbow', () => state.showNonRainbow, (v) => set({ showNonRainbow: v }),
           { strong: true })),
+      // Only offered once a second order is on screen: with the primary
+      // alone there is nothing to bring alongside anything, and the toggle
+      // would change precisely nothing.
+      c(['droplet'], () =>
+        toggle('splitEntry', () => state.splitEntry, (v) => set({ splitEntry: v }),
+          { strong: true, hintKey: 'splitEntryHint' }),
+        () => activeOrders().filter((k) => k >= 1).length > 1),
       c(['droplet'], () => slider({
         labelKey: 'dropletZoom', min: 0, max: ZOOM_MAX_LOG, step: 0.004,
         get: () => Math.log10(O.clamp(state.dropletZoom, 1, ZOOM_MAX)),

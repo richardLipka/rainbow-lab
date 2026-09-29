@@ -1451,3 +1451,39 @@ driving the actual app:
 - The refractive-index table (`NAMED_COLORS` in `optics.js`) is explicitly
   documented as approximate, chosen for teaching clarity, not claimed to be
   exact for all conditions — keep that framing if you touch it.
+
+## Split entry: the one place the scene traces two entry points
+
+Every other droplet step traces a single entry point and lets the orders peel
+off it, because that cascade is what causes the secondary bow. The cost is
+measured and unavoidable: from one entry point the primary leaves along a
+screen bearing of 137.72 deg and the secondary along 129.48 deg, i.e. the two
+eyes land **92.8 deg apart** in a picture whose whole subject is a **8.2 deg**
+gap. The exit side flips with every internal reflection, at every impact
+parameter, never once the same — `test/optics.test.mjs` asserts both halves of
+this.
+
+`state.splitEntry` (off by default, control hidden unless two orders are on
+screen, reset by `applyStep` so it can never leak into a later step) lets each
+order enter through whichever half puts its light on the common side. Entry at
++0.862 for k=1 and **-0.950** for k=2 gives 137.72 vs 129.48 — 8.24 deg, which
+is Alexander's band at its real size. Physically this is what the sky does:
+sunlight covers the whole face, so each bow is built by whichever band of
+entry points happens to aim at you.
+
+`entrySide(k, n)` in rays.js is the single source of the sign. `buildRays`,
+`computeObservers` and `drawBowMarks` all read it; an eye placed from an
+unsigned trace is an eye placed for a ray that is not on screen.
+
+Two things this broke, both fixed:
+
+- **The eye captions collided.** They are 8 deg apart now, which is a few tens
+  of pixels, and the two `phi` readings printed straight over each other.
+  `drawObserver` stacks a caption clear of any already-drawn eye within 108 px.
+- **A filled wedge was invisible.** The band is dark, the canvas is dark, and
+  8 deg of slightly-darker on near-black is nothing. It is drawn as a hatched
+  ribbon at 2.3–3.2 droplet radii instead, measured at **1.38x** the luminance
+  of the canvas either side of it, bounded by the two bow rays as dashed lines.
+
+The wedge's edges come from traced rays, never from the analytic angles, so a
+disagreement between trace and formula would show up as a wrong-sized band.

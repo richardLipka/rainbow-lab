@@ -118,6 +118,14 @@ export const translations = {
     /* ---- controls: rays ---- */
     rays: 'Paprsky',
     showNonRainbow: 'Zobrazit paprsky mimo duhu',
+    splitEntry: 'Každý řád vlastním vstupem',
+    splitEntryHint:
+      'Slunce osvětluje celou přední stěnu kapky naráz. Sekundární duhu tedy staví paprsky, '
+      + 'které vstupují horní polovinou, zatímco primární staví ty ze spodní. Zapnuto: každý řád '
+      + 'vstupuje tou polovinou, která jeho světlo pošle na společnou stranu, a obě duhy vyjdou '
+      + 'vedle sebe 8,2° od sebe. Vypnuto: jeden vstupní bod, ze kterého se řády odštěpují — '
+      + 'to je příčina sekundární duhy, ale oči pak leží 92,8° od sebe.',
+    alexanderBandLabel: 'Alexandrův temný pás',
     showFamilies: 'Zobrazené rodiny paprsků',
     family0: '0 odrazů',
     family1: '1 odraz (primární)',
@@ -359,6 +367,13 @@ export const translations = {
     s12title: 'Odkud jsou barvy?',
     s12body:
       'Index lomu vody závisí na vlnové délce. Posuňte disperzi z 0 % na 100 % a jediný úhel se rozpadne na pás barev. Graf dole se rozpadne s ním — na jednu křivku pro každou vlnovou délku.',
+    s13ctitle: 'Osm stupňů, ne devadesát',
+    s13cbody:
+      'Do teď vstupoval každý řád stejným bodem. Zapněte „každý řád vlastním vstupem“ a sekundární '
+      + 'paprsek projde horní polovinou kapky — přesně jak to dělá Slunce, které osvětluje celou '
+      + 'přední stěnu naráz. Oba paprsky pak odcházejí vedle sebe. Mezi nimi je klín, do kterého '
+      + 'nevychází světlo ani prvního, ani druhého řádu, při žádném vstupním bodu. To je Alexandrův '
+      + 'temný pás. Vypněte přepínač a stejné dva paprsky se rozletí 92,8° od sebe.',
     s13title: 'Může být duh víc?',
     s13body:
       'A takhle to dopadne na obloze. Dva prstence, ten vnější slabší a s obráceným pořadím barev, a mezi nimi Alexandrův temný pás — přesně ta mezera, ze které se obě křivky odvracely.',
@@ -612,6 +627,14 @@ export const translations = {
     /* ---- controls: rays ---- */
     rays: 'Rays',
     showNonRainbow: 'Show non-rainbow rays',
+    splitEntry: 'Each order enters its own half',
+    splitEntryHint:
+      'The Sun lights the whole face of the drop at once. So the secondary bow is built by rays '
+      + 'entering the top half while the primary is built by rays entering the bottom. On: every '
+      + 'order enters through whichever half sends its light to the common side, and the two bows '
+      + 'leave side by side, 8.2° apart. Off: one entry point with the orders peeling off it — '
+      + 'that is what causes the secondary bow, but it puts the two eyes 92.8° apart.',
+    alexanderBandLabel: "Alexander's dark band",
     showFamilies: 'Ray families shown',
     family0: '0 reflections',
     family1: '1 reflection (primary)',
@@ -854,6 +877,13 @@ export const translations = {
     s12title: 'Where do the colours come from?',
     s12body:
       "Water's refractive index depends on wavelength. Move dispersion from 0 % to 100 % and a single angle splits into a band of colours. The graph below splits with it, one curve per wavelength.",
+    s13ctitle: 'Eight degrees, not ninety',
+    s13cbody:
+      'Every order has entered at the same point until now. Switch on "each order enters its own '
+      + 'half" and the secondary ray goes through the top of the drop — which is what the Sun does, '
+      + 'lighting the whole face at once. Now both rays leave side by side. The wedge between them '
+      + "takes no light of either order, at any entry point. That is Alexander's dark band. Turn "
+      + 'the switch off and those same two rays fly 92.8° apart.',
     s13title: 'Can there be another rainbow?',
     s13body:
       "And here is how it lands in the sky. Two rings, the outer one fainter and with its colours reversed, and between them Alexander's dark band — the very gap both curves were turning away from.",

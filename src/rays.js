@@ -56,7 +56,8 @@ export function buildRays() {
   for (const k of orders) {
     for (const lambda of lambdas) {
       const n = idx(lambda);
-      const r = traceOne(lambda, n, k, state.impact, 1, rayLength);
+      const side = entrySide(k, n);
+      const r = traceOne(lambda, n, k, side * state.impact, 1, rayLength);
       r.role = 'main';
       out.push(r);
 
@@ -64,7 +65,7 @@ export function buildRays() {
         for (let i = 0; i < state.fanCount; i++) {
           const b = (i + 0.5) / state.fanCount;
           if (Math.abs(b - state.impact) < 1e-6) continue;
-          const f = traceOne(lambda, n, k, b, 1, rayLength);
+          const f = traceOne(lambda, n, k, side * b, 1, rayLength);
           f.role = 'fan';
           out.push(f);
         }
@@ -113,6 +114,29 @@ export function bowExitSide(n, k) {
   const canonical = traceOne(650, n, k, geo.impactParameter);
   if (!canonical.path.dirOut) return 1;
   return canonical.path.dirOut.y > 0 ? 1 : -1;
+}
+
+/**
+ * Which half of the droplet face order k enters through.
+ *
+ * +1 always, unless state.splitEntry is on. Then every order enters through
+ * whichever half puts its light on the SAME side as the lowest order on
+ * screen, which is what the sky does anyway: sunlight covers the whole face,
+ * so each bow is built by whichever band of entry points happens to aim at
+ * you. Tracing is mirror-symmetric about the axis, so flipping the sign of b
+ * flips the exit side and nothing else.
+ *
+ * Measured, with n(650): entering at +0.862 the primary leaves along a screen
+ * bearing of 137.72 deg; entering at -0.950 the secondary leaves along
+ * 129.48 deg. 8.24 deg apart -- Alexander's band, at its real size, in a
+ * picture that from one entry point puts those same two rays 92.8 deg apart.
+ */
+export function entrySide(k, n) {
+  if (!state.splitEntry) return 1;
+  const orders = activeOrders().filter((j) => j >= 1);
+  const ref = orders.length ? orders[0] : 1;
+  if (k < 1 || k === ref) return 1;
+  return bowExitSide(n, ref) * bowExitSide(n, k);
 }
 
 /**

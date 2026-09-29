@@ -51,6 +51,20 @@ export const state = {
 
   /* rays */
   showNonRainbow: false,
+
+  /* Let each reflection order enter the droplet through whichever half puts
+     its light on the common side.
+
+     Off by default, and deliberately so: one entry point splitting into every
+     order is what the scene exists to show, and a second entry point
+     immediately reads as a second droplet. But it is also the reason the
+     primary and the secondary eyes end up 92.8 deg apart on screen when the
+     sky puts them 8.2 deg apart, and that gap is the one thing the picture
+     cannot otherwise say. Turned on, order 2 enters the top half instead of
+     the bottom -- which is exactly what the real sky does, because sunlight
+     covers the whole face at once -- and the two bow rays leave side by side
+     with Alexander's band measurably between them. */
+  splitEntry: false,
   families: { 0: false, 1: true, 2: false, 3: false },
   fanCount: 0, // 0 = a single ray
 

@@ -9,6 +9,7 @@ import * as O from './optics.js';
 import { state, set, indexModel, activeOrders, activeLambdas } from './state.js';
 import {
   buildRays, distanceFromExtremum, colorFor, traceOne, BOW_MATCH_DEG, bowNameKey, sharedPrefix,
+  entrySide,
 } from './rays.js';
 import { t, deg, num } from './i18n.js';
 import { fitCanvas, strokePath, label, arrowHead, angleArc, capture } from './ui.js';
@@ -79,6 +80,8 @@ export function createDropletView(canvas) {
     drawSun(ctx, w, h);
 
     const observers = eyes;
+
+    drawAlexanderBand(ctx);
 
     const rays = buildRays();
     // Rays that reach the observer are drawn LAST, above everything else.
@@ -169,7 +172,10 @@ export function createDropletView(canvas) {
     for (const kRef of orders) {
       const geo = O.rainbowGeometry(nRef, kRef);
       if (!geo) continue;
-      const canonical = traceOne(650, nRef, kRef, geo.impactParameter);
+      // The SAME signed entry buildRays() uses, or the eye would be placed
+      // for a ray the scene is not drawing.
+      const canonical = traceOne(650, nRef, kRef,
+        entrySide(kRef, nRef) * geo.impactParameter);
       if (!canonical.path.dirOut) continue;
       // Every active colour's bow for this order. Under white light the bows
       // are 1.7 deg apart, so "the rainbow is at 42.4 deg" is red's edge of a
@@ -786,7 +792,26 @@ export function createDropletView(canvas) {
       // three-line stack from a bottom-margin eye lands exactly on top of.
       const HINT_BAND = 26;
       const dir = y + 62 > h - HINT_BAND ? -1 : 1;
-      const y1 = dir > 0 ? y + 20 : y - 52;
+      // With split entry on, the two eyes land about 8 deg apart, which at
+      // this scale is a few tens of pixels -- close enough that the two
+      // captions printed straight over each other and neither phi could be
+      // read. The whole point of putting them that close is that you can read
+      // both, so an eye whose caption would collide with one already drawn
+      // steps its stack clear of it.
+      const CAPTION_H = 46;
+      let bump = 0;
+      for (const prev of eyeScreen) {
+        if (Math.abs(prev.x - x) > 108) continue;
+        const py = prev.captionY;
+        if (py === undefined) continue;
+        while (Math.abs((dir > 0 ? y + 20 : y - 52) + dir * bump - py) < CAPTION_H) {
+          bump += CAPTION_H;
+        }
+      }
+      const y1 = (dir > 0 ? y + 20 : y - 52) + dir * bump;
+      // Recorded so the NEXT eye can step clear of this one.
+      const mine = eyeScreen[eyeScreen.length - 1];
+      if (mine) mine.captionY = y1;
       // Centred on the eye, but slid back onto the canvas when that would
       // run it off an edge. The eye's position is dictated by the optics and
       // routinely sits hard against a margin, where the longest caption --
@@ -949,12 +974,28 @@ export function createDropletView(canvas) {
       if (k < 1) continue;
       const geo = O.rainbowGeometry(nRef, k);
       if (!geo) continue;
-      marks.push({ k, b: geo.impactParameter, y: layout.cy - geo.impactParameter * layout.s });
+      // With split entry on, order k's own ray enters the other half, so its
+      // tick belongs on that half of the track. A tick left on the reference
+      // side would point at an entry point no drawn ray uses.
+      const sb = entrySide(k, nRef) * geo.impactParameter;
+      marks.push({ k, b: geo.impactParameter, sb, y: layout.cy - sb * layout.s });
     }
     marks.sort((a2, b2) => a2.y - b2.y);
     let lastLabelY = -1e9;
     for (const m of marks) {
       const on = Math.abs(state.impact - m.b) < 0.004;
+      if (m.sb !== 0 && Math.sign(m.sb) !== Math.sign(state.impact || 1)) {
+        // Mirrored orders get their own faint dot on the track, so the second
+        // entry point is visible as a position and not only as a ray that
+        // appears from nowhere.
+        ctx.save();
+        ctx.fillStyle = orderColor(m.k);
+        ctx.globalAlpha = on ? 0.9 : 0.4;
+        ctx.beginPath();
+        ctx.arc(x, m.y, on ? 4 : 2.6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
       ctx.save();
       ctx.strokeStyle = orderColor(m.k);
       ctx.globalAlpha = on ? 1 : 0.55;
@@ -978,6 +1019,91 @@ export function createDropletView(canvas) {
         font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
       });
     }
+  }
+
+  /**
+   * Alexander's dark band, as a wedge between two rays rather than a number.
+   *
+   * Only meaningful with split entry on. From one entry point the primary and
+   * the secondary leave 92.8 deg apart on screen, and a wedge drawn between
+   * them would be 92.8 deg of nothing -- a measurement of the drawing, not of
+   * the sky. Let each order enter through its own half and the same two rays
+   * leave 8.2 deg apart, which is the real gap: no light of either order
+   * leaves into it, at any impact parameter. That is the whole reason the
+   * band is dark, and it is the one claim the scene could not previously
+   * make without asking the reader to subtract two captions.
+   *
+   * The edges come from the traced canonical rays, never from the analytic
+   * angles, so if the trace and the formula ever disagreed the wedge would
+   * show it.
+   */
+  function drawAlexanderBand(ctx) {
+    if (!state.splitEntry) return;
+    const orders = activeOrders().filter((k) => k === 1 || k === 2);
+    if (orders.length < 2) return;
+    const nRef = indexModel()(650);
+    const edges = [];
+    for (const k of orders) {
+      const geo = O.rainbowGeometry(nRef, k);
+      if (!geo) continue;
+      const p = traceOne(650, nRef, k, entrySide(k, nRef) * geo.impactParameter).path;
+      if (!p.dirOut) continue;
+      edges.push({ k, ang: Math.atan2(-p.dirOut.y, p.dirOut.x), phi: geo.antisolarDeg });
+    }
+    if (edges.length < 2) return;
+    const a0 = Math.min(edges[0].ang, edges[1].ang);
+    const a1 = Math.max(edges[0].ang, edges[1].ang);
+    const gap = Math.abs(edges[0].phi - edges[1].phi);
+
+    // A ribbon rather than a wedge from the centre. A filled wedge was tried
+    // and could not be seen: the band is dark, the canvas is dark, and 8 deg
+    // of slightly-darker on a nearly-black ground is nothing. Hatching at a
+    // radius the eyes are not sitting at gives the band an edge and a texture
+    // without pretending there is light in it.
+    const r0 = layout.s * 2.3;
+    const r1 = layout.s * 3.2;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(layout.cx, layout.cy, r1, a0, a1);
+    ctx.arc(layout.cx, layout.cy, r0, a1, a0, true);
+    ctx.closePath();
+    ctx.clip();
+    ctx.strokeStyle = 'rgba(152,174,218,0.42)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    const span = r1 + Math.max(layout.w, layout.h);
+    for (let o = -span; o < span; o += 7) {
+      ctx.moveTo(layout.cx + o, layout.cy - span);
+      ctx.lineTo(layout.cx + o + span * 2, layout.cy + span);
+    }
+    ctx.stroke();
+    ctx.restore();
+
+    // The two bow rays themselves, carried out past the droplet so the band
+    // is visibly bounded BY them and not merely near them.
+    ctx.save();
+    ctx.strokeStyle = 'rgba(160,178,214,0.45)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 5]);
+    for (const e of edges) {
+      ctx.beginPath();
+      ctx.moveTo(layout.cx, layout.cy);
+      ctx.lineTo(layout.cx + Math.cos(e.ang) * r1, layout.cy + Math.sin(e.ang) * r1);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    if (!state.show.labels) return;
+    const mid = (a0 + a1) / 2;
+    // ON the ribbon, not beyond it. Beyond it the label ran into the two eye
+    // captions, which sit much further out along this same bearing, and into
+    // the hint row at the foot of the canvas.
+    const lr = (r0 + r1) / 2;
+    label(ctx, `${t('alexanderBandLabel')} · ${deg(gap, 1)}`,
+      O.clamp(layout.cx + Math.cos(mid) * lr, 84, layout.w - 84),
+      O.clamp(layout.cy + Math.sin(mid) * lr, 16, layout.h - 44),
+      { align: 'center', color: '#b3c2dc', bg: true });
   }
 
   function drawImpactHandle(ctx) {

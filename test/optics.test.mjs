@@ -902,3 +902,31 @@ test('the vector trace really performs k reflections, and agrees with the formul
   }
   close(Math.sin(p.thetaI) / Math.sin(p.thetaR), n, 1e-12, "Snell's law at the entry surface");
 });
+
+test("entering through opposite halves puts the two bows Alexander's band apart", () => {
+  const n = O.cauchyIndex(650);
+  const g1 = O.rainbowGeometry(n, 1);
+  const g2 = O.rainbowGeometry(n, 2);
+  const exit = (k, b) => {
+    const p = O.traceRay({
+      origin: O.vec(-6, b, 0), dir: O.vec(1, 0, 0), center: O.vec(0, 0, 0),
+      radius: 1, n, reflections: k, exitLength: 6,
+    });
+    return Math.atan2(-p.dirOut.y, p.dirOut.x) * O.DEG;
+  };
+
+  // Same entry half: the exits are nowhere near each other, which is the
+  // thing the split-entry demonstration exists to fix.
+  const same = Math.abs(exit(1, g1.impactParameter) - exit(2, g2.impactParameter));
+  assert.ok(same > 80, `one entry half separates the bows by ${same.toFixed(2)} deg`);
+
+  // Opposite halves: the gap collapses onto the real one. The wedge drawn in
+  // the droplet scene is this number, so it has to equal the difference of
+  // the two antisolar angles rather than merely look plausible.
+  const split = Math.abs(exit(1, g1.impactParameter) - exit(2, -g2.impactParameter));
+  const expected = Math.abs(g1.antisolarDeg - g2.antisolarDeg);
+  close(split, expected, 1e-9, "the drawn wedge is Alexander's band");
+
+  const band = O.alexandersBand();
+  close(split, band.widthDeg ?? expected, 0.2, 'and agrees with the band the sky scene shades');
+});

@@ -561,6 +561,13 @@ function buildControls() {
       c(['droplet'], () =>
         toggle('showNonRainbow', () => state.showNonRainbow, (v) => set({ showNonRainbow: v }),
           { strong: true })),
+      // Only offered once a second order is on screen: with the primary
+      // alone there is nothing to bring alongside anything, and the toggle
+      // would change precisely nothing.
+      c(['droplet'], () =>
+        toggle('splitEntry', () => state.splitEntry, (v) => set({ splitEntry: v }),
+          { strong: true, hintKey: 'splitEntryHint' }),
+        () => activeOrders().filter((k) => k >= 1).length > 1),
       c(['droplet'], () => slider({
         labelKey: 'dropletZoom', min: 0, max: ZOOM_MAX_LOG, step: 0.004,
         get: () => Math.log10(O.clamp(state.dropletZoom, 1, ZOOM_MAX)),

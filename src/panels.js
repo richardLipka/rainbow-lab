@@ -288,6 +288,38 @@ export const TUTORIAL = [
     note: 'explColourFlip',
   },
   {
+    /* Two rays, two entry heights, and the gap between them at its real size.
+       Every other droplet step traces one entry point, because the cascade is
+       what causes the secondary -- but that same choice throws the two exits
+       onto opposite sides of the picture, 92.8 deg apart, and the 8 deg the
+       sky actually shows you becomes something only the captions know. Here
+       the secondary is fed through the top half, which is what the Sun does
+       anyway, and the dark band is a wedge you can see instead of a
+       subtraction you have to perform. */
+    title: 's13ctitle', body: 's13cbody',
+    apply: {
+      scene: 'droplet', panel: 'guide', wavelength: 650, dispersion: 1,
+      reflections: 2, fanCount: 0, dropletZoom: 1, observerMode: 'auto',
+      graphOpen: false, showNonRainbow: false, splitEntry: true,
+      families: { 0: false, 1: true, 2: true, 3: false },
+      show: { angles: true, normals: false, labels: true, renderedBow: false },
+    },
+    focus: ['splitEntry', 'impactParameter'],
+    actions: [
+      {
+        labelKey: 'bowName1',
+        patch: () => ({ impact: O.rainbowGeometry(indexModel()(650), 1).impactParameter }),
+      },
+      {
+        labelKey: 'bowName2',
+        patch: () => ({ impact: O.rainbowGeometry(indexModel()(650), 2).impactParameter }),
+      },
+      { labelKey: 'splitEntry', patch: { splitEntry: false } },
+    ],
+    note: 'explAlexander',
+    showRay: true,
+  },
+  {
     title: 's13title', body: 's13body',
     apply: {
       scene: 'sky', view: 'eye', dispersion: 1, wavelength: 'white', reflections: 2,
@@ -310,7 +342,11 @@ export const TUTORIAL = [
 export function applyStep(i) {
   const s = TUTORIAL[i];
   if (!s) return;
-  set({ ...s.apply, step: i });
+  // Split entry is the one droplet setting a step must opt INTO. It changes
+  // where the rays enter, so left sticky it would silently rewrite every
+  // later step's picture -- and a reader who turned it on by hand three steps
+  // ago has long stopped expecting it.
+  set({ splitEntry: false, ...s.apply, step: i });
 }
 
 function renderTutorial() {

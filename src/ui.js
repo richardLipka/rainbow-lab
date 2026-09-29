@@ -115,7 +115,10 @@ export function toggle(labelKey, get, onChange, opts = {}) {
     { class: 'ctl ctl-toggle' + (opts.strong ? ' strong' : '') },
     input,
     el('span', {}, t(labelKey)),
-    opts.swatch ? el('i', { class: 'swatch', style: `background:${opts.swatch}` }) : null
+    opts.swatch ? el('i', { class: 'swatch', style: `background:${opts.swatch}` }) : null,
+    // A checkbox whose meaning needs a sentence gets one, the same way the
+    // sliders do. Inside the label so clicking the explanation still toggles.
+    opts.hintKey ? el('small', { class: 'ctl-hint block' }, t(opts.hintKey)) : null
   );
   node.dataset.ctl = labelKey;
   node.sync = () => {
