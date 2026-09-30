@@ -3496,6 +3496,33 @@ function bowExitSide(n, k) {
 }
 
 /**
+ * The signed entry point at which order k's bow ray heads towards the
+ * observer, rather than away from it.
+ *
+ * The exit side flips with every internal reflection, so from one entry point
+ * the primary and the secondary part company. The beam covers the whole face,
+ * so each order's caustic exists on both halves; this picks the half whose
+ * light joins the rest. Measured for n(650): the primary at b = +0.861 leaves
+ * downward and the secondary at b = -0.950 leaves downward too, while
+ * +0.950 sends the secondary up and away.
+ *
+ * Mirroring is exact -- flipping b flips the whole path about the axis and
+ * changes nothing else -- so this is a choice of which side to draw, never a
+ * change to the optics. Exported because the eye placement, the tick on the
+ * entry track and every "jump to this bow" chip have to agree about it; they
+ * did not, and a chip for the secondary used to send the ray to the half that
+ * points away from the observer.
+ */
+function bowEntry(k, n) {
+  const geo = O.rainbowGeometry(n, k);
+  if (!geo) return null;
+  const orders = activeOrders().filter((j) => j >= 1);
+  const ref = orders.length ? orders[0] : k;
+  const side = k === ref ? 1 : bowExitSide(n, ref) * bowExitSide(n, k);
+  return side * geo.impactParameter;
+}
+
+/**
  * Chrome colour for reflection order k, shared by every scene.
  *
  * It started out private to the droplet view while the rain cross-section
@@ -4328,23 +4355,6 @@ function createDropletView(canvas) {
    * modes cannot drift apart, and 42 deg becomes something to find rather
    * than something the app quietly asserts.
    */
-  /**
-   * The signed entry point whose light lands on the side everyone else's
-   * does. The exit side flips with every internal reflection, so from one
-   * entry point the primary and the secondary part company; the full-face
-   * beam contains both halves anyway, so each order's eye is placed on the
-   * ray that actually aims at the others. Mirroring is exact -- flipping b
-   * flips the whole path about the axis and changes nothing else.
-   */
-  function commonEntry(k, n) {
-    const geo = O.rainbowGeometry(n, k);
-    if (!geo) return null;
-    const orders = activeOrders().filter((j) => j >= 1);
-    const ref = orders.length ? orders[0] : k;
-    const side = k === ref ? 1 : bowExitSide(n, ref) * bowExitSide(n, k);
-    return side * geo.impactParameter;
-  }
-
   function computeObservers() {
     const idx = indexModel();
     const nRef = idx(650); // red, the same reference wavelength used elsewhere
@@ -4354,7 +4364,7 @@ function createDropletView(canvas) {
     for (const kRef of orders) {
       const geo = O.rainbowGeometry(nRef, kRef);
       if (!geo) continue;
-      const b = commonEntry(kRef, nRef);
+      const b = bowEntry(kRef, nRef);
       if (b === null) continue;
       const canonical = traceOne(650, nRef, kRef, b);
       if (!canonical.path.dirOut) continue;
@@ -5219,7 +5229,7 @@ function createDropletView(canvas) {
       // The beam covers the whole face, so each order's caustic entry point
       // exists on BOTH halves. Ticked on the half whose light joins the
       // others, which is the one the eyes are placed from.
-      const sb = commonEntry(k, nRef);
+      const sb = bowEntry(k, nRef);
       const at = project({ x: HANDLE_X, y: sb });
       marks.push({ k, b: geo.impactParameter, sb, at });
     }
@@ -5284,7 +5294,7 @@ function createDropletView(canvas) {
     for (const k of orders) {
       const geo = O.rainbowGeometry(nRef, k);
       if (!geo) continue;
-      const p = traceOne(650, nRef, k, commonEntry(k, nRef)).path;
+      const p = traceOne(650, nRef, k, bowEntry(k, nRef)).path;
       if (!p.dirOut) continue;
       edges.push({ k, ang: bearing(p.dirOut), phi: geo.antisolarDeg });
     }
@@ -8196,11 +8206,11 @@ const TUTORIAL = [
     actions: [
       {
         labelKey: 'bowName1',
-        patch: () => ({ impact: O.rainbowGeometry(indexModel()(650), 1).impactParameter }),
+        patch: () => ({ impact: bowEntry(1, indexModel()(650)) }),
       },
       {
         labelKey: 'bowName2',
-        patch: () => ({ impact: O.rainbowGeometry(indexModel()(650), 2).impactParameter }),
+        patch: () => ({ impact: bowEntry(2, indexModel()(650)) }),
       },
     ],
   },
@@ -8253,7 +8263,7 @@ const TUTORIAL = [
       labelKey: 'extremumLabel',
       // From the engine, not written down: 0.861 was a literal sitting in
       // the one file that is supposed to contain none.
-      patch: () => ({ impact: O.rainbowGeometry(indexModel()(650), 1).impactParameter }),
+      patch: () => ({ impact: bowEntry(1, indexModel()(650)) }),
     }],
     showRay: true,
   },
@@ -8430,11 +8440,11 @@ const TUTORIAL = [
     actions: [
       {
         labelKey: 'bowName1',
-        patch: () => ({ impact: O.rainbowGeometry(indexModel()(650), 1).impactParameter }),
+        patch: () => ({ impact: bowEntry(1, indexModel()(650)) }),
       },
       {
         labelKey: 'bowName2',
-        patch: () => ({ impact: O.rainbowGeometry(indexModel()(650), 2).impactParameter }),
+        patch: () => ({ impact: bowEntry(2, indexModel()(650)) }),
       },
     ],
     note: 'coneSliceNote',
@@ -8476,11 +8486,11 @@ const TUTORIAL = [
     actions: [
       {
         labelKey: 'bowName1',
-        patch: () => ({ impact: O.rainbowGeometry(indexModel()(650), 1).impactParameter }),
+        patch: () => ({ impact: bowEntry(1, indexModel()(650)) }),
       },
       {
         labelKey: 'bowName2',
-        patch: () => ({ impact: O.rainbowGeometry(indexModel()(650), 2).impactParameter }),
+        patch: () => ({ impact: bowEntry(2, indexModel()(650)) }),
       },
     ],
     note: 'explAlexander',
@@ -9674,12 +9684,17 @@ function buildControls() {
         el('span', { class: 'ctl-label' }, t('bowRayChips')),
         el('div', { class: 'chip-row' },
           activeOrders().filter((k) => k >= 1).map((k) => {
-            const geo = O.rainbowGeometry(indexModel()(650), k);
-            if (!geo) return null;
+            // The SIGNED entry, so picking a bow moves the ray to the half of
+            // the face whose light heads towards the observer. Jumping to
+            // +0.951 for the secondary put it on the half that fires the
+            // other way, and the tick on the entry track disagreed with the
+            // chip that was supposed to land on it.
+            const b = bowEntry(k, indexModel()(650));
+            if (b === null) return null;
             return el('button', {
               class: 'chip', type: 'button',
-              onclick: () => set({ impact: geo.impactParameter, selectedRay: null }),
-            }, `${t(bowNameKey(k), { k })} · ${num(geo.impactParameter, 3)}`);
+              onclick: () => set({ impact: b, selectedRay: null }),
+            }, `${t(bowNameKey(k), { k })} · ${num(b, 3)}`);
           }).filter(Boolean))),
         () => activeOrders().some((k) => k >= 1)),
       c(['droplet'], () => slider({
@@ -9986,6 +10001,11 @@ function controlsKey() {
     state.scene, state.view, state.mode, state.step,
     state.selectedDrop ? 1 : 0, state.skyPick ? 1 : 0, state.fieldPick ? 1 : 0,
     state.graphOpen ? 1 : 0,
+    // Which orders are traced. The bow chips are built from activeOrders(),
+    // so without this, picking 2 internal reflections left the chip row
+    // showing the primary alone -- there was no way to send the ray to the
+    // secondary's entry point at all.
+    activeOrders().join(','),
   ].join('|');
 }
 

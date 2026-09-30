@@ -5,7 +5,7 @@
 import * as O from './optics.js';
 import { t, setLang, getLang, num, deg, LANGS } from './i18n.js';
 import { state, set, subscribe, indexModel, activeOrders } from './state.js';
-import { bowNameKey } from './rays.js';
+import { bowNameKey, bowEntry } from './rays.js';
 import { el, clear, group, slider, toggle, segmented, select, collectSyncers, setRenderScale } from './ui.js';
 import { FAV_LOGO } from './assets.js';
 import { createDropletView, ZOOM_RANGE } from './dropletView.js';
@@ -529,12 +529,17 @@ function buildControls() {
         el('span', { class: 'ctl-label' }, t('bowRayChips')),
         el('div', { class: 'chip-row' },
           activeOrders().filter((k) => k >= 1).map((k) => {
-            const geo = O.rainbowGeometry(indexModel()(650), k);
-            if (!geo) return null;
+            // The SIGNED entry, so picking a bow moves the ray to the half of
+            // the face whose light heads towards the observer. Jumping to
+            // +0.951 for the secondary put it on the half that fires the
+            // other way, and the tick on the entry track disagreed with the
+            // chip that was supposed to land on it.
+            const b = bowEntry(k, indexModel()(650));
+            if (b === null) return null;
             return el('button', {
               class: 'chip', type: 'button',
-              onclick: () => set({ impact: geo.impactParameter, selectedRay: null }),
-            }, `${t(bowNameKey(k), { k })} · ${num(geo.impactParameter, 3)}`);
+              onclick: () => set({ impact: b, selectedRay: null }),
+            }, `${t(bowNameKey(k), { k })} · ${num(b, 3)}`);
           }).filter(Boolean))),
         () => activeOrders().some((k) => k >= 1)),
       c(['droplet'], () => slider({
@@ -841,6 +846,11 @@ function controlsKey() {
     state.scene, state.view, state.mode, state.step,
     state.selectedDrop ? 1 : 0, state.skyPick ? 1 : 0, state.fieldPick ? 1 : 0,
     state.graphOpen ? 1 : 0,
+    // Which orders are traced. The bow chips are built from activeOrders(),
+    // so without this, picking 2 internal reflections left the chip row
+    // showing the primary alone -- there was no way to send the ray to the
+    // secondary's entry point at all.
+    activeOrders().join(','),
   ].join('|');
 }
 

@@ -1138,3 +1138,55 @@ test('total internal reflection is impossible inside the droplet', () => {
       `k=${k} back wall reflects ${(light.R * 100).toFixed(2)} %, the rest leaves`);
   }
 });
+
+test("jumping to a bow puts the ray on the half that aims at the observer", async () => {
+  // bowEntry() reads state, so import the module that owns it rather than
+  // re-deriving the rule here -- re-deriving it is exactly how the chip and
+  // the tick on the entry track came to disagree in the first place.
+  const { bowEntry } = await import('../src/rays.js');
+  const { state } = await import('../src/state.js');
+  const n = O.cauchyIndex(650);
+  const trace = (b, k) => O.traceRay({
+    origin: O.vec(-6, b, 0), dir: O.vec(1, 0, 0), center: O.vec(0, 0, 0),
+    radius: 1, n, reflections: k, exitLength: 6,
+  });
+
+  state.families = { 0: false, 1: true, 2: true, 3: false };
+  state.reflections = 2;
+
+  const b1 = bowEntry(1, n);
+  const b2 = bowEntry(2, n);
+  assert.ok(b1 > 0, `primary entry ${b1} is the reference half`);
+  assert.ok(b2 < 0, `secondary entry ${b2} is the other half`);
+
+  // Both bow rays leave on the same side, so both reach one observer.
+  const out1 = trace(b1, 1).dirOut;
+  const out2 = trace(b2, 2).dirOut;
+  assert.equal(Math.sign(out1.y), Math.sign(out2.y),
+    'both bow rays leave on the same side of the axis');
+
+  // And each really is its own bow, not merely on the right side of the drop.
+  for (const [k, b] of [[1, b1], [2, b2]]) {
+    const geo = O.rainbowGeometry(n, k);
+    close(trace(b, k).antisolar * O.DEG, geo.antisolarDeg, 1e-9,
+      `k=${k} lands on its own caustic`);
+  }
+
+  // Every order, not just the secondary. The exit side does NOT simply
+  // alternate with k -- measured, k=3 and k=4 both need the sign the parity
+  // rule would get wrong -- which is why bowEntry reads bowExitSide from a
+  // traced ray instead of computing (-1)^k.
+  state.families = { 0: false, 1: true, 2: true, 3: true };
+  state.reflections = 4;
+  const ref = trace(bowEntry(1, n), 1).dirOut.y;
+  for (const k of [1, 2, 3, 4]) {
+    const b = bowEntry(k, n);
+    assert.equal(Math.sign(trace(b, k).dirOut.y), Math.sign(ref),
+      `k=${k} at b=${b.toFixed(3)} leaves on the same side as the primary`);
+  }
+
+  // With only the primary traced there is no other half to move to.
+  state.families = { 0: false, 1: true, 2: false, 3: false };
+  state.reflections = 1;
+  assert.ok(bowEntry(1, n) > 0, 'the sole order keeps the reference half');
+});

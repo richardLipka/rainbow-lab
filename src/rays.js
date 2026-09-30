@@ -122,6 +122,33 @@ export function bowExitSide(n, k) {
 }
 
 /**
+ * The signed entry point at which order k's bow ray heads towards the
+ * observer, rather than away from it.
+ *
+ * The exit side flips with every internal reflection, so from one entry point
+ * the primary and the secondary part company. The beam covers the whole face,
+ * so each order's caustic exists on both halves; this picks the half whose
+ * light joins the rest. Measured for n(650): the primary at b = +0.861 leaves
+ * downward and the secondary at b = -0.950 leaves downward too, while
+ * +0.950 sends the secondary up and away.
+ *
+ * Mirroring is exact -- flipping b flips the whole path about the axis and
+ * changes nothing else -- so this is a choice of which side to draw, never a
+ * change to the optics. Exported because the eye placement, the tick on the
+ * entry track and every "jump to this bow" chip have to agree about it; they
+ * did not, and a chip for the secondary used to send the ray to the half that
+ * points away from the observer.
+ */
+export function bowEntry(k, n) {
+  const geo = O.rainbowGeometry(n, k);
+  if (!geo) return null;
+  const orders = activeOrders().filter((j) => j >= 1);
+  const ref = orders.length ? orders[0] : k;
+  const side = k === ref ? 1 : bowExitSide(n, ref) * bowExitSide(n, k);
+  return side * geo.impactParameter;
+}
+
+/**
  * Chrome colour for reflection order k, shared by every scene.
  *
  * It started out private to the droplet view while the rain cross-section

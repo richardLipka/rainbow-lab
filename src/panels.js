@@ -8,7 +8,7 @@ import { t, deg, num, CLASS_KEY, CLASS_EXPLAIN } from './i18n.js';
 import { el, row, segmented } from './ui.js';
 import {
   traceOne, distanceFromExtremum, dropReport, colorIdFor, DROP_ORDERS,
-  orderLedger, bowNameKey, fieldReport, BOW_MATCH_DEG, nearestColorId,
+  orderLedger, bowNameKey, fieldReport, BOW_MATCH_DEG, nearestColorId, bowEntry,
 } from './rays.js';
 // One definition of what a world unit is worth, shared with the scene that
 // generates the rain -- a readout quoting its own metres would drift.
@@ -56,11 +56,11 @@ export const TUTORIAL = [
     actions: [
       {
         labelKey: 'bowName1',
-        patch: () => ({ impact: O.rainbowGeometry(indexModel()(650), 1).impactParameter }),
+        patch: () => ({ impact: bowEntry(1, indexModel()(650)) }),
       },
       {
         labelKey: 'bowName2',
-        patch: () => ({ impact: O.rainbowGeometry(indexModel()(650), 2).impactParameter }),
+        patch: () => ({ impact: bowEntry(2, indexModel()(650)) }),
       },
     ],
   },
@@ -113,7 +113,7 @@ export const TUTORIAL = [
       labelKey: 'extremumLabel',
       // From the engine, not written down: 0.861 was a literal sitting in
       // the one file that is supposed to contain none.
-      patch: () => ({ impact: O.rainbowGeometry(indexModel()(650), 1).impactParameter }),
+      patch: () => ({ impact: bowEntry(1, indexModel()(650)) }),
     }],
     showRay: true,
   },
@@ -290,11 +290,11 @@ export const TUTORIAL = [
     actions: [
       {
         labelKey: 'bowName1',
-        patch: () => ({ impact: O.rainbowGeometry(indexModel()(650), 1).impactParameter }),
+        patch: () => ({ impact: bowEntry(1, indexModel()(650)) }),
       },
       {
         labelKey: 'bowName2',
-        patch: () => ({ impact: O.rainbowGeometry(indexModel()(650), 2).impactParameter }),
+        patch: () => ({ impact: bowEntry(2, indexModel()(650)) }),
       },
     ],
     note: 'coneSliceNote',
@@ -336,11 +336,11 @@ export const TUTORIAL = [
     actions: [
       {
         labelKey: 'bowName1',
-        patch: () => ({ impact: O.rainbowGeometry(indexModel()(650), 1).impactParameter }),
+        patch: () => ({ impact: bowEntry(1, indexModel()(650)) }),
       },
       {
         labelKey: 'bowName2',
-        patch: () => ({ impact: O.rainbowGeometry(indexModel()(650), 2).impactParameter }),
+        patch: () => ({ impact: bowEntry(2, indexModel()(650)) }),
       },
     ],
     note: 'explAlexander',

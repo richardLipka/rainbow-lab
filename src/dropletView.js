@@ -9,7 +9,7 @@ import * as O from './optics.js';
 import { state, set, indexModel, activeOrders, activeLambdas } from './state.js';
 import {
   buildRays, distanceFromExtremum, colorFor, traceOne, BOW_MATCH_DEG, bowNameKey, sharedPrefix,
-  orderColor, alexanderCaption, bowExitSide,
+  orderColor, alexanderCaption, bowEntry,
 } from './rays.js';
 import { t, deg, num } from './i18n.js';
 import { fitCanvas, strokePath, label, arrowHead, angleArc, capture } from './ui.js';
@@ -214,23 +214,6 @@ export function createDropletView(canvas) {
    * modes cannot drift apart, and 42 deg becomes something to find rather
    * than something the app quietly asserts.
    */
-  /**
-   * The signed entry point whose light lands on the side everyone else's
-   * does. The exit side flips with every internal reflection, so from one
-   * entry point the primary and the secondary part company; the full-face
-   * beam contains both halves anyway, so each order's eye is placed on the
-   * ray that actually aims at the others. Mirroring is exact -- flipping b
-   * flips the whole path about the axis and changes nothing else.
-   */
-  function commonEntry(k, n) {
-    const geo = O.rainbowGeometry(n, k);
-    if (!geo) return null;
-    const orders = activeOrders().filter((j) => j >= 1);
-    const ref = orders.length ? orders[0] : k;
-    const side = k === ref ? 1 : bowExitSide(n, ref) * bowExitSide(n, k);
-    return side * geo.impactParameter;
-  }
-
   function computeObservers() {
     const idx = indexModel();
     const nRef = idx(650); // red, the same reference wavelength used elsewhere
@@ -240,7 +223,7 @@ export function createDropletView(canvas) {
     for (const kRef of orders) {
       const geo = O.rainbowGeometry(nRef, kRef);
       if (!geo) continue;
-      const b = commonEntry(kRef, nRef);
+      const b = bowEntry(kRef, nRef);
       if (b === null) continue;
       const canonical = traceOne(650, nRef, kRef, b);
       if (!canonical.path.dirOut) continue;
@@ -1105,7 +1088,7 @@ export function createDropletView(canvas) {
       // The beam covers the whole face, so each order's caustic entry point
       // exists on BOTH halves. Ticked on the half whose light joins the
       // others, which is the one the eyes are placed from.
-      const sb = commonEntry(k, nRef);
+      const sb = bowEntry(k, nRef);
       const at = project({ x: HANDLE_X, y: sb });
       marks.push({ k, b: geo.impactParameter, sb, at });
     }
@@ -1170,7 +1153,7 @@ export function createDropletView(canvas) {
     for (const k of orders) {
       const geo = O.rainbowGeometry(nRef, k);
       if (!geo) continue;
-      const p = traceOne(650, nRef, k, commonEntry(k, nRef)).path;
+      const p = traceOne(650, nRef, k, bowEntry(k, nRef)).path;
       if (!p.dirOut) continue;
       edges.push({ k, ang: bearing(p.dirOut), phi: geo.antisolarDeg });
     }

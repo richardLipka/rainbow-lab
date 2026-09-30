@@ -1693,3 +1693,36 @@ entering a sphere they are unreachable, which is the point.
 Verified by pixel probe rather than by eye: along the refracted-out direction
 from the primary's bounce, 21 of 22 samples are lit; along a control direction
 the same length away, 0.
+
+## Picking a bow moves the ray to the half that aims at the observer
+
+`bowEntry(k, n)` moved out of dropletView into rays.js, because three places
+have to agree about the signed entry point and only two of them did. The eye
+placement and the tick on the entry track used it; every "jump to this bow"
+chip used `rainbowGeometry().impactParameter`, which is unsigned. Picking the
+secondary therefore sent the ray to +0.951 -- the half that fires away from
+the observer -- while the tick it was supposed to land on sat at -0.951.
+
+Measured, all four orders now land on the primary's side:
+
+| k | chip b | exit y | phi |
+|---|---|---|---|
+| 1 | +0.861 | -0.672 | 42.19 |
+| 2 | -0.950 | -0.774 | 50.69 |
+| 3 | -0.974 | -0.669 | 137.98 |
+| 4 | +0.984 | -0.686 | 136.66 |
+
+The signs are NOT `(-1)^k`. k=3 needs the same sign as k=2, which a parity
+rule gets wrong -- `bowEntry` reads `bowExitSide`, i.e. a traced ray, and a
+test now checks all four rather than the two that made the rule look obvious.
+
+### The chip row was stale
+
+Found while checking the above: `controlsKey()` did not include the traced
+orders, so clicking "2" on the reflections selector set `families` correctly
+but never rebuilt the control column. The secondary chip simply never
+appeared, which meant there was no way to send the ray to its entry point at
+all. `activeOrders().join(',')` is in the key now.
+
+Worth the habit: when a control's CONTENTS are derived from state, that state
+belongs in `controlsKey()`, not just the state the control writes.
