@@ -9,7 +9,7 @@ import * as O from './optics.js';
 import { state, set, indexModel, activeOrders, activeLambdas } from './state.js';
 import {
   buildRays, distanceFromExtremum, colorFor, traceOne, BOW_MATCH_DEG, bowNameKey, sharedPrefix,
-  entrySide, orderColor, alexanderCaption,
+  orderColor, alexanderCaption, bowExitSide,
 } from './rays.js';
 import { t, deg, num } from './i18n.js';
 import { fitCanvas, strokePath, label, arrowHead, angleArc, capture } from './ui.js';
@@ -20,6 +20,9 @@ import { fitCanvas, strokePath, label, arrowHead, angleArc, capture } from './ui
 const REACHES_OBSERVER = new Set([O.RayClass.PRIMARY, O.RayClass.SECONDARY, O.RayClass.HIGHER_ORDER]);
 
 const SEG_LABELS = ['R0', 'R1', 'R2', 'R3', 'R4', 'R5'];
+
+/** Where the entry-point track is drawn, in droplet radii up-beam. */
+const HANDLE_X = -1.9;
 
 /**
  * How far the view may be pulled back from the droplet, in droplet radii.
@@ -38,8 +41,37 @@ export function createDropletView(canvas) {
   let eyes = [];
   let eyeScreen = [];
 
+  /**
+   * The scene is traced along +x and DRAWN rotated by the Sun's elevation, so
+   * this cross-section sits the same way up as the rain and sky scenes: raise
+   * the Sun and the antisolar direction tips below the horizontal, exactly as
+   * rays.antisolarAxis() has it everywhere else.
+   *
+   * A rotation only, applied at the last moment. The optics never see it --
+   * a sphere in a parallel beam has no preferred orientation, so rotating the
+   * trace would change nothing except which numbers are hard to check.
+   */
+  function sunTilt() {
+    return state.sunElevation * O.RAD;
+  }
+
+  /** World point -> world point, turned by the Sun's elevation. */
+  function turn(p) {
+    const a = sunTilt();
+    const c = Math.cos(a);
+    const sn = Math.sin(a);
+    return { x: p.x * c + p.y * sn, y: -p.x * sn + p.y * c };
+  }
+
   function project(p) {
-    return { x: layout.cx + p.x * layout.s, y: layout.cy - p.y * layout.s };
+    const q = turn(p);
+    return { x: layout.cx + q.x * layout.s, y: layout.cy - q.y * layout.s };
+  }
+
+  /** Screen bearing (radians, y down) of a world direction. */
+  function bearing(d) {
+    const q = turn(d);
+    return Math.atan2(-q.y, q.x);
   }
 
   function draw() {
@@ -130,7 +162,7 @@ export function createDropletView(canvas) {
     for (const observer of observers) drawObserver(ctx, observer, reachingKs.has(observer.kRef));
     drawLegend(ctx, w, h, rays);
     if (state.show.labels) {
-      label(ctx, t(state.observerMode === 'manual' ? 'observerManualHint' : 'observerReachHint'), 12, h - 14, {
+      label(ctx, t('observerReachHint'), 12, h - 14, {
         color: '#6f86ab', font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
       });
     }
@@ -162,65 +194,57 @@ export function createDropletView(canvas) {
    * modes cannot drift apart, and 42 deg becomes something to find rather
    * than something the app quietly asserts.
    */
+  /**
+   * The signed entry point whose light lands on the side everyone else's
+   * does. The exit side flips with every internal reflection, so from one
+   * entry point the primary and the secondary part company; the full-face
+   * beam contains both halves anyway, so each order's eye is placed on the
+   * ray that actually aims at the others. Mirroring is exact -- flipping b
+   * flips the whole path about the axis and changes nothing else.
+   */
+  function commonEntry(k, n) {
+    const geo = O.rainbowGeometry(n, k);
+    if (!geo) return null;
+    const orders = activeOrders().filter((j) => j >= 1);
+    const ref = orders.length ? orders[0] : k;
+    const side = k === ref ? 1 : bowExitSide(n, ref) * bowExitSide(n, k);
+    return side * geo.impactParameter;
+  }
+
   function computeObservers() {
     const idx = indexModel();
     const nRef = idx(650); // red, the same reference wavelength used elsewhere
-    const manual = state.observerMode === 'manual';
     const orders = activeOrders().filter((k) => k >= 1);
     const lambdas = activeLambdas();
     const observers = [];
     for (const kRef of orders) {
       const geo = O.rainbowGeometry(nRef, kRef);
       if (!geo) continue;
-      // The SAME signed entry buildRays() uses, or the eye would be placed
-      // for a ray the scene is not drawing.
-      const canonical = traceOne(650, nRef, kRef,
-        entrySide(kRef, nRef) * geo.impactParameter);
+      const b = commonEntry(kRef, nRef);
+      if (b === null) continue;
+      const canonical = traceOne(650, nRef, kRef, b);
       if (!canonical.path.dirOut) continue;
       // Every active colour's bow for this order. Under white light the bows
       // are 1.7 deg apart, so "the rainbow is at 42.4 deg" is red's edge of a
       // band, not the whole band -- an eye parked at 41.1 deg is on the bow
-      // just as truly, it is simply catching blue. Quoting red's angle at
-      // every eye position was the thing that made a single bow read as
-      // several: nothing on screen ever said which colour was arriving.
+      // just as truly, it is simply catching blue.
       const bows = [];
       for (const lambda of lambdas) {
         const g = O.rainbowGeometry(idx(lambda), kRef);
         if (g) bows.push({ lambda, phi: g.antisolarDeg });
       }
-      const common = { valid: true, kRef, manual, bows };
-      if (!manual) {
-        const near = nearestBow(bows, geo.antisolarDeg);
-        observers.push({
-          ...common, dir: canonical.path.dirOut, phiDeg: geo.antisolarDeg,
-          rainbowPhiDeg: geo.antisolarDeg, bowLambda: near ? near.lambda : 650,
-        });
-        continue;
-      }
-      // The exit side flips with every internal reflection (k=1 leaves below
-      // the axis for b>0, k=2 above), so the side has to come from this
-      // family's own canonical ray -- a manual eye placed on the wrong side
-      // would be mirrored away from the light and could never light up.
-      const side = Math.sign(canonical.path.dirOut.y) || 1;
-      // phi is measured AT the observer, between the line back to the droplet
-      // and the antisolar direction (+x), so the droplet-to-eye direction is
-      // Theta = 180 - phi away from +x.
-      const phi = O.clamp(state.observerPhi, 0, 180) * O.RAD;
-      const phiDeg = O.clamp(state.observerPhi, 0, 180);
-      const near = nearestBow(bows, phiDeg);
+      const near = nearestBow(bows, geo.antisolarDeg);
       observers.push({
-        ...common,
-        dir: O.vec(-Math.cos(phi), side * Math.sin(phi), 0),
-        phiDeg,
-        rainbowPhiDeg: near ? near.phi : geo.antisolarDeg,
-        bowLambda: near ? near.lambda : 650,
+        valid: true, kRef, bows,
+        dir: canonical.path.dirOut, phiDeg: geo.antisolarDeg,
+        rainbowPhiDeg: geo.antisolarDeg, bowLambda: near ? near.lambda : 650,
       });
     }
     if (!observers.length) {
       const kRef = state.reflections >= 1 ? state.reflections : 0;
       observers.push({
         dir: O.vec(-1, 0, 0), valid: false, kRef, phiDeg: null,
-        rainbowPhiDeg: null, bowLambda: null, bows: [], manual,
+        rainbowPhiDeg: null, bowLambda: null, bows: [],
       });
     }
     return observers;
@@ -269,14 +293,7 @@ export function createDropletView(canvas) {
    * agree ray for ray.
    */
   function reachesEye(ray) {
-    if (state.observerMode !== 'manual') return REACHES_OBSERVER.has(ray.classification);
-    if (ray.k < 1 || ray.path.antisolar === null) return false;
-    const phi = ray.path.antisolar * O.DEG;
-    for (const eye of eyes) {
-      if (!eye.valid || eye.kRef !== ray.k) continue;
-      if (Math.abs(phi - eye.phiDeg) <= O.CAUSTIC_TOLERANCE_DEG) return true;
-    }
-    return false;
+    return REACHES_OBSERVER.has(ray.classification);
   }
 
   function drawBackground(ctx, w, h) {
@@ -286,22 +303,23 @@ export function createDropletView(canvas) {
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, h);
 
-    // optical axis through the droplet centre
-    strokePath(
-      ctx,
-      [{ x: 0, y: layout.cy }, { x: w, y: layout.cy }],
-      'rgba(120,140,180,0.18)',
-      1,
-      [4, 6]
-    );
+    // The sunlight axis, tilted with the Sun. Sunlight travels along it and
+    // carries on past the droplet to the antisolar point, so it is one line
+    // and both ends of it are labelled.
+    const far = Math.hypot(w, h);
+    const A = project({ x: -far / layout.s, y: 0 });
+    const B = project({ x: far / layout.s, y: 0 });
+    strokePath(ctx, [A, B], 'rgba(120,140,180,0.18)', 1, [4, 6]);
     if (state.show.labels) {
       // The antisolar direction IS the incoming beam's direction of travel
       // (away from the Sun, continuing forward) -- so its label belongs on
       // the far side of the droplet from the Sun icon, not next to it.
-      label(ctx, t('antisolarPoint'), w - 14, layout.cy - 13, {
-        align: 'right', color: '#8fa4c8', bg: false,
-        font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
-      });
+      const end = project({ x: 5.6, y: 0 });
+      label(ctx, t('antisolarPoint'),
+        O.clamp(end.x, 70, w - 14), O.clamp(end.y - 13, 14, h - 16), {
+          align: 'right', color: '#8fa4c8', bg: false,
+          font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
+        });
     }
   }
 
@@ -330,29 +348,30 @@ export function createDropletView(canvas) {
       label(ctx, `${t('raindrop')} · n = ${num(idx(lam), 3)}`, cx, cy + s + 16, {
         align: 'center', color: '#9fc4ee',
       });
-      label(ctx, `R = ${num(state.dropletRadiusMm, 2)} mm`, cx, cy + s + 34, {
-        align: 'center', color: '#6f86ab', bg: false, font: '10px "IBM Plex Mono", ui-monospace, monospace',
-      });
     }
   }
 
   function drawSun(ctx, w, h) {
-    const y = layout.cy - state.impact * layout.s;
+    // Parked up-beam of the entry point, so the Sun always sits at the far
+    // end of the ray the reader is steering however the scene is tilted.
+    const p = project({ x: -3.4, y: state.impact });
+    const x = O.clamp(p.x, 24, w - 24);
+    const y = O.clamp(p.y, 26, h - 26);
     ctx.save();
-    const g = ctx.createRadialGradient(24, y, 2, 24, y, 16);
+    const g = ctx.createRadialGradient(x, y, 2, x, y, 16);
     g.addColorStop(0, 'rgba(255,238,180,0.95)');
     g.addColorStop(1, 'rgba(255,210,90,0)');
     ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.arc(24, y, 16, 0, Math.PI * 2);
+    ctx.arc(x, y, 16, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#ffe9a8';
     ctx.beginPath();
-    ctx.arc(24, y, 4.5, 0, Math.PI * 2);
+    ctx.arc(x, y, 4.5, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
     if (state.show.labels) {
-      label(ctx, t('sunLabel'), 24, y - 24, { align: 'center', color: '#ffe9a8' });
+      label(ctx, t('sunLabel'), x, y - 24, { align: 'center', color: '#ffe9a8' });
     }
   }
 
@@ -371,7 +390,11 @@ export function createDropletView(canvas) {
     // faint. Alpha is kept high enough that the missing rays stay clearly
     // present -- they are the pedagogical point, not clutter to hide.
     if (ray.role === 'fan') {
-      return { alpha: reaches ? 0.95 : 0.4, width: reaches ? 2.2 : 0.9, greyMix: reaches ? 0 : 0.82, reaches };
+      // A beam covering the whole face puts fifty-odd rays on screen at two
+      // orders, and at the old 0.4 they read as a thicket rather than as a
+      // background the few bright ones stand out from. The ones that pile up
+      // are the subject; the rest are there to be outnumbered.
+      return { alpha: reaches ? 1 : 0.2, width: reaches ? 2.4 : 0.7, greyMix: reaches ? 0 : 0.92, reaches };
     }
     return { alpha: reaches ? 1 : 0.62, width: reaches ? 2.4 : 1.3, greyMix: reaches ? 0 : 0.72, reaches };
   }
@@ -483,14 +506,15 @@ export function createDropletView(canvas) {
    */
   const ARRIVAL_SAMPLES = 200;
 
-  /* Cached against the physics, never the camera: the exit directions depend
-     on the index model and the orders, and nothing else. */
+  /* Cached against the physics plus the one piece of camera that reaches
+     into it: the exit bearings are stored already tilted by the Sun's
+     elevation, so the tilt belongs in the key. */
   let arrival = { key: '', groups: [] };
 
   function arrivalKey() {
     return [
       state.wavelength, state.dispersion, state.indexMode, state.indexScale,
-      activeOrders().join(','),
+      activeOrders().join(','), state.sunElevation,
     ].join('|');
   }
 
@@ -525,11 +549,13 @@ export function createDropletView(canvas) {
     for (const k of activeOrders()) {
       if (k < 1) continue;
       const angs = [];
+      // Rim to rim, matching the beam: the exits pile up on both sides and
+      // the arc shows both concentrations.
       for (let i = 0; i < ARRIVAL_SAMPLES; i++) {
-        const b = (i + 0.5) / ARRIVAL_SAMPLES;
+        const b = -1 + (2 * (i + 0.5)) / ARRIVAL_SAMPLES;
         const path = traceOne(lambda, n, k, b).path;
         if (!path.dirOut) continue;
-        angs.push(Math.atan2(-path.dirOut.y, path.dirOut.x));
+        angs.push(bearing(path.dirOut));
       }
       if (angs.length > 8) groups.push({ k, lambda, angs });
     }
@@ -783,7 +809,7 @@ export function createDropletView(canvas) {
       const manyColours = observer.bows && observer.bows.length > 1;
       const nm = manyColours && observer.bowLambda ? ` · ${observer.bowLambda} ${t('nm')}` : '';
       const belowLine2 = observer.valid
-        ? `φ ${observer.manual ? '=' : '≈'} ${deg(observer.phiDeg, 1)}${observer.kRef ? ` · k=${observer.kRef}` : ''}`
+        ? `φ ≈ ${deg(observer.phiDeg, 1)}${observer.kRef ? ` · k=${observer.kRef}` : ''}`
         : t('observerNoConcentration');
       // Stack the caption upwards when a downward stack would not fit. The
       // eye's position is dictated by the optics -- for k=1 it lands on the
@@ -829,24 +855,10 @@ export function createDropletView(canvas) {
       centred(belowLine2, y1 + 16, {
         color: '#6f86ab', font: '10px "IBM Plex Mono", ui-monospace, monospace',
       });
-      // Manual mode has to say plainly how far from the bow the eye is, or
-      // "move it until something happens" is a search with no feedback.
-      if (observer.manual && observer.rainbowPhiDeg !== null) {
-        const d = observer.phiDeg - observer.rainbowPhiDeg;
-        // Measured against the NEAREST active colour's bow, with the tighter
-        // of the two tolerances. Against red's angle at the caustic
-        // half-width, "on the bow" lit up across a window wider than the
-        // whole band -- including angles where nothing is concentrated at
-        // all -- so the badge stopped meaning anything.
-        const onBow = Math.abs(d) <= BOW_MATCH_DEG;
-        centred(onBow
-          ? `${t('observerOnBow')}${nm}`
-          : `Δ ${d > 0 ? '+' : ''}${num(d, 1)}° → ${deg(observer.rainbowPhiDeg, 1)}${nm}`,
-          y1 + 32, {
-            color: onBow ? '#6fd3a4' : '#c9905c',
-            font: '10px "IBM Plex Mono", ui-monospace, monospace',
-          });
-      } else if (observer.valid && nm) {
+      // Which colour this eye is actually catching, when more than one is in
+      // play. The eye sits on its order's own bow by construction now, so
+      // there is no "how far off" to report -- only which wavelength arrives.
+      if (observer.valid && nm) {
         centred(`${t('observerOnBow')}${nm}`, y1 + 32, {
           color: '#6fd3a4', font: '10px "IBM Plex Mono", ui-monospace, monospace',
         });
@@ -958,7 +970,7 @@ export function createDropletView(canvas) {
    * "the secondary needs a different ray" something you can see rather than
    * something the panel has to assert.
    */
-  function drawBowMarks(ctx, x) {
+  function drawBowMarks(ctx) {
     // Below this the droplet is too small for the marks to separate: the
     // primary and secondary sit 0.089 apart in b, so at s = 60 their ticks
     // are five pixels apart and the labels would be a smear.
@@ -969,47 +981,41 @@ export function createDropletView(canvas) {
       if (k < 1) continue;
       const geo = O.rainbowGeometry(nRef, k);
       if (!geo) continue;
-      // With split entry on, order k's own ray enters the other half, so its
-      // tick belongs on that half of the track. A tick left on the reference
-      // side would point at an entry point no drawn ray uses.
-      const sb = entrySide(k, nRef) * geo.impactParameter;
-      marks.push({ k, b: geo.impactParameter, sb, y: layout.cy - sb * layout.s });
+      // The beam covers the whole face, so each order's caustic entry point
+      // exists on BOTH halves. Ticked on the half whose light joins the
+      // others, which is the one the eyes are placed from.
+      const sb = commonEntry(k, nRef);
+      const at = project({ x: HANDLE_X, y: sb });
+      marks.push({ k, b: geo.impactParameter, sb, at });
     }
-    marks.sort((a2, b2) => a2.y - b2.y);
+    marks.sort((m1, m2) => m1.at.y - m2.at.y);
     let lastLabelY = -1e9;
+    // The track runs along the face, which is tilted with the Sun, so the
+    // ticks are drawn across it rather than horizontally.
+    const a = sunTilt();
+    const tx = Math.cos(a) * 7;
+    const ty = -Math.sin(a) * 7;
     for (const m of marks) {
-      const on = Math.abs(state.impact - m.b) < 0.004;
-      if (m.sb !== 0 && Math.sign(m.sb) !== Math.sign(state.impact || 1)) {
-        // Mirrored orders get their own faint dot on the track, so the second
-        // entry point is visible as a position and not only as a ray that
-        // appears from nowhere.
-        ctx.save();
-        ctx.fillStyle = orderColor(m.k);
-        ctx.globalAlpha = on ? 0.9 : 0.4;
-        ctx.beginPath();
-        ctx.arc(x, m.y, on ? 4 : 2.6, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      }
+      const on = Math.abs(state.impact - m.sb) < 0.004;
       ctx.save();
       ctx.strokeStyle = orderColor(m.k);
-      ctx.globalAlpha = on ? 1 : 0.55;
+      ctx.globalAlpha = on ? 1 : 0.6;
       ctx.lineWidth = on ? 2.4 : 1.4;
       ctx.beginPath();
-      ctx.moveTo(x - 7, m.y);
-      ctx.lineTo(x + 7, m.y);
+      ctx.moveTo(m.at.x - tx, m.at.y - ty);
+      ctx.lineTo(m.at.x + tx, m.at.y + ty);
       ctx.stroke();
       ctx.restore();
       // A tick is always worth drawing; a label only when it will not land on
       // the one above it.
-      if (!state.show.labels || m.y - lastLabelY < 13) continue;
-      lastLabelY = m.y;
-      const text = `${t(bowNameKey(m.k), { k: m.k })} · ${num(m.b, 3)}`;
+      if (!state.show.labels || m.at.y - lastLabelY < 13) continue;
+      lastLabelY = m.at.y;
+      const text = `${t(bowNameKey(m.k), { k: m.k })} · ${num(Math.abs(m.sb), 3)}`;
       ctx.save();
       ctx.font = '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif';
       const width = ctx.measureText(text).width;
       ctx.restore();
-      label(ctx, text, Math.max(width + 8, x - 11), m.y, {
+      label(ctx, text, Math.max(width + 8, m.at.x - 11), m.at.y, {
         align: 'right', color: orderColor(m.k), bg: on,
         font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
       });
@@ -1033,7 +1039,6 @@ export function createDropletView(canvas) {
    * show it.
    */
   function drawAlexanderBand(ctx) {
-    if (!state.splitEntry) return;
     const orders = activeOrders().filter((k) => k === 1 || k === 2);
     if (orders.length < 2) return;
     const nRef = indexModel()(650);
@@ -1041,9 +1046,9 @@ export function createDropletView(canvas) {
     for (const k of orders) {
       const geo = O.rainbowGeometry(nRef, k);
       if (!geo) continue;
-      const p = traceOne(650, nRef, k, entrySide(k, nRef) * geo.impactParameter).path;
+      const p = traceOne(650, nRef, k, commonEntry(k, nRef)).path;
       if (!p.dirOut) continue;
-      edges.push({ k, ang: Math.atan2(-p.dirOut.y, p.dirOut.x), phi: geo.antisolarDeg });
+      edges.push({ k, ang: bearing(p.dirOut), phi: geo.antisolarDeg });
     }
     if (edges.length < 2) return;
     const a0 = Math.min(edges[0].ang, edges[1].ang);
@@ -1101,21 +1106,24 @@ export function createDropletView(canvas) {
   }
 
   function drawImpactHandle(ctx) {
-    const y = layout.cy - state.impact * layout.s;
-    const x = layout.cx - layout.s * 1.9;
-    drawBowMarks(ctx, x);
+    drawBowMarks(ctx);
+    // The track is the droplet face seen edge-on, drawn up-beam of the
+    // droplet and tilted with it: one line covering every entry point the
+    // beam uses, from one rim to the other.
+    const top = project({ x: HANDLE_X, y: 1 });
+    const bot = project({ x: HANDLE_X, y: -1 });
+    const at = project({ x: HANDLE_X, y: state.impact });
     ctx.save();
+    strokePath(ctx, [top, bot], 'rgba(130,152,190,0.35)', 1);
     ctx.strokeStyle = hover ? 'rgba(255,255,255,0.75)' : 'rgba(180,200,240,0.45)';
     ctx.lineWidth = 1;
     ctx.setLineDash([2, 3]);
-    ctx.beginPath();
-    ctx.moveTo(x, layout.cy);
-    ctx.lineTo(x, y);
-    ctx.stroke();
+    strokePath(ctx, [project({ x: HANDLE_X, y: 0 }), at],
+      hover ? 'rgba(255,255,255,0.75)' : 'rgba(180,200,240,0.45)', 1, [2, 3]);
     ctx.setLineDash([]);
     ctx.fillStyle = hover ? '#ffffff' : 'rgba(200,220,255,0.85)';
     ctx.beginPath();
-    ctx.arc(x, y, 4.5, 0, Math.PI * 2);
+    ctx.arc(at.x, at.y, 5, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
     if (state.show.labels) {
@@ -1123,7 +1131,8 @@ export function createDropletView(canvas) {
       // only one of them leaves the reader looking for a second control that
       // sets the angle, and there isn't one.
       const thetaDeg = Math.asin(O.clamp(Math.abs(state.impact), 0, 1)) * O.DEG;
-      label(ctx, `b/R = ${num(state.impact, 3)} · θᵢ = ${deg(thetaDeg, 1)}`, x, y - 16,
+      label(ctx, `b/R = ${num(state.impact, 3)} · θᵢ = ${deg(thetaDeg, 1)}`,
+        O.clamp(at.x, 74, layout.w - 74), O.clamp(at.y - 16, 14, layout.h - 16),
         { align: 'center', color: '#cfe0ff' });
     }
   }
@@ -1238,71 +1247,46 @@ export function createDropletView(canvas) {
 
   /* ---------------------------------------------------------- interaction */
 
+  /**
+   * Where the pointer sits along the droplet face, in units of b/R.
+   *
+   * The scene is drawn rotated by the Sun's elevation, so the face is no
+   * longer a vertical line on screen; the pointer has to be turned back into
+   * the untilted frame before its height means anything.
+   */
   function impactFromEvent(e) {
     const rect = canvas.getBoundingClientRect();
-    const y = e.clientY - rect.top;
-    const b = (layout.cy - y) / layout.s;
-    return Math.max(-0.999, Math.min(0.999, b));
-  }
-
-  /** The eye under the pointer, if any -- the drag handle for phi. */
-  function eyeUnder(e) {
-    const rect = canvas.getBoundingClientRect();
-    const px = e.clientX - rect.left;
-    const py = e.clientY - rect.top;
-    return eyeScreen.find((eye) => Math.hypot(px - eye.x, py - eye.y) < 22) || null;
-  }
-
-  /**
-   * The phi a pointer position implies: the angle at the pointer between the
-   * line back to the droplet and the antisolar direction. Only the magnitude
-   * of the screen angle is used, so the eye stays on whichever side of the
-   * axis its own reflection family actually exits towards, however far round
-   * the droplet the pointer wanders.
-   */
-  function phiFromEvent(e) {
-    const rect = canvas.getBoundingClientRect();
     const dx = e.clientX - rect.left - layout.cx;
-    const dy = e.clientY - rect.top - layout.cy;
-    const len = Math.hypot(dx, dy);
-    if (len < 1e-6) return state.observerPhi;
-    const theta = Math.acos(O.clamp(dx / len, -1, 1)) * O.DEG;
-    return Math.round(O.clamp(180 - theta, 0, 180) * 10) / 10;
+    const dy = -(e.clientY - rect.top - layout.cy);
+    const a = sunTilt();
+    const by = dx * Math.sin(a) + dy * Math.cos(a);
+    return Math.max(-0.999, Math.min(0.999, by / layout.s));
+  }
+
+  /** Where the handle for impact parameter b currently sits on screen. */
+  function handleScreen() {
+    return project({ x: -1.9, y: state.impact });
   }
 
   let dragging = false;
-  let eyeDrag = false;
   canvas.addEventListener('pointerdown', (e) => {
     if (!layout) return;
     capture(canvas, e);
-    // Grabbing the eye steers phi directly. Doing it while still in auto mode
-    // is what switches the mode over: the gesture IS the request to place the
-    // eye by hand, and making the user find a radio button first would only
-    // give the drag a way to look broken.
-    if (eyeUnder(e)) {
-      eyeDrag = true;
-      set({ observerMode: 'manual', observerPhi: phiFromEvent(e) });
-      return;
-    }
     dragging = true;
     set({ impact: impactFromEvent(e) });
     selectNearest(e);
   });
   canvas.addEventListener('pointermove', (e) => {
     if (!layout) return;
-    if (eyeDrag) {
-      set({ observerPhi: phiFromEvent(e) });
-      return;
-    }
     if (dragging) {
       set({ impact: impactFromEvent(e) });
     } else {
       const rect = canvas.getBoundingClientRect();
-      const y = e.clientY - rect.top;
-      const hy = layout.cy - state.impact * layout.s;
-      const overEye = !!eyeUnder(e);
-      const nowHover = !overEye && Math.abs(y - hy) < 14;
-      const cursor = overEye ? 'grab' : nowHover ? 'ns-resize' : 'crosshair';
+      const px = e.clientX - rect.left;
+      const py = e.clientY - rect.top;
+      const hp = handleScreen();
+      const nowHover = Math.hypot(px - hp.x, py - hp.y) < 16;
+      const cursor = nowHover ? 'grab' : 'crosshair';
       if (canvas.style.cursor !== cursor) canvas.style.cursor = cursor;
       if (nowHover !== hover) {
         hover = nowHover;
@@ -1310,7 +1294,7 @@ export function createDropletView(canvas) {
       }
     }
   });
-  const stop = () => { dragging = false; eyeDrag = false; };
+  const stop = () => { dragging = false; };
   canvas.addEventListener('pointerup', stop);
   canvas.addEventListener('pointercancel', stop);
 

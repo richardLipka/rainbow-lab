@@ -434,22 +434,6 @@ function sceneGroup(titleKey, items, opts) {
 const chipRow = (...chips) => el('div', { class: 'action-row' }, ...chips);
 const chip = (labelKey, onclick) => el('button', { class: 'chip', type: 'button', onclick }, t(labelKey));
 
-/** The rainbow angle for order k, from the engine -- never a literal. */
-function rainbowPhi(k) {
-  const geo = O.rainbowGeometry(indexModel()(650), Math.max(1, k));
-  return geo ? geo.antisolarDeg : 42;
-}
-
-/**
- * The angle the single-droplet eye is at right now. In auto mode that is the
- * angle the engine derives, so the slider tracks the eye rather than sitting
- * on a stale number the user never set -- and dragging it out of auto is then
- * one continuous gesture instead of a jump.
- */
-function observerPhiNow() {
-  return state.observerMode === 'manual' ? state.observerPhi : rainbowPhi(state.reflections);
-}
-
 /**
  * Where the reflection-order controls do anything.
  *
@@ -561,13 +545,6 @@ function buildControls() {
       c(['droplet'], () =>
         toggle('showNonRainbow', () => state.showNonRainbow, (v) => set({ showNonRainbow: v }),
           { strong: true })),
-      // Only offered once a second order is on screen: with the primary
-      // alone there is nothing to bring alongside anything, and the toggle
-      // would change precisely nothing.
-      c(['droplet'], () =>
-        toggle('splitEntry', () => state.splitEntry, (v) => set({ splitEntry: v }),
-          { strong: true, hintKey: 'splitEntryHint' }),
-        () => activeOrders().filter((k) => k >= 1).length > 1),
       c(['droplet'], () => slider({
         labelKey: 'dropletZoom', min: 0, max: ZOOM_MAX_LOG, step: 0.004,
         get: () => Math.log10(O.clamp(state.dropletZoom, 1, ZOOM_MAX)),
@@ -575,13 +552,19 @@ function buildControls() {
         onInput: (v) => set({ dropletZoom: Math.pow(10, v) }),
         hintKey: 'dropletZoomHint',
       })),
+      // The Sun's elevation, here as well as in the rain and sky scenes and
+      // reading the same way: raise it and the sunlight axis tips downward,
+      // carrying the antisolar direction with it. The droplet scene used to
+      // pin sunlight to the horizontal, so a reader arriving from the rain
+      // scene had to work out for themselves that the two pictures were the
+      // same picture.
       c(['droplet'], () => slider({
-        labelKey: 'dropletRadius', min: 0.05, max: 5, step: 0.05,
-        get: () => state.dropletRadiusMm,
-        format: (v) => `${num(v, 2)} mm`,
-        onInput: (v) => set({ dropletRadiusMm: v }),
+        labelKey: 'sunElevation', min: 0, max: 90, step: 0.5,
+        get: () => state.sunElevation,
+        format: (v) => deg(v, 1),
+        onInput: (v) => set({ sunElevation: v }),
+        hintKey: 'sunElevationDropletHint',
       })),
-      c(['droplet'], () => el('small', { class: 'ctl-hint block' }, t('dropletSizeNote'))),
     ]),
 
     /* --- which reflection families are traced at all. The bounce count lives
@@ -610,37 +593,10 @@ function buildControls() {
             });
           }),
         el('small', { class: 'ctl-hint' }, t('reflectionsHint'))), ORDERS_MATTER),
-      c(ALL, () => el('div', { class: 'ctl', dataset: { ctl: 'showFamilies' } },
-        el('span', { class: 'ctl-label' }, t('showFamilies')),
-        el('div', { class: 'stack' },
-          toggle('family0', () => state.families[0], (v) => set({ families: { 0: v } })),
-          toggle('family1', () => state.families[1], (v) => set({ families: { 1: v } })),
-          toggle('family2', () => state.families[2], (v) => set({ families: { 2: v } })),
-          toggle('family3', () => state.families[3], (v) => set({ families: { 3: v } })))), ORDERS_MATTER),
     ]),
 
     /* --- where the observer is standing, in whichever scene we are in --- */
     sceneGroup('observerGroup', [
-      c(['droplet'], () => el('div', { class: 'ctl', dataset: { ctl: 'observerPlacement' } },
-        el('span', { class: 'ctl-label' }, t('observerPlacement')),
-        segmented(
-          [{ value: 'auto', labelKey: 'observerAuto' }, { value: 'manual', labelKey: 'observerManual' }],
-          () => state.observerMode,
-          // Seed the manual angle from wherever the eye already is, so
-          // switching mode never teleports it.
-          (v) => set({ observerMode: v, observerPhi: observerPhiNow() })))),
-      c(['droplet'], () => slider({
-        labelKey: 'observerAngle', min: 0, max: 180, step: 0.1,
-        get: () => observerPhiNow(),
-        format: (v) => deg(v, 1),
-        onInput: (v) => set({ observerMode: 'manual', observerPhi: v }),
-        hintKey: 'observerAngleHint',
-      })),
-      c(['droplet'], () => chipRow(
-        chip('observerSnap', () =>
-          set({ observerMode: 'manual', observerPhi: Math.round(rainbowPhi(state.reflections) * 10) / 10 })),
-        chip('observerAuto', () => set({ observerMode: 'auto' })))),
-
       c(['drops'], () => slider({
         labelKey: 'observerDepth', min: OBS_RANGE.x[0], max: OBS_RANGE.x[1], step: 0.005,
         get: () => state.dropsObserverX,
@@ -818,10 +774,9 @@ function sliderToHeight(v) {
 function resetState() {
   set({
     wavelength: 'white', dispersion: 1, impact: 0.861, reflections: 1,
-    dropletRadiusMm: 1, dropletZoom: 1, indexMode: 'table', indexScale: 1,
-    observerMode: 'auto', observerPhi: 42.4,
+    dropletZoom: 1, indexMode: 'table', indexScale: 1,
     dropsObserverX: 0, dropsObserverY: 0,
-    showNonRainbow: false, fanCount: 0, families: { 0: false, 1: true, 2: false, 3: false },
+    showNonRainbow: false, fanCount: 24, families: { 0: false, 1: true, 2: false, 3: false },
     angleMode: 'antisolar', distRays: 60, distAccumulate: false, graphOpen: false,
     dropCount: 1, dropsAnimate: false, fieldCount: 60000,
     sunElevation: 15, sunAzimuth: 180, observerHeight: 1.7,
@@ -882,7 +837,7 @@ function rebuild() {
  */
 function controlsKey() {
   return [
-    state.scene, state.view, state.observerMode, state.mode, state.step,
+    state.scene, state.view, state.mode, state.step,
     state.selectedDrop ? 1 : 0, state.skyPick ? 1 : 0, state.fieldPick ? 1 : 0,
     state.graphOpen ? 1 : 0,
   ].join('|');

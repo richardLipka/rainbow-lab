@@ -1570,3 +1570,43 @@ one ray makes both bows. Off is still one click away, and two tutorial steps
 switch it off deliberately, because the cascade out of one entry point is what
 causes the higher orders. `state.fanCount` defaults to 9 for the same reason:
 one ray can only ever show one exit direction.
+
+## The single-droplet scene, reworked
+
+The scene had accumulated a control for everything and a picture for nothing.
+What it shows now:
+
+**One parallel beam, rim to rim.** `buildRays` sweeps b from -1 to +1, because
+that is what sunlight does. Rays entering above and below the axis leave on
+opposite sides, so the picture is symmetric and each order piles up on BOTH
+sides at its own angle. That pile-up is the bow. The previous half-face beam
+plus `splitEntry` produced two visibly separate beams entering the drop, which
+read as two droplets, and `splitEntry` is gone with it — the full beam already
+contains every entry point either family needs.
+
+**The scene tilts with the Sun.** `sunElevation` is now a droplet control too,
+and `project()` turns the whole drawing by it, so this cross-section sits the
+same way up as the rain and sky scenes and `rays.antisolarAxis()` means the
+same thing in all three. It is a rotation applied at the last moment: a sphere
+in a parallel beam has no preferred orientation, so the optics never see it.
+Anything that worked in screen space had to follow — `bearing()` for the
+arrival arc and the band edges, the tilted entry-point track and its bow
+ticks, `impactFromEvent` (which now turns the pointer back into the untilted
+frame), the Sun marker and the axis.
+
+**Removed.** Droplet radius (changed no angle and nothing else read it; the
+note explaining why size does not matter stayed, and now also explains why
+there is no control). The observer placement / angle / snap controls, and with
+them manual observer mode, `observerPhi`, the eye-drag gesture and the
+two-branch `reachesEye`. The four family checkboxes — the reflections selector
+already writes `families` cumulatively, so they were a second control for one
+setting.
+
+**Fan defaults to 24**, and non-contributing fan rays dropped to alpha 0.2 /
+width 0.7 / greyMix 0.92. At the old 0.4 a whole-face beam over two orders
+read as a thicket rather than as a background for the few bright rays.
+
+Tutorial: step 6 was "drag the eye until rays pile up", which no longer has an
+eye to drag. It is now "add more rays" — 4, then 16, then 60 — which makes the
+same point out of the thing the scene is actually built around. Step 15 lost
+its split-entry framing; the band is simply there whenever two orders are.

@@ -47,12 +47,12 @@ export const TUTORIAL = [
     title: 's1title', body: 's1body',
     apply: {
       scene: 'droplet', graph: 'exit', reflections: 2, dispersion: 1, wavelength: 650,
-      impact: 0.861, fanCount: 0, showNonRainbow: false, angleMode: 'antisolar',
-      dropletZoom: 1, observerMode: 'auto', graphOpen: false, splitEntry: true,
+      impact: 0.861, fanCount: 24, showNonRainbow: false, angleMode: 'antisolar',
+      dropletZoom: 1, graphOpen: false,
       show: { angles: true, normals: false, labels: true, renderedBow: false },
       families: { 0: false, 1: true, 2: true, 3: false },
     },
-    focus: ['splitEntry', 'reflections'],
+    focus: ['reflections', 'fanCount'],
     actions: [
       {
         labelKey: 'bowName1',
@@ -72,7 +72,7 @@ export const TUTORIAL = [
     apply: {
       scene: 'droplet', graph: 'exit', reflections: 0, dispersion: 0, wavelength: 'white',
       impact: 0.6, fanCount: 0, showNonRainbow: false, angleMode: 'antisolar',
-      dropletZoom: 1, observerMode: 'auto', graphOpen: false,
+      dropletZoom: 1, graphOpen: false,
       show: { angles: false, normals: false, labels: true, renderedBow: false },
       families: { 0: true, 1: false, 2: false, 3: false },
     },
@@ -141,25 +141,22 @@ export const TUTORIAL = [
       // One wavelength, full dispersion: the tally then counts exactly the
       // rays that are visible on screen (under white light all six overlap
       // at once and it would read 48/276 for 46 visible lines), and the
-      // angle being hunted for is the real n(650) one the rest of the app
-      // quotes rather than the mean-index 41.9 that dispersion=0 produces.
-      scene: 'droplet', graph: 'exit', reflections: 1, fanCount: 45, dispersion: 1,
-      wavelength: 650, impact: 0.861, dropletZoom: 2.6, observerMode: 'manual', observerPhi: 30,
+      // angle in play is the real n(650) one the rest of the app quotes
+      // rather than the mean-index 41.9 that dispersion=0 produces.
+      scene: 'droplet', graph: 'exit', reflections: 1, fanCount: 4, dispersion: 1,
+      wavelength: 650, impact: 0.861, dropletZoom: 2.6,
       panel: 'guide', graphOpen: false, show: { angles: true, normals: false, labels: true },
       families: { 0: false, 1: true, 2: false, 3: false },
     },
-    focus: ['observerAngle', 'observerPlacement'],
+    focus: ['fanCount', 'impactParameter'],
+    // Deliberately starting at four rays: a sparse beam shows every ray
+    // leaving in its own direction, and only as the count climbs do they
+    // stop spreading and stack up along one. Handing the reader a dense beam
+    // first shows the answer without the comparison.
     actions: [
-      { label: '30°', patch: { observerMode: 'manual', observerPhi: 30 } },
-      { label: '38°', patch: { observerMode: 'manual', observerPhi: 38 } },
-      {
-        labelKey: 'observerSnap',
-        patch: () => ({
-          observerMode: 'manual',
-          observerPhi: Math.round(O.rainbowGeometry(indexModel()(650), 1).antisolarDeg * 10) / 10,
-        }),
-      },
-      { label: '55°', patch: { observerMode: 'manual', observerPhi: 55 } },
+      { label: '4', patch: { fanCount: 4 } },
+      { label: '16', patch: { fanCount: 16 } },
+      { label: '60', patch: { fanCount: 60 } },
     ],
     note: 'explObserverAngle',
   },
@@ -257,7 +254,7 @@ export const TUTORIAL = [
     title: 's12title', body: 's12body',
     apply: {
       scene: 'droplet', graph: 'exit', wavelength: 'white', dispersion: 0, reflections: 1,
-      fanCount: 0, dropletZoom: 9, observerMode: 'auto', graphOpen: true,
+      fanCount: 0, dropletZoom: 9, graphOpen: true,
       show: { wavelengthLabels: true, angles: true },
       families: { 0: false, 1: true, 2: false, 3: false },
     },
@@ -284,7 +281,7 @@ export const TUTORIAL = [
       // arrival arc is the point of this step. 45 gives the secondary's
       // narrower caustic enough rays to bunch visibly.
       scene: 'droplet', panel: 'guide', wavelength: 650, dispersion: 1,
-      reflections: 2, fanCount: 45, dropletZoom: 1, observerMode: 'auto',
+      reflections: 2, fanCount: 45, dropletZoom: 1,
       graphOpen: false, showNonRainbow: false,
       families: { 0: false, 1: true, 2: true, 3: false },
       show: { angles: false, normals: false, labels: true, renderedBow: false },
@@ -330,12 +327,12 @@ export const TUTORIAL = [
     title: 's13ctitle', body: 's13cbody',
     apply: {
       scene: 'droplet', panel: 'guide', wavelength: 650, dispersion: 1,
-      reflections: 2, fanCount: 0, dropletZoom: 1, observerMode: 'auto',
-      graphOpen: false, showNonRainbow: false, splitEntry: true,
+      reflections: 2, fanCount: 32, dropletZoom: 1,
+      graphOpen: false, showNonRainbow: false,
       families: { 0: false, 1: true, 2: true, 3: false },
       show: { angles: true, normals: false, labels: true, renderedBow: false },
     },
-    focus: ['splitEntry', 'impactParameter'],
+    focus: ['reflections', 'impactParameter'],
     actions: [
       {
         labelKey: 'bowName1',
@@ -345,7 +342,6 @@ export const TUTORIAL = [
         labelKey: 'bowName2',
         patch: () => ({ impact: O.rainbowGeometry(indexModel()(650), 2).impactParameter }),
       },
-      { labelKey: 'splitEntry', patch: { splitEntry: false } },
     ],
     note: 'explAlexander',
     showRay: true,
@@ -373,11 +369,7 @@ export const TUTORIAL = [
 export function applyStep(i) {
   const s = TUTORIAL[i];
   if (!s) return;
-  // Split entry is the one droplet setting a step must opt INTO. It changes
-  // where the rays enter, so left sticky it would silently rewrite every
-  // later step's picture -- and a reader who turned it on by hand three steps
-  // ago has long stopped expecting it.
-  set({ splitEntry: false, ...s.apply, step: i });
+  set({ ...s.apply, step: i });
 }
 
 function renderTutorial() {

@@ -28,7 +28,6 @@ export const state = {
   /* droplet & optics */
   impact: 0.861, // b/R
   reflections: 1,
-  dropletRadiusMm: 1.0,
   indexMode: 'table',
   indexScale: 1,
 
@@ -38,42 +37,19 @@ export const state = {
      fan of colour becomes visible on its way to the eye. */
   dropletZoom: 1,
 
-  /* Where the single-droplet observer's eye sits.
-     'auto'   -- one eye per active reflection family, each exactly along its
-                 own rainbow direction (the app tells you where to stand).
-     'manual' -- one eye at state.observerPhi, so the angle is the thing the
-                 user steers and ~42 deg is something they find rather than
-                 something they are shown. In manual mode a ray is emphasised
-                 when it really does point at THAT eye, so the emphasis is a
-                 geometric consequence of where the eye is, not a label. */
-  observerMode: 'auto', // 'auto' | 'manual'
-  observerPhi: 42.4, // antisolar angle (deg) of the manually placed eye
-
   /* rays */
   showNonRainbow: false,
-
-  /* Let each reflection order enter the droplet through whichever half puts
-     its light on the common side.
-
-     ON by default. The primary and the secondary are different trajectories
-     through different entry points -- 0.862 and 0.950 -- and a picture that
-     traces both orders from one entry point says the opposite: that one ray
-     makes both bows. It does split into every order at every wall, which is
-     worth seeing, but only the order whose own caustic it sits on is a bow.
-     Off, the two exits also land 92.8 deg apart on screen, when the sky puts
-     them 8.2 deg apart.
-
-     Turning it off is still offered, because the cascade out of a single
-     entry point is what CAUSES the higher orders, and two tutorial steps
-     switch it off to show exactly that. With one order on screen it changes
-     nothing, so the control only appears once a second order is active. */
-  splitEntry: true,
+  /* Which orders are traced. Written only by the reflections selector, which
+     is cumulative: picking k shows every order up to k, because the angles
+     are only worth anything next to each other. */
   families: { 0: false, 1: true, 2: false, 3: false },
-  /* 0 draws a single ray. Free mode starts with a small fan instead: one ray
-     can only ever show one exit direction, and the thing worth seeing is that
-     neighbouring entry points leave together near the bow and fan apart away
-     from it. Tutorial steps that want a bare ray ask for 0. */
-  fanCount: 9,
+  /* How many parallel rays cross the droplet face, rim to rim.
+     0 draws the single ray at state.impact and nothing else.
+
+     Sunlight covers the whole face at once, so the beam does too: b runs from
+     -1 to +1 and the reader watches where the exits bunch up. That bunching
+     IS the bow, and no single ray can show it. */
+  fanCount: 24,
 
   /* graph */
   angleMode: 'antisolar', // 'antisolar' | 'scattering' | 'deviation'

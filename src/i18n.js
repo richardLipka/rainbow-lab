@@ -71,6 +71,13 @@ export const translations = {
 
     /* ---- controls: sun ---- */
     sun: 'Slunce',
+    dropletSizeNote:
+      'Velikost kapky s úhlem skoro nic nedělá: geometrická optika dá stejných 42° pro kapku 0,1 mm '
+      + 'i pro kapku 5 mm. Na velikosti závisí ostrost a sytost skutečné duhy, jenže to je vlnová '
+      + 'optika, kterou tahle simulace nepočítá. Proto tu žádný ovladač velikosti nenajdete.',
+    sunElevationDropletHint:
+      'Stejný ovladač jako ve scénách s deštěm a oblohou. Čím výš Slunce, tím níž míří antisolární '
+      + 'směr — a řez kapkou se naklápí s ním, aby obě scény seděly na sebe.',
     sunElevation: 'Výška Slunce nad obzorem',
     sunAzimuth: 'Azimut Slunce',
     observer: 'Pozorovatel',
@@ -97,7 +104,6 @@ export const translations = {
 
     /* ---- controls: droplet & optics ---- */
     droplet: 'Kapka',
-    dropletRadius: 'Poloměr kapky',
     dropletZoom: 'Oddálení pohledu',
     dropletZoomHint: 'Oddalte pohled a sledujte, jak se barvy paprsku rozestupují na cestě k oku pozorovatele.',
     impactParameter: 'Parametr dopadu b/R',
@@ -118,19 +124,7 @@ export const translations = {
     /* ---- controls: rays ---- */
     rays: 'Paprsky',
     showNonRainbow: 'Zobrazit paprsky mimo duhu',
-    splitEntry: 'Každý řád vlastním vstupem',
-    splitEntryHint:
-      'Slunce osvětluje celou přední stěnu kapky naráz. Sekundární duhu tedy staví paprsky, '
-      + 'které vstupují horní polovinou, zatímco primární staví ty ze spodní. Zapnuto: každý řád '
-      + 'vstupuje tou polovinou, která jeho světlo pošle na společnou stranu, a obě duhy vyjdou '
-      + 'vedle sebe 8,2° od sebe. Vypnuto: jeden vstupní bod, ze kterého se řády odštěpují — '
-      + 'to je příčina sekundární duhy, ale oči pak leží 92,8° od sebe.',
     alexanderBandLabel: 'Alexandrův temný pás',
-    showFamilies: 'Zobrazené rodiny paprsků',
-    family0: '0 odrazů',
-    family1: '1 odraz (primární)',
-    family2: '2 odrazy (sekundární)',
-    family3: '3+ odrazy (vyšší řád)',
     rayFan: 'Svazek paprsků',
     fanCount: 'Počet paprsků ve svazku',
 
@@ -322,8 +316,6 @@ export const translations = {
       'Simulace počítá jen geometrickou optiku. Nepočítá interferenci, ohyb, Mieův rozptyl, vedlejší (supernumerární) oblouky ani polarizaci. Velmi malé kapky vyžadují vlnovou optiku.',
 
     /* ---- droplet size note ---- */
-    dropletSizeNote:
-      'Úhlová poloha duhy na velikosti kapky prakticky nezávisí — geometrická optika dává stejné úhly pro kapku 0,1 mm i 5 mm. Ostrost a barevnost skutečné duhy na velikosti kapek závisí, ale to je jev vlnové optiky, který tato simulace nepočítá.',
 
     /* ---- tutorial ---- */
     tutorial: 'Průvodce',
@@ -373,26 +365,17 @@ export const translations = {
     s12title: 'Odkud jsou barvy?',
     s12body:
       'Index lomu vody závisí na vlnové délce. Posuňte disperzi z 0 % na 100 % a jediný úhel se rozpadne na pás barev. Graf dole se rozpadne s ním — na jednu křivku pro každou vlnovou délku.',
-    s13ctitle: 'Osm stupňů, ne devadesát',
+    s13ctitle: 'Pás, do kterého nic nepřijde',
     s13cbody:
-      'Do teď vstupoval každý řád stejným bodem. Zapněte „každý řád vlastním vstupem“ a sekundární '
-      + 'paprsek projde horní polovinou kapky — přesně jak to dělá Slunce, které osvětluje celou '
-      + 'přední stěnu naráz. Oba paprsky pak odcházejí vedle sebe. Mezi nimi je klín, do kterého '
-      + 'nevychází světlo ani prvního, ani druhého řádu, při žádném vstupním bodu. To je Alexandrův '
-      + 'temný pás. Vypněte přepínač a stejné dva paprsky se rozletí 92,8° od sebe.',
+      'Dva řády naráz, plný svazek přes celou kapku. Každý řád si najde svůj úhel a mezi nimi zůstane klín, '
+      + 'do kterého nevychází nic — ani po jednom odrazu, ani po dvou, při žádném místě dopadu. '
+      + 'To je Alexandrův temný pás. Na obloze je to ten tmavší proužek mezi hlavní a vedlejší duhou.',
     s13title: 'Může být duh víc?',
     s13body:
       'A takhle to dopadne na obloze. Dva prstence, ten vnější slabší a s obráceným pořadím barev, a mezi nimi Alexandrův temný pás — přesně ta mezera, ze které se obě křivky odvracely.',
 
 /* ---- controls: the observer ---- */
     observerGroup: 'Pozorovatel',
-    observerPlacement: 'Umístění oka',
-    observerAuto: 'automaticky',
-    observerManual: 'ručně',
-    observerAngle: 'Úhel pozorovatele φ',
-    observerAngleHint:
-      'Kam se pozorovatel postaví, měřeno od antisolárního směru. Táhněte okem přímo v obrázku nebo tímto posuvníkem a hledejte úhel, ve kterém do oka dorazí nejvíc paprsků.',
-    observerSnap: 'Na duhu',
     observerDepth: 'Pozorovatel — dopředu / dozadu',
     observerRise: 'Pozorovatel — nahoru / dolů',
     observerMoveHint:
@@ -400,17 +383,17 @@ export const translations = {
     observerRecentre: 'Zpět na výchozí místo',
     indexGroup: 'Index lomu (pokročilé)',
     observerOnBow: '✓ přesně na duze',
-    observerManualHint:
-      'Zvýrazněné paprsky vycházejí přesně pod tím úhlem, ve kterém stojí oko. Čím víc jich je, tím jasnější je ten směr.',
     dropsMoveHint: 'Přetáhněte pozorovatele — duha se přesune s vámi na jiné kapky.',
     obsChipForward: 'dál do deště',
     obsChipUp: 'výš',
     obsChipDown: 'níž',
 
     /* ---- tutorial: the two observer steps ---- */
-    s6title: 'Kde musí pozorovatel stát?',
+    s6title: 'Přidávejte paprsky',
     s6body:
-      'Oko teď ovládáte vy. Táhněte jím po obrázku (nebo použijte posuvník úhlu) a sledujte počítadlo paprsků vpravo nahoře. Ve většině úhlů dorazí do oka jeden nebo dva paprsky. V jednom jediném úhlu jich dorazí celý svazek — a přesně pod tím úhlem vidíme duhu.',
+      'Čtyři rovnoběžné paprsky, čtyři různé směry ven. Nic zvláštního. Přidejte jich šestnáct a pak šedesát '
+      + 'a sledujte, kde se začnou hromadit. Většina směrů zůstane skoro prázdná, jeden se zaplní. '
+      + 'Tam je oko. Duha není směr, kterým letí paprsek, ale směr, kterým jich letí naráz mnoho.',
     explObserverAngle:
       'Úhel φ se měří u pozorovatele: mezi pohledem na kapku a antisolárním směrem, tedy směrem, kterým sluneční světlo letělo dál. Je to přesně totéž φ, které ukazuje výpis u výstupu paprsku.',
     s9title: 'Duha není na jednom místě',
@@ -586,6 +569,14 @@ export const translations = {
 
     /* ---- controls: sun ---- */
     sun: 'Sun',
+    dropletSizeNote:
+      'Droplet size barely touches the angle: geometric optics gives the same 42° for a 0.1 mm drop '
+      + 'and a 5 mm one. Size decides how sharp and how saturated a real bow looks, and that is wave '
+      + 'optics, which this simulation does not compute. So there is no size control here.',
+    sunElevationDropletHint:
+      'The same control the rain and sky scenes use. The higher the Sun, the further the antisolar '
+      + 'direction tips below the horizontal — and this cross-section tilts with it, so the two '
+      + 'pictures line up.',
     sunElevation: 'Height of the Sun above the horizon',
     sunAzimuth: 'Sun azimuth',
     observer: 'Observer',
@@ -612,7 +603,6 @@ export const translations = {
 
     /* ---- controls: droplet & optics ---- */
     droplet: 'Droplet',
-    dropletRadius: 'Droplet radius',
     dropletZoom: 'Zoom out',
     dropletZoomHint: 'Zoom out to watch the ray colours spread apart on their way to the eye.',
     impactParameter: 'Impact parameter b/R',
@@ -633,19 +623,7 @@ export const translations = {
     /* ---- controls: rays ---- */
     rays: 'Rays',
     showNonRainbow: 'Show non-rainbow rays',
-    splitEntry: 'Each order enters its own half',
-    splitEntryHint:
-      'The Sun lights the whole face of the drop at once. So the secondary bow is built by rays '
-      + 'entering the top half while the primary is built by rays entering the bottom. On: every '
-      + 'order enters through whichever half sends its light to the common side, and the two bows '
-      + 'leave side by side, 8.2° apart. Off: one entry point with the orders peeling off it — '
-      + 'that is what causes the secondary bow, but it puts the two eyes 92.8° apart.',
     alexanderBandLabel: "Alexander's dark band",
-    showFamilies: 'Ray families shown',
-    family0: '0 reflections',
-    family1: '1 reflection (primary)',
-    family2: '2 reflections (secondary)',
-    family3: '3+ reflections (higher order)',
     rayFan: 'Fan of rays',
     fanCount: 'Rays in the fan',
 
@@ -838,8 +816,6 @@ export const translations = {
       'Geometric optics only. The simulation does not compute interference, diffraction, Mie scattering, supernumerary bows or polarisation. Very small droplets require wave optics.',
 
     /* ---- droplet size note ---- */
-    dropletSizeNote:
-      'The angular position of the bow is essentially independent of droplet size — geometric optics gives the same angles for a 0.1 mm and a 5 mm drop. The sharpness and colour purity of a real rainbow do depend on droplet size, but that is a wave-optical effect this simulation does not compute.',
 
     /* ---- tutorial ---- */
     tutorial: 'Tutorial',
@@ -890,26 +866,17 @@ export const translations = {
     s12title: 'Where do the colours come from?',
     s12body:
       "Water's refractive index depends on wavelength. Move dispersion from 0 % to 100 % and a single angle splits into a band of colours. The graph below splits with it, one curve per wavelength.",
-    s13ctitle: 'Eight degrees, not ninety',
+    s13ctitle: 'The band nothing arrives in',
     s13cbody:
-      'Every order has entered at the same point until now. Switch on "each order enters its own '
-      + 'half" and the secondary ray goes through the top of the drop — which is what the Sun does, '
-      + 'lighting the whole face at once. Now both rays leave side by side. The wedge between them '
-      + "takes no light of either order, at any entry point. That is Alexander's dark band. Turn "
-      + 'the switch off and those same two rays fly 92.8° apart.',
+      'Two orders at once, the beam covering the whole drop. Each order finds its own angle, and a wedge is '
+      + 'left between them that takes no light at all — not after one bounce, not after two, at no entry '
+      + "point. That is Alexander's dark band. In the sky it is the darker strip between the two bows.",
     s13title: 'Can there be another rainbow?',
     s13body:
       "And here is how it lands in the sky. Two rings, the outer one fainter and with its colours reversed, and between them Alexander's dark band — the very gap both curves were turning away from.",
 
 /* ---- controls: the observer ---- */
     observerGroup: 'Observer',
-    observerPlacement: 'Eye placement',
-    observerAuto: 'automatic',
-    observerManual: 'manual',
-    observerAngle: 'Observer angle φ',
-    observerAngleHint:
-      'Where the observer stands, measured from the antisolar direction. Drag the eye in the picture, or use this slider, and hunt for the angle where the most rays arrive.',
-    observerSnap: 'Snap to the bow',
     observerDepth: 'Observer — forward / back',
     observerRise: 'Observer — up / down',
     observerMoveHint:
@@ -917,17 +884,17 @@ export const translations = {
     observerRecentre: 'Back to the starting point',
     indexGroup: 'Refractive index (advanced)',
     observerOnBow: '✓ exactly on the bow',
-    observerManualHint:
-      'Highlighted rays leave at exactly the angle the eye sits at. The more of them there are, the brighter that direction.',
     dropsMoveHint: 'Drag the observer — the bow moves with you, onto different droplets.',
     obsChipForward: 'further into the rain',
     obsChipUp: 'higher',
     obsChipDown: 'lower',
 
     /* ---- tutorial: the two observer steps ---- */
-    s6title: 'Where does the observer have to stand?',
+    s6title: 'Add more rays',
     s6body:
-      'The eye is yours now. Drag it across the picture (or use the angle slider) and watch the ray tally in the top right. Most angles give one or two rays. One angle gives a whole bundle at once — and that is the angle a rainbow is seen at.',
+      'Four parallel rays, four different directions out. Nothing special. Put sixteen in, then sixty, and '
+      + 'watch where they start to stack. Most directions stay nearly empty; one fills up. That is where '
+      + 'the eye is. A rainbow is not the direction a ray goes — it is the direction a crowd of them goes at once.',
     explObserverAngle:
       'φ is measured at the observer: between the line of sight to the droplet and the antisolar direction, the direction the sunlight was already travelling. It is the same φ the exit readout prints.',
     s9title: 'A rainbow is not in a place',
