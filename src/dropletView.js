@@ -901,6 +901,17 @@ export function createDropletView(canvas) {
     if (!p.hit || !p.vertices.length) return;
     const n = ray.n;
     const crit = O.criticalAngle(n, 1);
+    // What is left of the original beam by the time it leaves each wall. The
+    // per-wall numbers say what happens THERE; this says what it has cost so
+    // far, which is the number that explains why a third bow is not a thing
+    // anyone sees. Multiplying it out along the path lands on exactly
+    // bowBrightness().survives -- checked in the tests, for every order.
+    let remains = 1;
+    // Where text has already landed. At k = 4 there are six walls around a
+    // droplet a couple of hundred pixels across, and two lines at each one
+    // overlapped into a smear. The ring is always drawn; the caption gives
+    // way, exactly as the bow ticks on the entry track do.
+    const placed = [];
 
     for (let vi = 0; vi < p.vertices.length; vi++) {
       const v = p.vertices[vi];
@@ -914,6 +925,7 @@ export function createDropletView(canvas) {
         ? O.fresnelReflectance(v.thetaIn, n, 1)
         : O.fresnelReflectance(v.thetaIn, 1, n);
       const tir = inside && crit !== null && v.thetaIn > crit;
+      remains *= v.type === 'reflection' ? R : 1 - R;
 
       if (v.type === 'reflection') {
         // The part that does NOT reflect: it refracts out and is gone. Drawn
@@ -953,10 +965,20 @@ export function createDropletView(canvas) {
         : v.type === 'reflection'
           ? `${t('wallPartial')} ${num(R * 100, 1)} %`
           : `${t('wallThrough')} ${num((1 - R) * 100, 1)} %`;
-      label(ctx, text,
-        O.clamp(lab.x, 58, layout.w - 58), O.clamp(lab.y, 14, layout.h - 16), {
-          align: 'center',
-          color: tir ? '#ffcf6a' : v.type === 'reflection' ? '#8fd8ff' : '#9fe3b6',
+      const lx = O.clamp(lab.x, 58, layout.w - 58);
+      const ly = O.clamp(lab.y, 14, layout.h - 28);
+      if (placed.some((q) => Math.abs(q.x - lx) < 96 && Math.abs(q.y - ly) < 26)) continue;
+      placed.push({ x: lx, y: ly });
+      label(ctx, text, lx, ly, {
+        align: 'center',
+        color: tir ? '#ffcf6a' : v.type === 'reflection' ? '#8fd8ff' : '#9fe3b6',
+        font: '10px "IBM Plex Mono", ui-monospace, monospace',
+      });
+      // Dimmer, and under the local number, because it answers a different
+      // question: not "what happens here" but "what is left by here".
+      label(ctx, `${num(remains * 100, remains < 0.01 ? 3 : 1)} % ${t('wallRemains')}`,
+        lx, ly + 12, {
+          align: 'center', color: '#c9a94f', bg: false,
           font: '10px "IBM Plex Mono", ui-monospace, monospace',
         });
     }
@@ -967,6 +989,11 @@ export function createDropletView(canvas) {
       `θ_c = ${deg(crit * O.DEG, 1)} · θ_r = ${deg((p.thetaR || 0) * O.DEG, 1)} · ${t('wallNeverTotal')}`,
       layout.w - 12, layout.h - 30,
       { align: 'right', color: '#8fa4c8',
+        font: '10px "IBM Plex Mono", ui-monospace, monospace' });
+    label(ctx,
+      `${t('wallBudget')} ${num(remains * 100, remains < 0.01 ? 3 : 2)} %`,
+      layout.w - 12, layout.h - 44,
+      { align: 'right', color: '#c9a94f',
         font: '10px "IBM Plex Mono", ui-monospace, monospace' });
   }
 

@@ -1726,3 +1726,59 @@ all. `activeOrders().join(',')` is in the key now.
 
 Worth the habit: when a control's CONTENTS are derived from state, that state
 belongs in `controlsKey()`, not just the state the control writes.
+
+## The running light budget on the wall markers
+
+Each wall marker gained a second line: the local number stays ("through
+94.3 %", "reflects 5.7 %") and under it, dimmer, what is left of the ORIGINAL
+beam by that point. Walking the path vertex by vertex and multiplying
+(1-R) at each refraction and R at each reflection lands exactly on
+`bowBrightness().survives`, which gets there by the closed form (1-R)^2 R^k --
+asserted to 1e-12 for 3 wavelengths x 4 orders.
+
+Measured at n(650), each bow ray at its own caustic:
+
+| k | chain of what remains | ends at |
+|---|---|---|
+| 1 | 94.267 -> 5.405 -> 5.095 | **5.095 %** |
+| 2 | 84.208 -> 13.298 -> 2.100 -> 1.768 | **1.768 %** |
+| 3 | 74.576 -> 18.960 -> 4.820 -> 1.226 -> 0.914 | **0.914 %** |
+
+The footer repeats the end of the chain, which is the number that explains why
+nobody sees a third bow better than any sentence does.
+
+One layout fix it forced: at k = 4 there are six walls around a droplet a
+couple of hundred pixels across, and two lines at each one smeared together.
+Captions now give way when they would land within 96 x 26 px of one already
+placed; the ring is always drawn. Same rule `drawBowMarks` uses on the entry
+track.
+
+## The droplet scene's default, and the bow chips as a selector
+
+**Default is now one white beam on the primary.** `fanCount` back to 0 in both
+`state.js` and `resetState()`: the whole-face beam is the second thing to look
+at, not the first. Everything else was already right -- white light,
+`reflections: 1`, `impact` on the primary's caustic.
+
+But a reader never reached those defaults. Leaving the tutorial kept whatever
+step they stopped on, and step 1 alone opens on two bows in red light with a
+24-ray beam, so Free mode started mid-explanation. The tutorial -> free switch
+now calls `resetState()`. It deliberately does NOT reset `scene`: a reader
+leaving the sky step should stay in the sky, and clicking "Single droplet"
+then gives them the defaults.
+
+**The chip row is the "which rainbow" selector.** It lists all four bows
+always (`BOW_ORDERS`), not `activeOrders()` -- built from the traced orders it
+could not offer the secondary until the secondary was already showing, which
+made it useless as a way of getting there. Picking one sets the reflection
+count to the minimum that bow needs (secondary -> 2, not 4) and the count
+stays cumulative, so the primary is still there to compare against.
+
+Two things this needed:
+
+- `bowEntry(k, n, refOrder)` grew an explicit reference order. The chips pass
+  1, because they are offered for orders that are not traced yet and the
+  label has to match where the ray will land after the click.
+- The active chip needs a `sync()`, not a class fixed at build time. Which bow
+  is showing changes on every drag of the impact slider, and the control
+  column does not rebuild for that.

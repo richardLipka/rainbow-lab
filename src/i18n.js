@@ -134,6 +134,8 @@ export const translations = {
     wallThrough: 'projde',
     wallPartial: 'odrazí se',
     wallTotal: 'úplný odraz',
+    wallRemains: 'zbývá z paprsku',
+    wallBudget: 'do oka dorazí z původního paprsku',
     wallNeverTotal: 'θ_r < θ_c, takže k úplnému odrazu nikdy nedojde',
     explNoTotalReflection:
       'Skoro každý výklad tvrdí, že uvnitř kapky nastává úplný vnitřní odraz. Nenastává a nastat '
@@ -653,6 +655,8 @@ export const translations = {
     wallThrough: 'through',
     wallPartial: 'reflects',
     wallTotal: 'total reflection',
+    wallRemains: 'of the beam left',
+    wallBudget: 'reaches the eye, of the original beam:',
     wallNeverTotal: 'θ_r < θ_c, so total reflection never happens',
     explNoTotalReflection:
       'Nearly every explanation says the bounces inside a raindrop are total internal reflection. '

@@ -95,6 +95,12 @@ function buildHeader() {
         () => state.mode,
         (v) => {
           if (v === 'tutorial') applyStep(state.step);
+          // Leaving the tutorial hands back the scene defaults rather than
+          // whatever step the reader happened to stop on. Step 1 alone opens
+          // on two bows in red light with a 24-ray beam, so "free mode"
+          // used to start mid-explanation with no way back to the plain
+          // picture short of reloading.
+          else resetState();
           set({ mode: v, panel: 'guide' });
           rebuild();
         }
@@ -431,6 +437,13 @@ function sceneGroup(titleKey, items, opts) {
   return opts ? group(titleKey, ...kids, opts) : group(titleKey, ...kids);
 }
 
+/**
+ * The bows the chip row offers, matching the range of the reflections
+ * selector. k = 0 has no bow -- no internal reflection, no caustic, nothing
+ * concentrated to stand in front of.
+ */
+const BOW_ORDERS = [1, 2, 3, 4];
+
 const chipRow = (...chips) => el('div', { class: 'action-row' }, ...chips);
 const chip = (labelKey, onclick) => el('button', { class: 'chip', type: 'button', onclick }, t(labelKey));
 
@@ -520,28 +533,50 @@ function buildControls() {
         onInput: (v) => set({ impact: v }),
         hintKey: 'impactParameterHint',
       })),
-      // One chip per bow on screen, each jumping to that bow's own entry
-      // position. Computed from rainbowGeometry, never written down -- and it
-      // is the demonstration that the secondary is a different ray, not a
-      // different droplet: the entry point slides towards the rim and the eye
-      // that lights up changes with it.
-      c(['droplet'], () => el('div', { class: 'ctl', dataset: { ctl: 'bowRays' } },
-        el('span', { class: 'ctl-label' }, t('bowRayChips')),
-        el('div', { class: 'chip-row' },
-          activeOrders().filter((k) => k >= 1).map((k) => {
-            // The SIGNED entry, so picking a bow moves the ray to the half of
-            // the face whose light heads towards the observer. Jumping to
-            // +0.951 for the secondary put it on the half that fires the
-            // other way, and the tick on the entry track disagreed with the
-            // chip that was supposed to land on it.
-            const b = bowEntry(k, indexModel()(650));
-            if (b === null) return null;
-            return el('button', {
-              class: 'chip', type: 'button',
-              onclick: () => set({ impact: b, selectedRay: null }),
-            }, `${t(bowNameKey(k), { k })} · ${num(b, 3)}`);
-          }).filter(Boolean))),
-        () => activeOrders().some((k) => k >= 1)),
+      /*
+       * The "which rainbow" selector.
+       *
+       * Every bow, always, whatever is currently traced. Built from
+       * activeOrders() it could not offer the secondary until the secondary
+       * was already showing, which made it useless as a way of getting there.
+       *
+       * Picking one sets the reflection count to the minimum that bow needs
+       * -- two bounces for the secondary, not four -- and the count stays
+       * cumulative, so the primary is still on screen to compare against.
+       * The entry is SIGNED, so the ray moves to the half of the face whose
+       * light heads towards the observer, with the reference order pinned to
+       * 1 because that is what the click is about to make the lowest traced
+       * order.
+       */
+      c(['droplet'], () => {
+        const chips = BOW_ORDERS.map((k) => {
+          const b = bowEntry(k, indexModel()(650), 1);
+          if (b === null) return null;
+          const node = el('button', {
+            class: 'chip', type: 'button',
+            onclick: () => set({
+              reflections: k,
+              families: { 0: false, 1: k >= 1, 2: k >= 2, 3: k >= 3 },
+              impact: b,
+              selectedRay: null,
+            }),
+          }, `${t(bowNameKey(k), { k })} · ${num(b, 3)}`);
+          // Which bow is showing changes on every drag of the impact slider,
+          // and the control column does not rebuild for that. Without a
+          // syncer the highlight was whatever it had been at build time.
+          node.sync = () => {
+            node.classList.toggle(
+              'active',
+              state.reflections === k && Math.abs(state.impact - b) < 0.004
+            );
+          };
+          node.sync();
+          return node;
+        }).filter(Boolean);
+        return el('div', { class: 'ctl', dataset: { ctl: 'bowRays' } },
+          el('span', { class: 'ctl-label' }, t('bowRayChips')),
+          el('div', { class: 'chip-row' }, chips));
+      }),
       c(['droplet'], () => slider({
         labelKey: 'fanCount', min: 0, max: 60, step: 1,
         get: () => state.fanCount,
@@ -782,7 +817,7 @@ function resetState() {
     wavelength: 'white', dispersion: 1, impact: 0.861, reflections: 1,
     dropletZoom: 1, indexMode: 'table', indexScale: 1,
     dropsObserverX: 0, dropsObserverY: 0,
-    showNonRainbow: false, fanCount: 24, families: { 0: false, 1: true, 2: false, 3: false },
+    showNonRainbow: false, fanCount: 0, families: { 0: false, 1: true, 2: false, 3: false },
     angleMode: 'antisolar', distRays: 60, distAccumulate: false, graphOpen: false,
     dropCount: 1, dropsAnimate: false, fieldCount: 60000,
     sunElevation: 15, sunAzimuth: 180, observerHeight: 1.7,
@@ -790,7 +825,7 @@ function resetState() {
     eyeAzimuth: 0, eyeElevation: 12, fov: 75,
     selectedRay: null, selectedDrop: null, skyPick: null, fieldPick: null,
     show: {
-      normals: false, angles: true, labels: true, wavelengthLabels: false,
+      normals: false, angles: true, labels: true, wavelengthLabels: false, walls: true,
       droplets: true, cone: true, antisolar: true, horizon: true, ground: true,
       renderedBow: false, alexander: true, primary: true, secondary: false,
       higher: false, sky: true, rainBelow: false,

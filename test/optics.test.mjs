@@ -1190,3 +1190,46 @@ test("jumping to a bow puts the ray on the half that aims at the observer", asyn
   state.reflections = 1;
   assert.ok(bowEntry(1, n) > 0, 'the sole order keeps the reference half');
 });
+
+test('the per-wall losses multiply out to the Fresnel budget', () => {
+  // The scene prints a local number at each wall (how much goes through, how
+  // much reflects on) and a running number beside it (how much of the
+  // original beam is left by there). This is the running number, computed the
+  // way drawWallMarks computes it -- vertex by vertex, from the angles the
+  // trace measured -- and it has to land exactly on bowBrightness().survives,
+  // which gets there by the closed form (1-R)^2 R^k.
+  for (const lambda of [420, 589, 650]) {
+    const n = O.cauchyIndex(lambda);
+    for (const k of [1, 2, 3, 4]) {
+      const geo = O.rainbowGeometry(n, k);
+      const p = O.traceRay({
+        origin: O.vec(-6, geo.impactParameter, 0), dir: O.vec(1, 0, 0),
+        center: O.vec(0, 0, 0), radius: 1, n, reflections: k, exitLength: 6,
+      });
+      let remains = 1;
+      for (let i = 0; i < p.vertices.length; i++) {
+        const v = p.vertices[i];
+        const inside = v.type === 'reflection' || i === p.vertices.length - 1;
+        const R = inside
+          ? O.fresnelReflectance(v.thetaIn, n, 1)
+          : O.fresnelReflectance(v.thetaIn, 1, n);
+        remains *= v.type === 'reflection' ? R : 1 - R;
+      }
+      close(remains, O.bowBrightness(n, k).survives, 1e-12,
+        `lambda=${lambda} k=${k}: walk-the-path budget vs (1-R)^2 R^k`);
+      // It only ever goes down, and it never reaches zero.
+      assert.ok(remains > 0 && remains < 1, `k=${k} budget ${remains} is a proper fraction`);
+    }
+  }
+
+  // Each extra order costs about the same factor again, which is the whole
+  // reason nobody sees a third bow: measured at n(650), roughly 2.9x, 1.9x
+  // and 1.6x down from the one before.
+  const n = O.cauchyIndex(650);
+  let prev = null;
+  for (const k of [1, 2, 3, 4]) {
+    const s = O.bowBrightness(n, k).survives;
+    if (prev !== null) assert.ok(s < prev, `k=${k} survives less than k=${k - 1}`);
+    prev = s;
+  }
+});

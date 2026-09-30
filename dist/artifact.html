@@ -417,6 +417,14 @@ select {
   cursor: pointer;
 }
 .chip:hover { color: var(--fg); border-color: var(--accent); }
+/* The bow the scene is currently showing. The chip row is a selector now,
+   so one of its buttons has to look chosen. */
+.chip.active {
+  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.chip.active:hover { color: var(--bg); }
 /* Chips inside the control column wrap rather than pushing the column wide. */
 .chip-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
 /* Supporting prose, folded away so the claim that matters stays above the
@@ -1760,6 +1768,8 @@ const translations = {
     wallThrough: 'projde',
     wallPartial: 'odrazí se',
     wallTotal: 'úplný odraz',
+    wallRemains: 'zbývá z paprsku',
+    wallBudget: 'do oka dorazí z původního paprsku',
     wallNeverTotal: 'θ_r < θ_c, takže k úplnému odrazu nikdy nedojde',
     explNoTotalReflection:
       'Skoro každý výklad tvrdí, že uvnitř kapky nastává úplný vnitřní odraz. Nenastává a nastat '
@@ -2279,6 +2289,8 @@ const translations = {
     wallThrough: 'through',
     wallPartial: 'reflects',
     wallTotal: 'total reflection',
+    wallRemains: 'of the beam left',
+    wallBudget: 'reaches the eye, of the original beam:',
     wallNeverTotal: 'θ_r < θ_c, so total reflection never happens',
     explNoTotalReflection:
       'Nearly every explanation says the bounces inside a raindrop are total internal reflection. '
@@ -2779,12 +2791,14 @@ const state = {
      are only worth anything next to each other. */
   families: { 0: false, 1: true, 2: false, 3: false },
   /* How many parallel rays cross the droplet face, rim to rim.
-     0 draws the single ray at state.impact and nothing else.
+     0 draws the single ray at state.impact and nothing else, which is where
+     the scene starts: one beam, one path, every wall it meets labelled.
 
-     Sunlight covers the whole face at once, so the beam does too: b runs from
-     -1 to +1 and the reader watches where the exits bunch up. That bunching
-     IS the bow, and no single ray can show it. */
-  fanCount: 24,
+     Turn it up and the beam covers the whole face the way sunlight does, b
+     running from -1 to +1, and the exits bunch up at the bow angle. That
+     bunching IS the bow and no single ray can show it -- but it is the second
+     thing to look at, not the first. */
+  fanCount: 0,
 
   /* graph */
   angleMode: 'antisolar', // 'antisolar' | 'scattering' | 'deviation'
@@ -3505,11 +3519,15 @@ function bowExitSide(n, k) {
  * did not, and a chip for the secondary used to send the ray to the half that
  * points away from the observer.
  */
-function bowEntry(k, n) {
+function bowEntry(k, n, refOrder = null) {
   const geo = O.rainbowGeometry(n, k);
   if (!geo) return null;
+  // Which order defines "the side the light goes". Normally the lowest one on
+  // screen; the bow chips pass 1 explicitly, because they are offered for
+  // orders that are not traced yet and the label has to match where the ray
+  // will land once the chip is clicked.
   const orders = activeOrders().filter((j) => j >= 1);
-  const ref = orders.length ? orders[0] : k;
+  const ref = refOrder ?? (orders.length ? orders[0] : k);
   const side = k === ref ? 1 : bowExitSide(n, ref) * bowExitSide(n, k);
   return side * geo.impactParameter;
 }
@@ -5034,6 +5052,17 @@ function createDropletView(canvas) {
     if (!p.hit || !p.vertices.length) return;
     const n = ray.n;
     const crit = O.criticalAngle(n, 1);
+    // What is left of the original beam by the time it leaves each wall. The
+    // per-wall numbers say what happens THERE; this says what it has cost so
+    // far, which is the number that explains why a third bow is not a thing
+    // anyone sees. Multiplying it out along the path lands on exactly
+    // bowBrightness().survives -- checked in the tests, for every order.
+    let remains = 1;
+    // Where text has already landed. At k = 4 there are six walls around a
+    // droplet a couple of hundred pixels across, and two lines at each one
+    // overlapped into a smear. The ring is always drawn; the caption gives
+    // way, exactly as the bow ticks on the entry track do.
+    const placed = [];
 
     for (let vi = 0; vi < p.vertices.length; vi++) {
       const v = p.vertices[vi];
@@ -5047,6 +5076,7 @@ function createDropletView(canvas) {
         ? O.fresnelReflectance(v.thetaIn, n, 1)
         : O.fresnelReflectance(v.thetaIn, 1, n);
       const tir = inside && crit !== null && v.thetaIn > crit;
+      remains *= v.type === 'reflection' ? R : 1 - R;
 
       if (v.type === 'reflection') {
         // The part that does NOT reflect: it refracts out and is gone. Drawn
@@ -5086,10 +5116,20 @@ function createDropletView(canvas) {
         : v.type === 'reflection'
           ? `${t('wallPartial')} ${num(R * 100, 1)} %`
           : `${t('wallThrough')} ${num((1 - R) * 100, 1)} %`;
-      label(ctx, text,
-        O.clamp(lab.x, 58, layout.w - 58), O.clamp(lab.y, 14, layout.h - 16), {
-          align: 'center',
-          color: tir ? '#ffcf6a' : v.type === 'reflection' ? '#8fd8ff' : '#9fe3b6',
+      const lx = O.clamp(lab.x, 58, layout.w - 58);
+      const ly = O.clamp(lab.y, 14, layout.h - 28);
+      if (placed.some((q) => Math.abs(q.x - lx) < 96 && Math.abs(q.y - ly) < 26)) continue;
+      placed.push({ x: lx, y: ly });
+      label(ctx, text, lx, ly, {
+        align: 'center',
+        color: tir ? '#ffcf6a' : v.type === 'reflection' ? '#8fd8ff' : '#9fe3b6',
+        font: '10px "IBM Plex Mono", ui-monospace, monospace',
+      });
+      // Dimmer, and under the local number, because it answers a different
+      // question: not "what happens here" but "what is left by here".
+      label(ctx, `${num(remains * 100, remains < 0.01 ? 3 : 1)} % ${t('wallRemains')}`,
+        lx, ly + 12, {
+          align: 'center', color: '#c9a94f', bg: false,
           font: '10px "IBM Plex Mono", ui-monospace, monospace',
         });
     }
@@ -5100,6 +5140,11 @@ function createDropletView(canvas) {
       `θ_c = ${deg(crit * O.DEG, 1)} · θ_r = ${deg((p.thetaR || 0) * O.DEG, 1)} · ${t('wallNeverTotal')}`,
       layout.w - 12, layout.h - 30,
       { align: 'right', color: '#8fa4c8',
+        font: '10px "IBM Plex Mono", ui-monospace, monospace' });
+    label(ctx,
+      `${t('wallBudget')} ${num(remains * 100, remains < 0.01 ? 3 : 2)} %`,
+      layout.w - 12, layout.h - 44,
+      { align: 'right', color: '#c9a94f',
         font: '10px "IBM Plex Mono", ui-monospace, monospace' });
   }
 
@@ -9242,6 +9287,12 @@ function buildHeader() {
         () => state.mode,
         (v) => {
           if (v === 'tutorial') applyStep(state.step);
+          // Leaving the tutorial hands back the scene defaults rather than
+          // whatever step the reader happened to stop on. Step 1 alone opens
+          // on two bows in red light with a 24-ray beam, so "free mode"
+          // used to start mid-explanation with no way back to the plain
+          // picture short of reloading.
+          else resetState();
           set({ mode: v, panel: 'guide' });
           rebuild();
         }
@@ -9578,6 +9629,13 @@ function sceneGroup(titleKey, items, opts) {
   return opts ? group(titleKey, ...kids, opts) : group(titleKey, ...kids);
 }
 
+/**
+ * The bows the chip row offers, matching the range of the reflections
+ * selector. k = 0 has no bow -- no internal reflection, no caustic, nothing
+ * concentrated to stand in front of.
+ */
+const BOW_ORDERS = [1, 2, 3, 4];
+
 const chipRow = (...chips) => el('div', { class: 'action-row' }, ...chips);
 const chip = (labelKey, onclick) => el('button', { class: 'chip', type: 'button', onclick }, t(labelKey));
 
@@ -9667,28 +9725,50 @@ function buildControls() {
         onInput: (v) => set({ impact: v }),
         hintKey: 'impactParameterHint',
       })),
-      // One chip per bow on screen, each jumping to that bow's own entry
-      // position. Computed from rainbowGeometry, never written down -- and it
-      // is the demonstration that the secondary is a different ray, not a
-      // different droplet: the entry point slides towards the rim and the eye
-      // that lights up changes with it.
-      c(['droplet'], () => el('div', { class: 'ctl', dataset: { ctl: 'bowRays' } },
-        el('span', { class: 'ctl-label' }, t('bowRayChips')),
-        el('div', { class: 'chip-row' },
-          activeOrders().filter((k) => k >= 1).map((k) => {
-            // The SIGNED entry, so picking a bow moves the ray to the half of
-            // the face whose light heads towards the observer. Jumping to
-            // +0.951 for the secondary put it on the half that fires the
-            // other way, and the tick on the entry track disagreed with the
-            // chip that was supposed to land on it.
-            const b = bowEntry(k, indexModel()(650));
-            if (b === null) return null;
-            return el('button', {
-              class: 'chip', type: 'button',
-              onclick: () => set({ impact: b, selectedRay: null }),
-            }, `${t(bowNameKey(k), { k })} · ${num(b, 3)}`);
-          }).filter(Boolean))),
-        () => activeOrders().some((k) => k >= 1)),
+      /*
+       * The "which rainbow" selector.
+       *
+       * Every bow, always, whatever is currently traced. Built from
+       * activeOrders() it could not offer the secondary until the secondary
+       * was already showing, which made it useless as a way of getting there.
+       *
+       * Picking one sets the reflection count to the minimum that bow needs
+       * -- two bounces for the secondary, not four -- and the count stays
+       * cumulative, so the primary is still on screen to compare against.
+       * The entry is SIGNED, so the ray moves to the half of the face whose
+       * light heads towards the observer, with the reference order pinned to
+       * 1 because that is what the click is about to make the lowest traced
+       * order.
+       */
+      c(['droplet'], () => {
+        const chips = BOW_ORDERS.map((k) => {
+          const b = bowEntry(k, indexModel()(650), 1);
+          if (b === null) return null;
+          const node = el('button', {
+            class: 'chip', type: 'button',
+            onclick: () => set({
+              reflections: k,
+              families: { 0: false, 1: k >= 1, 2: k >= 2, 3: k >= 3 },
+              impact: b,
+              selectedRay: null,
+            }),
+          }, `${t(bowNameKey(k), { k })} · ${num(b, 3)}`);
+          // Which bow is showing changes on every drag of the impact slider,
+          // and the control column does not rebuild for that. Without a
+          // syncer the highlight was whatever it had been at build time.
+          node.sync = () => {
+            node.classList.toggle(
+              'active',
+              state.reflections === k && Math.abs(state.impact - b) < 0.004
+            );
+          };
+          node.sync();
+          return node;
+        }).filter(Boolean);
+        return el('div', { class: 'ctl', dataset: { ctl: 'bowRays' } },
+          el('span', { class: 'ctl-label' }, t('bowRayChips')),
+          el('div', { class: 'chip-row' }, chips));
+      }),
       c(['droplet'], () => slider({
         labelKey: 'fanCount', min: 0, max: 60, step: 1,
         get: () => state.fanCount,
@@ -9929,7 +10009,7 @@ function resetState() {
     wavelength: 'white', dispersion: 1, impact: 0.861, reflections: 1,
     dropletZoom: 1, indexMode: 'table', indexScale: 1,
     dropsObserverX: 0, dropsObserverY: 0,
-    showNonRainbow: false, fanCount: 24, families: { 0: false, 1: true, 2: false, 3: false },
+    showNonRainbow: false, fanCount: 0, families: { 0: false, 1: true, 2: false, 3: false },
     angleMode: 'antisolar', distRays: 60, distAccumulate: false, graphOpen: false,
     dropCount: 1, dropsAnimate: false, fieldCount: 60000,
     sunElevation: 15, sunAzimuth: 180, observerHeight: 1.7,
@@ -9937,7 +10017,7 @@ function resetState() {
     eyeAzimuth: 0, eyeElevation: 12, fov: 75,
     selectedRay: null, selectedDrop: null, skyPick: null, fieldPick: null,
     show: {
-      normals: false, angles: true, labels: true, wavelengthLabels: false,
+      normals: false, angles: true, labels: true, wavelengthLabels: false, walls: true,
       droplets: true, cone: true, antisolar: true, horizon: true, ground: true,
       renderedBow: false, alexander: true, primary: true, secondary: false,
       higher: false, sky: true, rainBelow: false,

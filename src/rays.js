@@ -139,11 +139,15 @@ export function bowExitSide(n, k) {
  * did not, and a chip for the secondary used to send the ray to the half that
  * points away from the observer.
  */
-export function bowEntry(k, n) {
+export function bowEntry(k, n, refOrder = null) {
   const geo = O.rainbowGeometry(n, k);
   if (!geo) return null;
+  // Which order defines "the side the light goes". Normally the lowest one on
+  // screen; the bow chips pass 1 explicitly, because they are offered for
+  // orders that are not traced yet and the label has to match where the ray
+  // will land once the chip is clicked.
   const orders = activeOrders().filter((j) => j >= 1);
-  const ref = orders.length ? orders[0] : k;
+  const ref = refOrder ?? (orders.length ? orders[0] : k);
   const side = k === ref ? 1 : bowExitSide(n, ref) * bowExitSide(n, k);
   return side * geo.impactParameter;
 }

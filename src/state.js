@@ -44,12 +44,14 @@ export const state = {
      are only worth anything next to each other. */
   families: { 0: false, 1: true, 2: false, 3: false },
   /* How many parallel rays cross the droplet face, rim to rim.
-     0 draws the single ray at state.impact and nothing else.
+     0 draws the single ray at state.impact and nothing else, which is where
+     the scene starts: one beam, one path, every wall it meets labelled.
 
-     Sunlight covers the whole face at once, so the beam does too: b runs from
-     -1 to +1 and the reader watches where the exits bunch up. That bunching
-     IS the bow, and no single ray can show it. */
-  fanCount: 24,
+     Turn it up and the beam covers the whole face the way sunlight does, b
+     running from -1 to +1, and the exits bunch up at the bow angle. That
+     bunching IS the bow and no single ray can show it -- but it is the second
+     thing to look at, not the first. */
+  fanCount: 0,
 
   /* graph */
   angleMode: 'antisolar', // 'antisolar' | 'scattering' | 'deviation'
