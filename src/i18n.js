@@ -130,6 +130,17 @@ export const translations = {
 
     /* ---- controls: visualisation ---- */
     visualization: 'Zobrazení',
+    showWalls: 'Označit, co se děje na stěně',
+    wallThrough: 'projde',
+    wallPartial: 'odrazí se',
+    wallTotal: 'úplný odraz',
+    wallNeverTotal: 'θ_r < θ_c, takže k úplnému odrazu nikdy nedojde',
+    explNoTotalReflection:
+      'Skoro každý výklad tvrdí, že uvnitř kapky nastává úplný vnitřní odraz. Nenastává a nastat '
+      + 'nemůže. Paprsek se při vstupu láme ze θᵢ na θᵣ, přičemž sin θᵣ = sin θᵢ / n, takže θᵣ '
+      + 'nikdy nepřeleze asin(1/n) — a to je přesně mezní úhel {crit}. Na zadní stěnu dopadá pod '
+      + 'týmž θᵣ, tedy pod mezním úhlem. U hlavní duhy je to {theta} a stěna odrazí {refl} světla. '
+      + 'Zbytek odejde ven. Proto ty čárkované pahýly: na každé stěně uniká víc světla, než pokračuje dál.',
     showNormals: 'Normály k povrchu',
     showAngles: 'Úhly',
     showLabels: 'Popisky',
@@ -262,10 +273,19 @@ export const translations = {
       'Všechno tohle dělá jediný paprsek. Co se na první stěně lomem dostane ven, je primární duha. Co zůstane uvnitř a doletí na další stěnu, je vedlejší. Co zůstane znovu, je třetí řád. Jeden paprsek, jeden vstupní bod — řády se z něj odlupují stěnu po stěně a každý si bere zlomek toho, co předchozí nechal být. Tohle je příčina vedlejší duhy a na nic z toho není potřeba druhý paprsek.',
     coneOtherSide: 'druhá strana kužele',
     entryHalvesNote:
-      'Obě oči stojí na opačných stranách, protože se strana výstupu s každým odrazem překlápí — z jednoho vstupního bodu se primární a vedlejší duha rozejdou pokaždé, při každém parametru dopadu. Neměřte úhel mezi očima. Čtěte u každého oka jeho vlastní φ od čárkované antisolární přímky: {phi1} a {phi2}, tedy {gap} od sebe. Ten rozdíl je to, co vidíte na obloze.',
+      'Obě oči stojí na téže straně, protože každý řád vchází svou polovinou kapky — a to je '
+      + 'jediný způsob, jak obě světla pošlete jednomu pozorovateli, protože strana výstupu se s '
+      + 'každým odrazem překlápí. Čtěte u každého oka jeho vlastní φ od čárkované antisolární '
+      + 'přímky: {phi1} a {phi2}, tedy {gap} od sebe. Ten rozdíl je to, co vidíte na obloze.',
 
     explBowNeedsOwnRay:
       'Jeden paprsek ukazuje, jak vedlejší duha vzniká. Neukazuje ji samotnou. Duha je nahromadění paprsků a každý řád se hromadí u svého vlastního parametru dopadu — {b1} pro primární, {b2} pro vedlejší. Přetáhněte posuvník mezi nimi a dívejte se, které oko se rozsvítí. Vždycky jen jedno.',
+    explOppositeHalves:
+      'Aby obě duhy dorazily do jednoho oka, musí každá vejít jinou polovinou kapky. '
+      + 'Primární vstupuje horem při b = +{b1}, odrazí se jednou a míří dolů. Vedlejší vstupuje '
+      + 'spodem při b = −{b2}, odrazí se dvakrát a míří dolů taky. Stejná polovina u obou by jednu '
+      + 'z nich poslala nahoru, pryč od pozorovatele. Proto to nejsou dva paprsky odnikud, ale dvě '
+      + 'různé dráhy dvěma různými místy dopadu.',
     explSameSplitInSky:
       'Tentýž rozpad, jenže venku. Každá kapka dělá to co ta jediná v řezu: všechny řády naráz, každý jinam. Který z nich dorazí k vám, rozhoduje jedině to, kde kapka stojí — takže kapka, ze které máte primární duhu, vám tu vedlejší udělat nemůže. Ta je z úplně jiných kapek.',
 
@@ -629,6 +649,18 @@ export const translations = {
 
     /* ---- controls: visualisation ---- */
     visualization: 'Visualisation',
+    showWalls: 'Mark what happens at each wall',
+    wallThrough: 'through',
+    wallPartial: 'reflects',
+    wallTotal: 'total reflection',
+    wallNeverTotal: 'θ_r < θ_c, so total reflection never happens',
+    explNoTotalReflection:
+      'Nearly every explanation says the bounces inside a raindrop are total internal reflection. '
+      + 'They are not, and cannot be. Light refracts on the way in from θᵢ to θᵣ with '
+      + 'sin θᵣ = sin θᵢ / n, so θᵣ can never exceed asin(1/n) — which is exactly the critical '
+      + 'angle, {crit}. It meets the back wall at that same θᵣ, so it arrives under the critical '
+      + 'angle. At the primary bow that is {theta}, and the wall reflects {refl} of the light. '
+      + 'The rest leaves. Hence the dashed stubs: more light escapes at every wall than carries on.',
     showNormals: 'Surface normals',
     showAngles: 'Angles',
     showLabels: 'Labels',
@@ -761,10 +793,19 @@ export const translations = {
       'One ray does all of this. The light that refracts out at the first wall is the primary. What stays inside and carries on to the next wall is the secondary, what stays again is the third order. Same ray, same entry point — the orders peel off it one wall at a time, each taking a fraction of what the one before it left behind. That is the cause of the secondary bow, and seeing it costs no second ray.',
     coneOtherSide: 'far side of the cone',
     entryHalvesNote:
-      'The two eyes sit on opposite sides because the exit side flips with every bounce — from one entry point the primary and the secondary part company every time, at every impact parameter. So do not read the angle between the eyes. Read each eye\'s own φ against the dashed antisolar line: {phi1} and {phi2}, which is {gap} apart. That difference is what the sky shows.',
+      'The two eyes sit on the same side because each order comes in through its own half of the drop '
+      + '— which is the only way to send both lots of light to one observer, since the exit side '
+      + "flips with every bounce. Read each eye's own φ against the dashed antisolar line: {phi1} "
+      + 'and {phi2}, which is {gap} apart. That difference is what the sky shows.',
 
     explBowNeedsOwnRay:
       "One ray shows how the secondary happens. It does not show the secondary bow. A bow is a pile-up, and each order piles up at its own impact parameter — {b1} for the primary, {b2} for the secondary. Drag the slider between them and watch which eye lights up. Only ever one at a time.",
+    explOppositeHalves:
+      'For both bows to reach one eye, each has to enter through a different half of the drop. '
+      + 'The primary comes in through the top at b = +{b1}, bounces once and heads down. The '
+      + 'secondary comes in through the bottom at b = −{b2}, bounces twice and heads down too. '
+      + 'Same half for both and one of them leaves upward, away from the observer. So these are '
+      + 'not two rays out of nowhere — they are two paths through two different entry points.',
     explSameSplitInSky:
       "The same split, out here. Every droplet does what the single one did: every order at once, each leaving in its own direction. Which one reaches you depends only on where the droplet sits — so the droplet giving you the primary cannot also give you the secondary. That one comes from entirely different droplets.",
 

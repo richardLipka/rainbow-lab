@@ -1756,6 +1756,17 @@ const translations = {
 
     /* ---- controls: visualisation ---- */
     visualization: 'Zobrazení',
+    showWalls: 'Označit, co se děje na stěně',
+    wallThrough: 'projde',
+    wallPartial: 'odrazí se',
+    wallTotal: 'úplný odraz',
+    wallNeverTotal: 'θ_r < θ_c, takže k úplnému odrazu nikdy nedojde',
+    explNoTotalReflection:
+      'Skoro každý výklad tvrdí, že uvnitř kapky nastává úplný vnitřní odraz. Nenastává a nastat '
+      + 'nemůže. Paprsek se při vstupu láme ze θᵢ na θᵣ, přičemž sin θᵣ = sin θᵢ / n, takže θᵣ '
+      + 'nikdy nepřeleze asin(1/n) — a to je přesně mezní úhel {crit}. Na zadní stěnu dopadá pod '
+      + 'týmž θᵣ, tedy pod mezním úhlem. U hlavní duhy je to {theta} a stěna odrazí {refl} světla. '
+      + 'Zbytek odejde ven. Proto ty čárkované pahýly: na každé stěně uniká víc světla, než pokračuje dál.',
     showNormals: 'Normály k povrchu',
     showAngles: 'Úhly',
     showLabels: 'Popisky',
@@ -1888,10 +1899,19 @@ const translations = {
       'Všechno tohle dělá jediný paprsek. Co se na první stěně lomem dostane ven, je primární duha. Co zůstane uvnitř a doletí na další stěnu, je vedlejší. Co zůstane znovu, je třetí řád. Jeden paprsek, jeden vstupní bod — řády se z něj odlupují stěnu po stěně a každý si bere zlomek toho, co předchozí nechal být. Tohle je příčina vedlejší duhy a na nic z toho není potřeba druhý paprsek.',
     coneOtherSide: 'druhá strana kužele',
     entryHalvesNote:
-      'Obě oči stojí na opačných stranách, protože se strana výstupu s každým odrazem překlápí — z jednoho vstupního bodu se primární a vedlejší duha rozejdou pokaždé, při každém parametru dopadu. Neměřte úhel mezi očima. Čtěte u každého oka jeho vlastní φ od čárkované antisolární přímky: {phi1} a {phi2}, tedy {gap} od sebe. Ten rozdíl je to, co vidíte na obloze.',
+      'Obě oči stojí na téže straně, protože každý řád vchází svou polovinou kapky — a to je '
+      + 'jediný způsob, jak obě světla pošlete jednomu pozorovateli, protože strana výstupu se s '
+      + 'každým odrazem překlápí. Čtěte u každého oka jeho vlastní φ od čárkované antisolární '
+      + 'přímky: {phi1} a {phi2}, tedy {gap} od sebe. Ten rozdíl je to, co vidíte na obloze.',
 
     explBowNeedsOwnRay:
       'Jeden paprsek ukazuje, jak vedlejší duha vzniká. Neukazuje ji samotnou. Duha je nahromadění paprsků a každý řád se hromadí u svého vlastního parametru dopadu — {b1} pro primární, {b2} pro vedlejší. Přetáhněte posuvník mezi nimi a dívejte se, které oko se rozsvítí. Vždycky jen jedno.',
+    explOppositeHalves:
+      'Aby obě duhy dorazily do jednoho oka, musí každá vejít jinou polovinou kapky. '
+      + 'Primární vstupuje horem při b = +{b1}, odrazí se jednou a míří dolů. Vedlejší vstupuje '
+      + 'spodem při b = −{b2}, odrazí se dvakrát a míří dolů taky. Stejná polovina u obou by jednu '
+      + 'z nich poslala nahoru, pryč od pozorovatele. Proto to nejsou dva paprsky odnikud, ale dvě '
+      + 'různé dráhy dvěma různými místy dopadu.',
     explSameSplitInSky:
       'Tentýž rozpad, jenže venku. Každá kapka dělá to co ta jediná v řezu: všechny řády naráz, každý jinam. Který z nich dorazí k vám, rozhoduje jedině to, kde kapka stojí — takže kapka, ze které máte primární duhu, vám tu vedlejší udělat nemůže. Ta je z úplně jiných kapek.',
 
@@ -2255,6 +2275,18 @@ const translations = {
 
     /* ---- controls: visualisation ---- */
     visualization: 'Visualisation',
+    showWalls: 'Mark what happens at each wall',
+    wallThrough: 'through',
+    wallPartial: 'reflects',
+    wallTotal: 'total reflection',
+    wallNeverTotal: 'θ_r < θ_c, so total reflection never happens',
+    explNoTotalReflection:
+      'Nearly every explanation says the bounces inside a raindrop are total internal reflection. '
+      + 'They are not, and cannot be. Light refracts on the way in from θᵢ to θᵣ with '
+      + 'sin θᵣ = sin θᵢ / n, so θᵣ can never exceed asin(1/n) — which is exactly the critical '
+      + 'angle, {crit}. It meets the back wall at that same θᵣ, so it arrives under the critical '
+      + 'angle. At the primary bow that is {theta}, and the wall reflects {refl} of the light. '
+      + 'The rest leaves. Hence the dashed stubs: more light escapes at every wall than carries on.',
     showNormals: 'Surface normals',
     showAngles: 'Angles',
     showLabels: 'Labels',
@@ -2387,10 +2419,19 @@ const translations = {
       'One ray does all of this. The light that refracts out at the first wall is the primary. What stays inside and carries on to the next wall is the secondary, what stays again is the third order. Same ray, same entry point — the orders peel off it one wall at a time, each taking a fraction of what the one before it left behind. That is the cause of the secondary bow, and seeing it costs no second ray.',
     coneOtherSide: 'far side of the cone',
     entryHalvesNote:
-      'The two eyes sit on opposite sides because the exit side flips with every bounce — from one entry point the primary and the secondary part company every time, at every impact parameter. So do not read the angle between the eyes. Read each eye\'s own φ against the dashed antisolar line: {phi1} and {phi2}, which is {gap} apart. That difference is what the sky shows.',
+      'The two eyes sit on the same side because each order comes in through its own half of the drop '
+      + '— which is the only way to send both lots of light to one observer, since the exit side '
+      + "flips with every bounce. Read each eye's own φ against the dashed antisolar line: {phi1} "
+      + 'and {phi2}, which is {gap} apart. That difference is what the sky shows.',
 
     explBowNeedsOwnRay:
       "One ray shows how the secondary happens. It does not show the secondary bow. A bow is a pile-up, and each order piles up at its own impact parameter — {b1} for the primary, {b2} for the secondary. Drag the slider between them and watch which eye lights up. Only ever one at a time.",
+    explOppositeHalves:
+      'For both bows to reach one eye, each has to enter through a different half of the drop. '
+      + 'The primary comes in through the top at b = +{b1}, bounces once and heads down. The '
+      + 'secondary comes in through the bottom at b = −{b2}, bounces twice and heads down too. '
+      + 'Same half for both and one of them leaves upward, away from the observer. So these are '
+      + 'not two rays out of nowhere — they are two paths through two different entry points.',
     explSameSplitInSky:
       "The same split, out here. Every droplet does what the single one did: every order at once, each leaving in its own direction. Which one reaches you depends only on where the droplet sits — so the droplet giving you the primary cannot also give you the secondary. That one comes from entirely different droplets.",
 
@@ -2783,6 +2824,11 @@ const state = {
   /* visualisation toggles */
   show: {
     normals: false,
+    /* Mark what happens at each surface the ray meets: how much goes through
+       and how much reflects on. On by default, because the thing it settles
+       is a misconception most explanations repeat -- that the bounces inside
+       a raindrop are TOTAL internal reflection. They are not, and cannot be. */
+    walls: true,
     angles: true,
     labels: true,
     wavelengthLabels: false,
@@ -4231,6 +4277,7 @@ function createDropletView(canvas) {
       // steering -- rather than an arbitrary last-built ray, so the detail
       // view never silently jumps to a family the user didn't ask about.
       const ref = main.find((r) => r.k === state.reflections) ?? main[main.length - 1];
+      if (state.show.walls) drawWallMarks(ctx, ref);
       if (state.show.angles) drawAngles(ctx, ref);
       if (state.show.labels) drawSegmentLabels(ctx, ref);
       if (state.show.angles && ref.path.dirOut) drawExitAngle(ctx, ref);
@@ -4955,6 +5002,97 @@ function createDropletView(canvas) {
     }
   }
 
+  /**
+   * What actually happens at every surface the ray meets.
+   *
+   * The textbook sentence "two refractions and a total internal reflection"
+   * is wrong, and the picture can say so rather than arguing. Light enters at
+   * theta_i and refracts to theta_r with sin theta_r = sin theta_i / n, so
+   * theta_r <= asin(1/n) -- which IS the critical angle. Equality only at
+   * grazing incidence. It meets the back wall at that same theta_r, so it is
+   * below the critical angle at every wall, at every impact parameter, in
+   * every order. Total internal reflection is not rare here; it is impossible.
+   *
+   * Measured for n(650) = 1.3322: the critical angle is 48.645 deg and the
+   * largest internal angle anywhere on the face is 48.6447 deg, reached only
+   * as b -> 1. At the primary's own bow the internal angle is 40.28 deg and
+   * the back wall reflects 5.73 per cent -- so about 94 per cent of the light
+   * leaves there, which is why the leak stubs are drawn.
+   */
+  function drawWallMarks(ctx, ray) {
+    const p = ray.path;
+    if (!p.hit || !p.vertices.length) return;
+    const n = ray.n;
+    const crit = O.criticalAngle(n, 1);
+
+    for (let vi = 0; vi < p.vertices.length; vi++) {
+      const v = p.vertices[vi];
+      const at = project(v.point);
+      const seg = p.segments[vi];
+      if (!seg) continue;
+      const dIn = O.vnorm(O.vsub(seg.b, seg.a));
+      const inside = v.type === 'reflection' || vi === p.vertices.length - 1;
+      // Fresnel at THIS wall, in the direction the light is actually going.
+      const R = inside
+        ? O.fresnelReflectance(v.thetaIn, n, 1)
+        : O.fresnelReflectance(v.thetaIn, 1, n);
+      const tir = inside && crit !== null && v.thetaIn > crit;
+
+      if (v.type === 'reflection') {
+        // The part that does NOT reflect: it refracts out and is gone. Drawn
+        // as a short stub, because at the primary's bow it is 94 per cent of
+        // the light and the picture otherwise shows only the 6 per cent.
+        const out = O.refract(dIn, O.vneg(v.normal), n);
+        if (out && !tir) {
+          const tip = project(O.vadd(v.point, O.vmul(out, 0.55)));
+          strokePath(ctx, [at, tip], colorFor(ray.lambda, 0.5, 0.55), 1.4, [3, 3]);
+          arrowHead(ctx, at, tip, colorFor(ray.lambda, 0.5, 0.55), 4);
+        }
+      }
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(at.x, at.y, 5, 0, Math.PI * 2);
+      if (tir) {
+        // Filled: nothing gets out. Never seen with sunlight entering the
+        // drop -- kept because the marker has to be able to say so.
+        ctx.fillStyle = '#ffcf6a';
+        ctx.fill();
+      } else {
+        // Hollow: light goes through here as well as on.
+        ctx.fillStyle = 'rgba(10,14,26,0.85)';
+        ctx.fill();
+        ctx.strokeStyle = v.type === 'reflection' ? '#8fd8ff' : '#9fe3b6';
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      if (!state.show.labels) continue;
+      const push = O.vnorm(O.vsub(v.point, O.vec(0, 0, 0)));
+      const lab = project(O.vadd(v.point, O.vmul(push, 0.3)));
+      const text = tir
+        ? t('wallTotal')
+        : v.type === 'reflection'
+          ? `${t('wallPartial')} ${num(R * 100, 1)} %`
+          : `${t('wallThrough')} ${num((1 - R) * 100, 1)} %`;
+      label(ctx, text,
+        O.clamp(lab.x, 58, layout.w - 58), O.clamp(lab.y, 14, layout.h - 16), {
+          align: 'center',
+          color: tir ? '#ffcf6a' : v.type === 'reflection' ? '#8fd8ff' : '#9fe3b6',
+          font: '10px "IBM Plex Mono", ui-monospace, monospace',
+        });
+    }
+
+    if (!state.show.labels || crit === null) return;
+    // The claim itself, with the two numbers it rests on.
+    label(ctx,
+      `θ_c = ${deg(crit * O.DEG, 1)} · θ_r = ${deg((p.thetaR || 0) * O.DEG, 1)} · ${t('wallNeverTotal')}`,
+      layout.w - 12, layout.h - 30,
+      { align: 'right', color: '#8fa4c8',
+        font: '10px "IBM Plex Mono", ui-monospace, monospace' });
+  }
+
   function drawNormals(ctx, ray) {
     for (const v of ray.path.vertices) {
       const a = project(v.point);
@@ -5099,7 +5237,10 @@ function createDropletView(canvas) {
       // the one above it.
       if (!state.show.labels || m.at.y - lastLabelY < 13) continue;
       lastLabelY = m.at.y;
-      const text = `${t(bowNameKey(m.k), { k: m.k })} · ${num(Math.abs(m.sb), 3)}`;
+      // Signed, because the sign IS the point: for both bows to reach the
+      // same eye the primary has to enter one half of the face and the
+      // secondary the other. Printing |b| hid the one number that says so.
+      const text = `${t(bowNameKey(m.k), { k: m.k })} · ${num(m.sb, 3)}`;
       ctx.save();
       ctx.font = '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif';
       const width = ctx.measureText(text).width;
@@ -8491,11 +8632,20 @@ function noteParams(key, k = state.reflections) {
       gap: deg(p2 - p1, 2),
     };
   }
-  if (key === 'explBowNeedsOwnRay') {
+  if (key === 'explBowNeedsOwnRay' || key === 'explOppositeHalves') {
     const g1 = O.rainbowGeometry(idx(650), 1);
     const g2 = O.rainbowGeometry(idx(650), 2);
     if (!g1 || !g2) return null;
     return { b1: num(g1.impactParameter, 3), b2: num(g2.impactParameter, 3) };
+  }
+  if (key === 'explNoTotalReflection') {
+    const light = O.bowBrightness(idx(650), Math.max(1, k));
+    if (!light || light.criticalDeg === null) return null;
+    return {
+      crit: deg(light.criticalDeg, 2),
+      theta: deg(light.internalDeg, 2),
+      refl: `${num(light.R * 100, 1)} %`,
+    };
   }
   if (key === 'explReflectionIsWeak') {
     const light = O.bowBrightness(idx(650), Math.max(1, k));
@@ -8603,12 +8753,18 @@ function rayInfoNodes(opts = {}) {
   }
   if (!opts.compact) {
     const manyOrders = activeOrders().filter((o) => o >= 1).length > 1;
-    // The two claims that have to be read, in the open and in this order:
-    // one ray makes every order, and a bow still needs its own ray.
-    if (manyOrders) nodes.push(noteNode('coneSliceNote'), noteNode('explBowNeedsOwnRay'));
+    // The three claims that have to be read, in the open and in this order:
+    // one ray makes every order; a bow still needs its own ray; and the two
+    // bows reaching one eye came in through opposite halves of the drop.
+    // The last one is what sends people off to check against a textbook.
+    if (manyOrders) {
+      nodes.push(noteNode('coneSliceNote'), noteNode('explBowNeedsOwnRay'),
+        noteNode('explOppositeHalves'));
+    }
     nodes.push(...bowLedgerNodes());
     nodes.push(moreNode(
       manyOrders ? noteNode('entryHalvesNote') : null,
+      noteNode('explNoTotalReflection'),
       // Quoting the critical angle next to k = 0 would describe a bounce the
       // ray never makes.
       k >= 1 ? noteNode('explReflectionIsWeak', k) : null,
@@ -9438,6 +9594,7 @@ const VIS_TOGGLES = [
   { scenes: ['drops', 'field', 'sky'], key: 'ground', labelKey: 'showGround' },
   { scenes: ['drops', 'field'], key: 'droplets', labelKey: 'showDroplets' },
   { scenes: ['droplet'], key: 'normals', labelKey: 'showNormals' },
+  { scenes: ['droplet'], key: 'walls', labelKey: 'showWalls' },
   // The many-droplets and sky scenes read show.angles only for the
   // phi/Theta arcs of something the reader has clicked on, so it is offered
   // there only once they have -- a toggle with nothing to toggle teaches

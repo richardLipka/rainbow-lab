@@ -171,6 +171,7 @@ export function createDropletView(canvas) {
       // steering -- rather than an arbitrary last-built ray, so the detail
       // view never silently jumps to a family the user didn't ask about.
       const ref = main.find((r) => r.k === state.reflections) ?? main[main.length - 1];
+      if (state.show.walls) drawWallMarks(ctx, ref);
       if (state.show.angles) drawAngles(ctx, ref);
       if (state.show.labels) drawSegmentLabels(ctx, ref);
       if (state.show.angles && ref.path.dirOut) drawExitAngle(ctx, ref);
@@ -895,6 +896,97 @@ export function createDropletView(canvas) {
     }
   }
 
+  /**
+   * What actually happens at every surface the ray meets.
+   *
+   * The textbook sentence "two refractions and a total internal reflection"
+   * is wrong, and the picture can say so rather than arguing. Light enters at
+   * theta_i and refracts to theta_r with sin theta_r = sin theta_i / n, so
+   * theta_r <= asin(1/n) -- which IS the critical angle. Equality only at
+   * grazing incidence. It meets the back wall at that same theta_r, so it is
+   * below the critical angle at every wall, at every impact parameter, in
+   * every order. Total internal reflection is not rare here; it is impossible.
+   *
+   * Measured for n(650) = 1.3322: the critical angle is 48.645 deg and the
+   * largest internal angle anywhere on the face is 48.6447 deg, reached only
+   * as b -> 1. At the primary's own bow the internal angle is 40.28 deg and
+   * the back wall reflects 5.73 per cent -- so about 94 per cent of the light
+   * leaves there, which is why the leak stubs are drawn.
+   */
+  function drawWallMarks(ctx, ray) {
+    const p = ray.path;
+    if (!p.hit || !p.vertices.length) return;
+    const n = ray.n;
+    const crit = O.criticalAngle(n, 1);
+
+    for (let vi = 0; vi < p.vertices.length; vi++) {
+      const v = p.vertices[vi];
+      const at = project(v.point);
+      const seg = p.segments[vi];
+      if (!seg) continue;
+      const dIn = O.vnorm(O.vsub(seg.b, seg.a));
+      const inside = v.type === 'reflection' || vi === p.vertices.length - 1;
+      // Fresnel at THIS wall, in the direction the light is actually going.
+      const R = inside
+        ? O.fresnelReflectance(v.thetaIn, n, 1)
+        : O.fresnelReflectance(v.thetaIn, 1, n);
+      const tir = inside && crit !== null && v.thetaIn > crit;
+
+      if (v.type === 'reflection') {
+        // The part that does NOT reflect: it refracts out and is gone. Drawn
+        // as a short stub, because at the primary's bow it is 94 per cent of
+        // the light and the picture otherwise shows only the 6 per cent.
+        const out = O.refract(dIn, O.vneg(v.normal), n);
+        if (out && !tir) {
+          const tip = project(O.vadd(v.point, O.vmul(out, 0.55)));
+          strokePath(ctx, [at, tip], colorFor(ray.lambda, 0.5, 0.55), 1.4, [3, 3]);
+          arrowHead(ctx, at, tip, colorFor(ray.lambda, 0.5, 0.55), 4);
+        }
+      }
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(at.x, at.y, 5, 0, Math.PI * 2);
+      if (tir) {
+        // Filled: nothing gets out. Never seen with sunlight entering the
+        // drop -- kept because the marker has to be able to say so.
+        ctx.fillStyle = '#ffcf6a';
+        ctx.fill();
+      } else {
+        // Hollow: light goes through here as well as on.
+        ctx.fillStyle = 'rgba(10,14,26,0.85)';
+        ctx.fill();
+        ctx.strokeStyle = v.type === 'reflection' ? '#8fd8ff' : '#9fe3b6';
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      if (!state.show.labels) continue;
+      const push = O.vnorm(O.vsub(v.point, O.vec(0, 0, 0)));
+      const lab = project(O.vadd(v.point, O.vmul(push, 0.3)));
+      const text = tir
+        ? t('wallTotal')
+        : v.type === 'reflection'
+          ? `${t('wallPartial')} ${num(R * 100, 1)} %`
+          : `${t('wallThrough')} ${num((1 - R) * 100, 1)} %`;
+      label(ctx, text,
+        O.clamp(lab.x, 58, layout.w - 58), O.clamp(lab.y, 14, layout.h - 16), {
+          align: 'center',
+          color: tir ? '#ffcf6a' : v.type === 'reflection' ? '#8fd8ff' : '#9fe3b6',
+          font: '10px "IBM Plex Mono", ui-monospace, monospace',
+        });
+    }
+
+    if (!state.show.labels || crit === null) return;
+    // The claim itself, with the two numbers it rests on.
+    label(ctx,
+      `θ_c = ${deg(crit * O.DEG, 1)} · θ_r = ${deg((p.thetaR || 0) * O.DEG, 1)} · ${t('wallNeverTotal')}`,
+      layout.w - 12, layout.h - 30,
+      { align: 'right', color: '#8fa4c8',
+        font: '10px "IBM Plex Mono", ui-monospace, monospace' });
+  }
+
   function drawNormals(ctx, ray) {
     for (const v of ray.path.vertices) {
       const a = project(v.point);
@@ -1039,7 +1131,10 @@ export function createDropletView(canvas) {
       // the one above it.
       if (!state.show.labels || m.at.y - lastLabelY < 13) continue;
       lastLabelY = m.at.y;
-      const text = `${t(bowNameKey(m.k), { k: m.k })} · ${num(Math.abs(m.sb), 3)}`;
+      // Signed, because the sign IS the point: for both bows to reach the
+      // same eye the primary has to enter one half of the face and the
+      // secondary the other. Printing |b| hid the one number that says so.
+      const text = `${t(bowNameKey(m.k), { k: m.k })} · ${num(m.sb, 3)}`;
       ctx.save();
       ctx.font = '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif';
       const width = ctx.measureText(text).width;

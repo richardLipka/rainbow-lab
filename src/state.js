@@ -89,6 +89,11 @@ export const state = {
   /* visualisation toggles */
   show: {
     normals: false,
+    /* Mark what happens at each surface the ray meets: how much goes through
+       and how much reflects on. On by default, because the thing it settles
+       is a misconception most explanations repeat -- that the bounces inside
+       a raindrop are TOTAL internal reflection. They are not, and cannot be. */
+    walls: true,
     angles: true,
     labels: true,
     wavelengthLabels: false,

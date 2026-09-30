@@ -457,6 +457,7 @@ const VIS_TOGGLES = [
   { scenes: ['drops', 'field', 'sky'], key: 'ground', labelKey: 'showGround' },
   { scenes: ['drops', 'field'], key: 'droplets', labelKey: 'showDroplets' },
   { scenes: ['droplet'], key: 'normals', labelKey: 'showNormals' },
+  { scenes: ['droplet'], key: 'walls', labelKey: 'showWalls' },
   // The many-droplets and sky scenes read show.angles only for the
   // phi/Theta arcs of something the reader has clicked on, so it is offered
   // there only once they have -- a toggle with nothing to toggle teaches

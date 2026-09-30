@@ -1632,3 +1632,64 @@ Two measurement traps hit while checking this, both worth remembering:
 `set({reflections: 1})` in a console probe changes nothing about what is
 traced -- set both. And a max-along-a-line probe reads whichever ray happens
 to cross it; take the median.
+
+## Which half of the drop each bow uses
+
+Checked against HyperPhysics (Nave, "Rainbow Light Paths"), whose figure draws
+the primary entering the upper part of the drop and the secondary the lower
+part. The engine agrees, measured with sunlight along +x, world y up and the
+observer below the axis:
+
+| order | enters at b | bounces at y | leaves |
+|---|---|---|---|
+| 1 | **+0.861** (upper) | +0.360 | **downward**, phi 42.19 |
+| 2 | **-0.950** (lower) | -0.328, +0.939 | **downward**, phi 50.69 |
+
+Same half for both and one of them leaves upward, away from that observer:
+k=1 at -0.861 and k=2 at +0.950 both exit up. `commonEntry()` picks the signed
+entry per order and has done since the rework, so the eyes and the bow ticks
+were already right — but nothing on screen SAID so, which is what sent the
+question to a textbook. Fixed by printing the bow tick's b signed (it read
+|b|, hiding the one number that carries the claim) and adding
+`explOppositeHalves` to the open notes.
+
+`entryHalvesNote` was stale: it still said the two eyes sit on OPPOSITE sides,
+true of the old one-entry-point scene where they were 92.8 deg apart, false
+since `commonEntry` put them on the same side 8.2 deg apart. Rewritten. Worth
+a habit: when a default changes what the picture shows, grep the notes that
+describe the picture.
+
+## Total internal reflection never happens, and the scene now says so
+
+Both Physics StackExchange threads the brief cited make the same correction,
+and the first one's *question* states the misconception: "two refractions and
+one total internal reflection". It is not total, and it cannot be.
+
+The proof is one line of Snell. Light entering from outside refracts from
+theta_i to theta_r with `sin theta_r = sin theta_i / n`, and `sin theta_i <= 1`,
+so `sin theta_r <= 1/n = sin(critical)`. It meets every later wall at that
+same theta_r. So the internal angle is at or below the critical angle
+everywhere, at every impact parameter, in every order.
+
+Measured, n(650) = 1.3322: critical angle **48.645 deg**; the largest internal
+angle anywhere on the face is **48.6447 deg**, reached only as b -> 1. The
+bound is tight and never crossed.
+
+| k | theta_i | theta_r | wall reflects | survives (1-R)^2 R^k |
+|---|---|---|---|---|
+| 1 | 59.46 | 40.28 | 5.73 % | 5.095 % |
+| 2 | 71.87 | 45.51 | 15.79 % | 1.768 % |
+| 3 | 76.86 | 46.97 | 25.42 % | 0.914 % |
+| 4 | 79.65 | 47.60 | 33.55 % | 0.560 % |
+
+`drawWallMarks` marks every surface the reference ray meets: a hollow ring
+with "through 94.3 %" at the two refractions, a hollow ring with
+"reflects 5.7 %" at each bounce, and a dashed stub showing the light that
+leaves there — at the primary's bow that stub carries 94 per cent of the
+light, and the picture used to draw only the 6 per cent that carries on. A
+filled marker and `wallTotal` exist for real total reflection; with sunlight
+entering a sphere they are unreachable, which is the point.
+
+Verified by pixel probe rather than by eye: along the refracted-out direction
+from the primary's bounce, 21 of 22 samples are lit; along a control direction
+the same length away, 0.

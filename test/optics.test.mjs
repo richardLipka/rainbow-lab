@@ -1063,3 +1063,78 @@ test('no bow angle is written into the engine as a constant', () => {
     .map((m) => m[0]);
   assert.deepEqual(hits, [], `bow angles must be derived, found literals: ${hits.join(', ')}`);
 });
+
+test('the two bows reach one eye through opposite halves of the drop', () => {
+  const n = O.cauchyIndex(650);
+  const trace = (b, k) => O.traceRay({
+    origin: O.vec(-6, b, 0), dir: O.vec(1, 0, 0), center: O.vec(0, 0, 0),
+    radius: 1, n, reflections: k, exitLength: 6,
+  });
+  const b1 = O.rainbowGeometry(n, 1).impactParameter;
+  const b2 = O.rainbowGeometry(n, 2).impactParameter;
+
+  // Sunlight along +x, world y up, observer below the axis. The primary has
+  // to enter the UPPER half and the secondary the LOWER one, or one of them
+  // leaves upward and never reaches that observer. This is the arrangement
+  // every textbook figure draws, and the scene places its eyes from it.
+  assert.ok(trace(b1, 1).dirOut.y < 0, 'primary from the upper half leaves downward');
+  assert.ok(trace(-b2, 2).dirOut.y < 0, 'secondary from the lower half leaves downward');
+
+  // Same half for both, and the secondary goes the other way.
+  assert.ok(trace(b2, 2).dirOut.y > 0, 'secondary from the upper half leaves upward');
+  assert.ok(trace(-b1, 1).dirOut.y > 0, 'primary from the lower half leaves upward');
+
+  // Mirroring is exact: flipping b flips the path about the axis and changes
+  // nothing else, so the two arrangements are one arrangement seen twice.
+  for (const [k, b] of [[1, b1], [2, b2]]) {
+    const up = trace(b, k);
+    const down = trace(-b, k);
+    close(up.antisolar, down.antisolar, 1e-12, `k=${k} the mirrored path scatters identically`);
+    close(up.dirOut.y, -down.dirOut.y, 1e-12, `k=${k} and exits the mirrored side`);
+  }
+});
+
+test('total internal reflection is impossible inside the droplet', () => {
+  // Snell at the entry surface: sin(theta_r) = sin(theta_i) / n, and
+  // sin(theta_i) <= 1, so sin(theta_r) <= 1/n = sin(critical). The ray meets
+  // every later wall at that same theta_r. So the internal angle is at or
+  // below the critical angle everywhere, always -- which is why every bounce
+  // is partial and why each extra order costs so much light.
+  for (const lambda of [400, 500, 589, 650, 700]) {
+    const n = O.cauchyIndex(lambda);
+    const crit = O.criticalAngle(n, 1);
+    assert.ok(crit !== null, `water has a critical angle at ${lambda} nm`);
+
+    for (const k of [1, 2, 3, 4]) {
+      for (let i = 1; i <= 2000; i++) {
+        const b = i / 2000;
+        const p = O.traceRay({
+          origin: O.vec(-6, b, 0), dir: O.vec(1, 0, 0), center: O.vec(0, 0, 0),
+          radius: 1, n, reflections: k, exitLength: 6,
+        });
+        if (!p.dirOut) continue;
+        assert.equal(p.totalInternalReflection, false,
+          `lambda=${lambda} k=${k} b=${b} reported total internal reflection`);
+        for (const v of p.vertices) {
+          if (v.type !== 'reflection') continue;
+          assert.ok(v.thetaIn <= crit + 1e-12,
+            `lambda=${lambda} k=${k} b=${b}: internal angle ${(v.thetaIn * O.DEG).toFixed(4)} ` +
+            `exceeded the critical angle ${(crit * O.DEG).toFixed(4)}`);
+        }
+      }
+    }
+  }
+
+  // The bound is tight: grazing incidence reaches the critical angle exactly.
+  const n = O.cauchyIndex(650);
+  close(O.snellAngle(Math.PI / 2, 1, n), O.criticalAngle(n, 1), 1e-12,
+    'a grazing ray refracts to exactly the critical angle');
+
+  // And the bounce is therefore partial everywhere, never a mirror.
+  for (const k of [1, 2, 3, 4]) {
+    const light = O.bowBrightness(n, k);
+    assert.equal(light.totalInternal, false, `k=${k} bow ray is a partial reflection`);
+    assert.ok(light.R > 0.01 && light.R < 0.5,
+      `k=${k} back wall reflects ${(light.R * 100).toFixed(2)} %, the rest leaves`);
+  }
+});

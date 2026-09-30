@@ -500,11 +500,20 @@ function noteParams(key, k = state.reflections) {
       gap: deg(p2 - p1, 2),
     };
   }
-  if (key === 'explBowNeedsOwnRay') {
+  if (key === 'explBowNeedsOwnRay' || key === 'explOppositeHalves') {
     const g1 = O.rainbowGeometry(idx(650), 1);
     const g2 = O.rainbowGeometry(idx(650), 2);
     if (!g1 || !g2) return null;
     return { b1: num(g1.impactParameter, 3), b2: num(g2.impactParameter, 3) };
+  }
+  if (key === 'explNoTotalReflection') {
+    const light = O.bowBrightness(idx(650), Math.max(1, k));
+    if (!light || light.criticalDeg === null) return null;
+    return {
+      crit: deg(light.criticalDeg, 2),
+      theta: deg(light.internalDeg, 2),
+      refl: `${num(light.R * 100, 1)} %`,
+    };
   }
   if (key === 'explReflectionIsWeak') {
     const light = O.bowBrightness(idx(650), Math.max(1, k));
@@ -612,12 +621,18 @@ function rayInfoNodes(opts = {}) {
   }
   if (!opts.compact) {
     const manyOrders = activeOrders().filter((o) => o >= 1).length > 1;
-    // The two claims that have to be read, in the open and in this order:
-    // one ray makes every order, and a bow still needs its own ray.
-    if (manyOrders) nodes.push(noteNode('coneSliceNote'), noteNode('explBowNeedsOwnRay'));
+    // The three claims that have to be read, in the open and in this order:
+    // one ray makes every order; a bow still needs its own ray; and the two
+    // bows reaching one eye came in through opposite halves of the drop.
+    // The last one is what sends people off to check against a textbook.
+    if (manyOrders) {
+      nodes.push(noteNode('coneSliceNote'), noteNode('explBowNeedsOwnRay'),
+        noteNode('explOppositeHalves'));
+    }
     nodes.push(...bowLedgerNodes());
     nodes.push(moreNode(
       manyOrders ? noteNode('entryHalvesNote') : null,
+      noteNode('explNoTotalReflection'),
       // Quoting the critical angle next to k = 0 would describe a bounce the
       // ray never makes.
       k >= 1 ? noteNode('explReflectionIsWeak', k) : null,
