@@ -294,7 +294,11 @@ export const translations = {
     /* ---- the secondary, built rather than announced ---- */
     s13atitle: 'Tentýž paprsek, o odraz dál',
     s13abody:
-      'Do kapky nevstupuje nic nového. Světlo, které se na první stěně lomem dostalo ven, udělalo primární duhu; to, co zůstalo uvnitř a doletělo na další stěnu, dělá vedlejší. Obě větve jsou na obrázku. Teď najděte paprsek, který vedlejší duze patří — čipy skáčou mezi oběma vstupními polohami a je vidět, které oko se rozsvítí.',
+      'Do kapky nevstupuje nic nového. Ten čárkovaný pahýl na první stěně je primární duha, jak '
+      + 'odchází; co zůstalo uvnitř a doletělo na další stěnu, dělá vedlejší. Obě větve jsou na '
+      + 'obrázku naráz. Teď najděte paprsek, kterému vedlejší duha patří — čipy skáčou mezi oběma '
+      + 'vstupními polohami, a ty leží v opačných polovinách kapky. Dívejte se, které oko se '
+      + 'rozsvítí. Vždycky jen jedno.',
     s13btitle: 'Proč se barvy obracejí',
     s13bbody:
       'Otevřete graf a podívejte se na obě křivky. Primární stoupá k vrcholu, vedlejší klesá do sedla. V tomhle jediném rozdílu je celé obrácení: ve vrcholu se nejdelší vlnová délka obrací nejdál od středu, v sedle nejblíž k němu. Červená tak končí vně primární duhy a uvnitř vedlejší.',
@@ -357,13 +361,19 @@ export const translations = {
       + 'Zkuste přepnout mezi oběma vstupními body. Zbytek prohlídky rozebírá, proč to tak je.',
     s1btitle: 'Může jedna kapka udělat duhu?',
     s1bbody:
-      'Vlevo je jediná kulová kapka v řezu. Sluneční paprsek přichází zleva. Zatím nevíme, co se s ním stane — necháme to spočítat.',
+      'Zpátky na začátek, s prázdným obrázkem. Jedna kulová kapka v řezu, jeden paprsek zleva a '
+      + 'zatím ani jeden odraz. Odsud se k těm dvěma duhám dopracujeme krok za krokem — nic '
+      + 'z toho, co uvidíte, není nakreslené dopředu.',
     s2title: 'Sledujte paprsek',
     s2body:
       'Táhněte posuvníkem parametru dopadu (nebo myší v kapce). Paprsek se láme podle Snellova zákona: sin θᵢ = n · sin θᵣ. Nic není nakresleno předem.',
     s3title: 'Přidejte vnitřní odraz',
     s3body:
-      'Na zadní straně kapky se část světla odrazí zpět dovnitř. Jeden vnitřní odraz je teď zapnutý — sledujte dráhu R0 → R1 → R2 → R3.',
+      'Na zadní stěně se část světla odrazí zpět dovnitř. Jak velká? Značky na stěnách to říkají '
+      + 'pro tenhle paprsek: kolik projde, kolik se odrazí, a ten čárkovaný pahýl je světlo, '
+      + 'které tam uniklo ven. Pod každým číslem je druhé — kolik z původního paprsku ještě '
+      + 'zbývá. Táhněte posuvníkem a obě čísla se mění s úhlem dopadu. '
+      + 'Sledujte dráhu R0 → R1 → R2 → R3 a čísla zároveň.',
     s4title: 'Kam paprsek míří?',
     s4body:
       'Změřte úhel mezi vystupujícím paprskem a směrem od Slunce. Panel vpravo ukazuje φ — úhel od antisolárního směru.',
@@ -384,6 +394,20 @@ export const translations = {
     s11title: 'Proč je to oblouk?',
     s11body:
       'Ve třech rozměrech tvoří všechny takové směry kužel kolem antisolárního bodu. Průnik kužele s oblohou je kružnice. Zapněte obzor a dolní část zmizí.',
+    s11btitle: 'Proč oblouk, a ne kruh',
+    s11bbody:
+      'Ze země uvidíte zhruba 40 % kruhu. Zbytek je pod obzorem a stojí v něm země. Výška sama '
+      + 'skoro nepomůže — deset kilometrů nad zemí sníží obzor o pouhé 3,2°. Rozhoduje něco jiného: '
+      + 'jestli je déšť i pod vámi. Zapněte ho a stoupejte. Kolem 1,7 km se kruh uzavře.',
+    explFullCircle:
+      'Duha je vždycky celý kruh. Ze země z něj vidíte horní část, protože antisolární bod leží '
+      + 'pod obzorem — při Slunci 15° nad obzorem sahá oblouk od +27,2° do −57,2° a pod nulou je '
+      + 'zem. Spodní část kruhu tvoří kapky pod úrovní očí a jejich světlo míří k vám vzhůru. '
+      + 'Z letadla, z útesu nebo nad tříští vodopádu tam ty kapky jsou, a kruh se uzavře.',
+    explArrivalArc:
+      'Oblouk nad kapkou počítá výstupní směry. Není to nakreslená duha — je to hustota: kolikrát '
+      + 'paprsky odejdou právě tímhle směrem. Ve většině směrů skoro nic, v jednom hrb. '
+      + 'Ten hrb je duha a jediný paprsek ho ukázat nedokáže.',
     s12title: 'Odkud jsou barvy?',
     s12body:
       'Index lomu vody závisí na vlnové délce. Posuňte disperzi z 0 % na 100 % a jediný úhel se rozpadne na pás barev. Graf dole se rozpadne s ním — na jednu křivku pro každou vlnovou délku.',
@@ -816,7 +840,11 @@ export const translations = {
     /* ---- the secondary, built rather than announced ---- */
     s13atitle: 'The same ray, one bounce further',
     s13abody:
-      'Nothing new enters the droplet. The light that refracted out at the first wall made the primary; what stayed inside and reached the next wall makes the secondary. Both branches are on screen. Now find the ray the secondary belongs to — the chips jump between the two entry positions, and you can watch which eye lights up.',
+      'Nothing new enters the droplet. That dashed stub at the first wall is the primary leaving; '
+      + 'what stayed inside and reached the next wall makes the secondary. Both branches are on '
+      + 'screen at once. Now find the ray the secondary belongs to — the chips jump between the '
+      + 'two entry positions, and those sit in opposite halves of the drop. Watch which eye lights '
+      + 'up. Only ever one.',
     s13btitle: 'Why the colours flip',
     s13bbody:
       'Open the plot and look at the two curves. The primary rises to a peak; the secondary falls to a trough. That single difference is the whole reversal: at a peak the longest wavelength turns over furthest out, at a trough it turns over furthest in. So red ends up outside the primary and inside the secondary.',
@@ -881,13 +909,19 @@ export const translations = {
       + 'this takes the picture apart.',
     s1btitle: 'Can one raindrop create a rainbow?',
     s1bbody:
-      'On the left is a single spherical droplet in cross-section. Sunlight arrives from the left. We do not yet know what happens to it — let the simulation work it out.',
+      'Back to the start, with an empty picture. One spherical drop in cross-section, one ray from '
+      + 'the left, and not a single reflection yet. From here we build up to those two bows a step '
+      + 'at a time, and nothing you see is drawn in advance.',
     s2title: 'Trace the ray',
     s2body:
       "Drag the impact-parameter slider (or drag inside the droplet). The ray bends according to Snell's law: sin θᵢ = n · sin θᵣ. Nothing here is drawn in advance.",
     s3title: 'Add internal reflection',
     s3body:
-      'At the back of the droplet part of the light reflects back inside. One internal reflection is switched on now — follow the path R0 → R1 → R2 → R3.',
+      'At the back wall part of the light reflects back inside. How much? The wall markers say, '
+      + 'for this ray: how much goes through, how much reflects on, and the dashed stub is the '
+      + 'light that escaped there. Under each is a second number — how much of the original beam '
+      + 'is still left. Drag the slider and both change with the angle of incidence. Follow the '
+      + 'path R0 → R1 → R2 → R3 and watch the numbers with it.',
     s4title: 'Where does the outgoing ray point?',
     s4body:
       'Measure the angle between the outgoing ray and the direction away from the Sun. The panel on the right shows φ, the angle from the antisolar direction.',
@@ -908,6 +942,22 @@ export const translations = {
     s11title: 'Why does it look like an arc?',
     s11body:
       'In three dimensions all those directions form a cone around the antisolar point. The cone meets the sky in a circle. Switch the horizon on and the lower part disappears.',
+    s11btitle: 'Why an arc and not a circle',
+    s11bbody:
+      'From the ground you get about 40 % of a circle. The rest is below the horizon with the '
+      + 'ground standing in it. Height on its own barely helps — ten kilometres up buys three '
+      + 'degrees of horizon dip. What decides it is whether there is rain below you. Switch that '
+      + 'on and climb. At around 1.7 km the ring closes.',
+    explFullCircle:
+      'A rainbow is always a full circle. From the ground you see the top of it, because the '
+      + 'antisolar point is below the horizon — with the Sun 15° up the bow runs from +27.2° down '
+      + 'to −57.2°, and everything under zero is ground. The bottom of the circle is made of '
+      + 'droplets below your eye, sending their light upward to you. From a plane, a cliff or '
+      + 'above the spray of a waterfall those droplets are there, and the ring closes.',
+    explArrivalArc:
+      'The arc above the droplet counts exit directions. It is not a drawn rainbow — it is a '
+      + 'density: how often rays leave along each direction. Most directions get almost nothing; '
+      + 'one gets a bulge. That bulge is the bow, and a single ray cannot show it.',
     s12title: 'Where do the colours come from?',
     s12body:
       "Water's refractive index depends on wavelength. Move dispersion from 0 % to 100 % and a single angle splits into a band of colours. The graph below splits with it, one curve per wavelength.",

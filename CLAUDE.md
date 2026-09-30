@@ -1782,3 +1782,46 @@ Two things this needed:
 - The active chip needs a `sync()`, not a class fixed at build time. Which bow
   is showing changes on every drag of the impact slider, and the control
   column does not rebuild for that.
+
+## Guide audit against the current scene
+
+The guide had drifted behind the simulation. Audited every step's `apply`,
+`focus`, `actions` and body against what the scene now offers. Six features
+shipped since the guide was last touched, and **none** of them was referenced
+by any step: the wall markers (`showWalls`), the running light budget, the
+arrival arc, the droplet scene's Sun-elevation tilt, Alexander's band in the
+rain and field scenes, and the observer-height / rain-below pair.
+
+Changed:
+
+- **Step 4 "Add internal reflection"** now focuses `showWalls` and carries
+  `explNoTotalReflection` beside `explReflectionIsWeak`. This is the step the
+  markers were built for, and it was still describing the bounce in prose
+  while the picture had the numbers.
+- **Step 7 "Add more rays"** names the arrival arc (`explArrivalArc`), which
+  is the thing that actually shows the stacking the body talks about.
+- **Step 15 "The same ray, one bounce further"** points at the dashed leak
+  stub, which IS "the light that refracted out at the first wall", and gains
+  `explOppositeHalves`.
+- **New step 13, "Why an arc and not a circle"** — the first step ever to
+  touch `observerHeight` and `rainBelow`. Step 12 ended on "switch the horizon
+  on and the lower part disappears" and dropped the obvious next question.
+  Measured, Sun at 15 deg: 40.5 % of the circle from the ground, 48.0 % at
+  300 m, 65.8 % at 1 km, **100 % at about 1.7 km** -- and horizon dip is NOT
+  the mechanism, since 10 km of altitude buys only 3.2 deg of it.
+- **Step 2** no longer says "we do not yet know what happens", which stopped
+  being true when step 1 became the destination-first opener.
+- **Step 18** pins `observerHeight` back to 1.7 m and `rainBelow` off, so a
+  reader who climbed to 3 km on the new step does not meet the payoff from an
+  aircraft without being told.
+
+Two bugs the audit turned up:
+
+- **Steps 3 and 4 did not pin `fanCount`.** Jump into them from anywhere the
+  reader had a beam running and the single path they are about to trace is
+  buried in 32 rays. Both pin 0 now. A step must pin everything it depends on;
+  inheriting is only safe for what it does not mention.
+- **I had written bow numbers into step 4's body** (94.3 % / 5.7 %) while the
+  step sits at b = 0.7, where the markers read 97.3 % / 2.7 %. Prose quoting
+  engine numbers has to quote them for the state the step actually sets --
+  or, better, not quote them at all, which is what it does now.

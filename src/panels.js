@@ -81,7 +81,10 @@ export const TUTORIAL = [
   {
     title: 's2title', body: 's2body',
     apply: {
-      scene: 'droplet', reflections: 0, graphOpen: false,
+      // One ray, pinned: these two steps are about following a single path,
+      // and a step that does not pin the beam inherits whatever the reader
+      // left on -- a 32-ray fan makes the path impossible to follow.
+      scene: 'droplet', reflections: 0, graphOpen: false, fanCount: 0,
       show: { angles: true, normals: true },
       families: { 0: true, 1: false, 2: false, 3: false },
     },
@@ -96,11 +99,15 @@ export const TUTORIAL = [
     title: 's3title', body: 's3body',
     apply: {
       scene: 'droplet', reflections: 1, impact: 0.7, showNonRainbow: true, graphOpen: false,
+      fanCount: 0,
       families: { 0: false, 1: true, 2: false, 3: false },
-      show: { normals: false, angles: true },
+      show: { normals: false, angles: true, walls: true, labels: true },
     },
-    focus: ['reflections', 'showNonRainbow'],
-    note: 'explReflectionIsWeak',
+    focus: ['reflections', 'showWalls'],
+    // The wall markers arrived after this step was written and say exactly
+    // what it is about: how little of the light carries on at each surface,
+    // and that the bounce is not total internal reflection.
+    note: ['explReflectionIsWeak', 'explNoTotalReflection'],
   },
   {
     title: 's4title', body: 's4body',
@@ -158,7 +165,9 @@ export const TUTORIAL = [
       { label: '16', patch: { fanCount: 16 } },
       { label: '60', patch: { fanCount: 60 } },
     ],
-    note: 'explObserverAngle',
+    // The arc above the droplet IS the stacking, counted. It draws only with
+    // a beam on screen, so this is the first step that can talk about it.
+    note: ['explArrivalArc', 'explObserverAngle'],
   },
   {
     title: 's7title', body: 's7body',
@@ -251,6 +260,34 @@ export const TUTORIAL = [
     ],
   },
   {
+    /* Why it is an arc and not a ring.
+       Step 11 ends on "switch the horizon on and the lower part disappears",
+       which invites the obvious next question and then drops it. The scene
+       has had the two controls that answer it for a long time -- observer
+       height and whether there is rain below the eye -- and no step ever
+       touched either. They are also the two that people get the wrong way
+       round: altitude is not what buys the full circle, rain underneath is. */
+    title: 's11btitle', body: 's11bbody',
+    apply: {
+      scene: 'sky', view: 'eye', sunElevation: 15, observerHeight: 1.7,
+      graphOpen: false, reflections: 1,
+      families: { 0: false, 1: true, 2: false, 3: false },
+      show: {
+        primary: true, secondary: false, cone: false, horizon: true, ground: true,
+        rainBelow: false, renderedBow: true, antisolar: true, labels: true,
+      },
+    },
+    focus: ['observerHeight', 'rainBelow'],
+    actions: [
+      { label: '1.7 m', patch: { observerHeight: 1.7, show: { rainBelow: false } } },
+      { labelKey: 'rainBelow', patch: { show: { rainBelow: true } } },
+      { label: '300 m', patch: { observerHeight: 300, show: { rainBelow: true } } },
+      { label: '1 km', patch: { observerHeight: 1000, show: { rainBelow: true } } },
+      { label: '3 km', patch: { observerHeight: 3000, show: { rainBelow: true } } },
+    ],
+    note: 'explFullCircle',
+  },
+  {
     title: 's12title', body: 's12body',
     apply: {
       scene: 'droplet', graph: 'exit', wavelength: 'white', dispersion: 0, reflections: 1,
@@ -297,7 +334,7 @@ export const TUTORIAL = [
         patch: () => ({ impact: bowEntry(2, indexModel()(650)) }),
       },
     ],
-    note: 'coneSliceNote',
+    note: ['coneSliceNote', 'explOppositeHalves'],
     showRay: true,
   },
   {
@@ -349,11 +386,15 @@ export const TUTORIAL = [
   {
     title: 's13title', body: 's13body',
     apply: {
+      // Back to ground level: the reader may have climbed to 3 km on the
+      // full-circle step, and the payoff is what the sky looks like from
+      // where they actually stand.
       scene: 'sky', view: 'eye', dispersion: 1, wavelength: 'white', reflections: 2,
-      graphOpen: false, families: { 0: false, 1: true, 2: true, 3: false },
+      graphOpen: false, observerHeight: 1.7,
+      families: { 0: false, 1: true, 2: true, 3: false },
       show: {
         primary: true, secondary: true, alexander: true, horizon: true, ground: true,
-        renderedBow: true, cone: false, wavelengthLabels: true,
+        renderedBow: true, cone: false, wavelengthLabels: true, rainBelow: false,
       },
     },
     focus: ['showSecondary', 'showAlexander', 'showRenderedBow'],
