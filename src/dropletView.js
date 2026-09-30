@@ -21,6 +21,11 @@ const REACHES_OBSERVER = new Set([O.RayClass.PRIMARY, O.RayClass.SECONDARY, O.Ra
 
 const SEG_LABELS = ['R0', 'R1', 'R2', 'R3', 'R4', 'R5'];
 
+/** One entry point of the beam: the same b and colour, whatever the order. */
+function trunkKey(ray) {
+  return `${ray.b.toFixed(6)}|${ray.lambda}`;
+}
+
 /** Where the entry-point track is drawn, in droplet radii up-beam. */
 const HANDLE_X = -1.9;
 
@@ -135,12 +140,26 @@ export function createDropletView(canvas) {
     // secondary bow, and was invisible while each order redrew the whole
     // path on top of the others.
     const lowest = Math.min(...rays.filter((r) => r.role === 'main' || r.role === 'fan').map((r) => r.k));
+    // Which entry points feed a HIGHER order that reaches the eye.
+    //
+    // At b = 0.958 the secondary is on its caustic and the primary is not, so
+    // the bright thing on screen was a secondary exit whose lead-in had been
+    // drawn dim by the primary that owns the shared trunk. The beam looked
+    // like it started in the middle of the droplet. The trunk belongs to
+    // whichever order is doing the arriving, so it is lit whenever any order
+    // sharing it arrives.
+    const litTrunks = new Set();
+    for (const r of rays) {
+      if (r.k > lowest && (r.role === 'main' || r.role === 'fan') && reachesEye(r)) {
+        litTrunks.add(trunkKey(r));
+      }
+    }
     // Fan segments are batched by stroke style into one Path2D each and
     // stroked once per group. Every other ray keeps its own path, because it
     // carries decorations -- arrowheads, vertex dots, the reaches-the-eye
     // glow -- that a shared path cannot.
     const batch = new Map();
-    for (const ray of rays) drawRay(ctx, ray, batch, lowest);
+    for (const ray of rays) drawRay(ctx, ray, batch, lowest, litTrunks);
     flushBatch(ctx, batch);
 
     const main = rays.filter((r) => r.role === 'main');
@@ -382,8 +401,8 @@ export function createDropletView(canvas) {
    * to land on the caustic is emphasised exactly like the main ray would be;
    * an off-caustic main ray is dimmed exactly like a non-rainbow fan ray.
    */
-  function rayStyle(ray) {
-    const reaches = reachesEye(ray);
+  function rayStyle(ray, force = null) {
+    const reaches = force === null ? reachesEye(ray) : force;
     // greyMix is the primary cue (see colorFor): a ray that misses the
     // observer loses most of its hue, so with a whole fan on screen the few
     // that matter stand out by colour and not merely by being a little less
@@ -407,12 +426,17 @@ export function createDropletView(canvas) {
    * thousand segments, and a stroke call each put the frame at 54 ms.
    * Grouped by style and width there are a couple of dozen strokes instead.
    */
-  function drawRay(ctx, ray, batch, lowest = 0) {
+  function drawRay(ctx, ray, batch, lowest = 0, litTrunks = null) {
     const p = ray.path;
     if (!p.hit && !p.miss) return;
     // Where this order stops being the same light as the lowest one drawn.
     const from = ray.role === 'main' || ray.role === 'fan' ? sharedPrefix(ray.k, lowest) : 0;
     const { alpha: a, width: baseWidth, greyMix, reaches } = rayStyle(ray);
+    // How much of THIS ray the higher orders are relying on it to draw.
+    const trunkTo = ray.k === lowest && (ray.role === 'main' || ray.role === 'fan')
+      ? sharedPrefix(lowest + 1, lowest) : 0;
+    const lendLit = trunkTo > 0 && !reaches && litTrunks && litTrunks.has(trunkKey(ray));
+    const lentStyle = lendLit ? rayStyle(ray, true) : null;
     const selected =
       state.selectedRay &&
       state.selectedRay.k === ray.k &&
@@ -435,17 +459,22 @@ export function createDropletView(canvas) {
       const seg = p.segments[si];
       const A = project(seg.a);
       const B = project(seg.b);
-      let width = baseWidth;
+      // On the shared trunk, borrow the style of the order that is arriving.
+      const lent = lentStyle && si < trunkTo;
+      const alpha = lent ? lentStyle.alpha : a;
+      const mix = lent ? lentStyle.greyMix : greyMix;
+      let width = lent ? lentStyle.width : baseWidth;
       if (selected) width += 1.6;
-      let style = base;
+      let style = lent ? colorFor(ray.lambda, alpha, mix) : base;
       if (seg.medium === 'water') {
-        style = colorFor(ray.lambda, Math.min(1, a * 0.95), greyMix);
+        style = colorFor(ray.lambda, Math.min(1, alpha * 0.95), mix);
         width += 0.2;
       }
       if (seg.kind === 'incident' && ray.role !== 'fan') {
         // incoming sunlight is white before the droplet splits it, but a
         // ray that will miss the observer still reads as greyed out
-        style = reaches && state.wavelength === 'white' ? `rgba(255,246,214,${a})` : base;
+        style = (reaches || lent) && state.wavelength === 'white'
+          ? `rgba(255,246,214,${alpha})` : style;
       }
       // A selected fan ray is drawn on its own: it is thicker than its group.
       if (batch && ray.role === 'fan' && !selected) {

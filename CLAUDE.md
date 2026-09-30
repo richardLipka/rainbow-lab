@@ -1610,3 +1610,25 @@ Tutorial: step 6 was "drag the eye until rays pile up", which no longer has an
 eye to drag. It is now "add more rays" — 4, then 16, then 60 — which makes the
 same point out of the thing the scene is actually built around. Step 15 lost
 its split-entry framing; the band is simply there whenever two orders are.
+
+### The beam that started in mid-air
+
+With two orders on screen a bright beam appeared to leave the droplet with no
+incoming ray attached. Cause: `sharedPrefix` has the LOWEST order draw the
+trunk every higher order shares, and the trunk was drawn in the lowest order's
+style. Measured across a 24-ray beam, at b = +-0.958 the secondary sits on its
+caustic (`secondary`) while the primary at that same entry point does not
+(`nonCaustic`) -- so the lead-in was painted at the dim style while the exit
+was painted bright.
+
+`litTrunks` fixes it: an entry point feeding ANY higher order that reaches the
+eye has its trunk drawn lit. Measured on the incident segment, sampled as a
+median along its length so crossing rays cannot flatter it -- with the primary
+alone, b=0.958 reads 30 against the primary caustic's 85; with both orders it
+reads 85. The bright exit now has a bright lead-in.
+
+Two measurement traps hit while checking this, both worth remembering:
+`activeOrders()` reads `state.families`, NOT `state.reflections`, so a
+`set({reflections: 1})` in a console probe changes nothing about what is
+traced -- set both. And a max-along-a-line probe reads whichever ray happens
+to cross it; take the median.
