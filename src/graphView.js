@@ -400,7 +400,7 @@ export function createGraphView(canvas) {
       }
     }
 
-    label(ctx, `${t('rayCount')}: ${formatCount(accum.count)}`, box.x + box.w - 8, box.y + 12, {
+    label(ctx, `${formatCount(accum.count)} ${t('distSamples')}`, box.x + box.w - 8, box.y + 12, {
       align: 'right', color: '#e8eefc',
     });
     const peakDeg = peakAngle(shown, lo, bw);

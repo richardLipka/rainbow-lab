@@ -1686,14 +1686,14 @@ const translations = {
 
     /* ---- graphs ---- */
     graphExitAngle: 'Výstupní úhel',
-    graphDistribution: 'Rozdělení paprsků',
+    graphDistribution: 'Světlo podle směru',
     graphExitAngleTitle: 'Výstupní úhel v závislosti na parametru dopadu',
-    graphDistributionTitle: 'Kolik paprsků odchází kterým směrem',
+    graphDistributionTitle: 'Kolik světla odchází kterým směrem',
     axisImpact: 'parametr dopadu b/R',
     axisAngleAntisolar: 'úhel od antisolárního směru φ [°]',
     axisAngleScattering: 'rozptylový úhel Θ [°]',
     axisAngleDeviation: 'celková odchylka D [°]',
-    axisRayCount: 'relativní jas (počet paprsků na úhel)',
+    axisRayCount: 'relativní jas — energie na jednotkový prostorový úhel',
     angleConvention: 'Zobrazený úhel',
     angleAntisolar: 'φ — od antisolárního směru',
     angleScattering: 'Θ — rozptylový úhel',
@@ -1706,7 +1706,12 @@ const translations = {
     graphExitExplain:
       'Každý přicházející paprsek je popsán tím, kam do kapky dopadne: b/R = 0 je přesný střed, b/R = 1 okraj. Křivka udává směr, kterým paprsek vyjde ven. V okolí svého extrému je téměř vodorovná, takže celý pás parametrů dopadu odchází skoro stejným směrem — právě tam se paprsky hromadí a ten úhel je úhlový poloměr duhy. Každá vlnová délka má svou křivku a každá se obrací u trochu jiného úhlu. Odtud pocházejí barvy.',
     graphDistExplain:
-      'Paprsky vystřelujeme náhodně po celé ploše kapky a počítáme, kterým směrem odejdou. Do většiny směrů jich jde podobně málo. Do jednoho ne: u úhlu, kde se křivka výstupního úhlu obrací, počet prudce vyskočí. Svislá osa je jas, vodorovná úhel — přesně to, co měří oko přejíždějící po obloze — takže ten vrchol je duha a leží u úhlu, pod kterým ji uvidíte. Zvyšte počet paprsků a vyloupne se ze šumu sám.',
+      'Vzorky dopadají náhodně po celé přední stěně kapky, každý na stejně velký kousek, takže '
+      + 'každý nese stejně světla. Nesčítá se jejich počet, ale energie: kolik z nich přežije lomy '
+      + 'a odrazy, rozprostřené do prostorového úhlu, kterým odcházejí. Do většiny směrů jde '
+      + 'podobně málo. Do jednoho ne — tam, kde je křivka výstupního úhlu plochá, se do téhož '
+      + 'směru nahrne celý pás vstupních bodů a energie vyskočí. Ten vrchol je duha a leží u '
+      + 'úhlu, pod kterým ji uvidíte. Zvyšte počet vzorků a vyloupne se ze šumu sám.',
     extremumLabel: 'extrém → duha',
     rayCount: 'Počet paprsků',
     accumulate: 'Přidávat paprsky',
@@ -1866,6 +1871,13 @@ const translations = {
       'Odrazy tam jsou, výstupní úhel ne. Tenhle paprsek odchází daleko od extrému, takže se rozptýlí jako každý jiný a k žádné duze nepřispívá.',
     explHigherOrder:
       'Tři odrazy a víc. Zbude zlomek toho, co má primární duha, a vrací se na opačnou stranu oblohy — vedle Slunce, ne proti němu.',
+    distSamples: 'vzorků',
+    explEnergyPlot:
+      'Tenhle graf není histogram paprsků, je to energie. Každý vzorek padne na stejně velký '
+      + 'kousek přední stěny kapky, takže nese stejně světla; váží se Fresnelovým rozpočtem '
+      + '(1−R)²·R^k, tedy tím, co z něj po odrazech zbude; a dělí se prostorovým úhlem prstence, '
+      + 'do kterého odejde. Výška křivky je proto jas v daném směru. Odtud ten ostrý vrchol na '
+      + '42° a nula hned za ním — za hlavní duhu se po jednom odrazu nedostane vůbec nic.',
     explCaustic:
       'V okolí tohoto extrému se mnoho různých paprsků odchyluje do velmi podobného směru. Světlo se proto v tomto směru výrazně koncentruje. Tento jev se nazývá kaustika.',
     explObserverHeight:
@@ -1943,7 +1955,12 @@ const translations = {
       + 'rozsvítí. Vždycky jen jedno.',
     s13btitle: 'Proč se barvy obracejí',
     s13bbody:
-      'Otevřete graf a podívejte se na obě křivky. Primární stoupá k vrcholu, vedlejší klesá do sedla. V tomhle jediném rozdílu je celé obrácení: ve vrcholu se nejdelší vlnová délka obrací nejdál od středu, v sedle nejblíž k němu. Červená tak končí vně primární duhy a uvnitř vedlejší.',
+      'Každá barva má svůj vlastní úhel, protože má svůj index lomu. Červená u jednoho odrazu '
+      + 'končí na 42,2°, fialová na 40,5° — červená je tedy dál od antisolárního bodu, tedy nahoře. '
+      + 'U dvou odrazů je červená na 50,7° a fialová na 53,7°, takže je to naopak: fialová je dál, '
+      + 'červená blíž. Na grafu je vidět proč. Primární křivka má vrchol a ten vrchol je pro '
+      + 'červenou výš; vedlejší má sedlo a to sedlo je pro červenou níž. Stejná dispersion, '
+      + 'obrácené pořadí.',
     explColourFlip:
       'Červená se v primární duze obrací u {p1} a ve vedlejší u {p2}, fialová u {v1} a u {v2}. Jedna křivka má vrchol, druhá sedlo — a tentýž rozptyl indexu lomu proto naskládá barvy jednou takhle a podruhé obráceně. Mezera mezi nimi, {gap} oblohy, je prázdná ze stejného důvodu: obě křivky se od ní odvracejí, takže do ní žádný paprsek s jedním ani dvěma odrazy nedopadne.',
     turnMax: 'vrchol',
@@ -2021,7 +2038,11 @@ const translations = {
       'Změřte úhel mezi vystupujícím paprskem a směrem od Slunce. Panel vpravo ukazuje φ — úhel od antisolárního směru.',
     s5title: 'Zkuste jiné paprsky',
     s5body:
-      'Projděte celý rozsah parametru dopadu a dívejte se na graf dole. Výstupní úhel není konstantní — ale ani nestoupá donekonečna.',
+      'Projděte celý rozsah parametru dopadu a dívejte se na graf dole. Nejde o to, že někde je '
+      + 'úhel největší — jde o to, že tam je křivka vodorovná. Plochá křivka znamená, že celý pás '
+      + 'vstupních bodů odejde skoro stejným směrem. Jinde se úhel při každém posunu mění a světlo '
+      + 'se rozprostře. Jestli je ten plochý bod vrchol nebo sedlo, je vedlejší: u jednoho odrazu '
+      + 'vyjde vrchol, u dvou sedlo, a duha je v obou případech tam, kde se křivka obrací.',
     s7title: 'Proč existuje jasný směr?',
     s7body:
       'Křivka má extrém. V jeho okolí je skoro plochá, takže mnoho různých vstupních paprsků odchází téměř stejným směrem. Graf dole teď počítá paprsky podle směru — zvyšte jejich počet a sledujte, jak vrchol roste.',
@@ -2055,12 +2076,18 @@ const translations = {
       'Index lomu vody závisí na vlnové délce. Posuňte disperzi z 0 % na 100 % a jediný úhel se rozpadne na pás barev. Graf dole se rozpadne s ním — na jednu křivku pro každou vlnovou délku.',
     s13ctitle: 'Pás, do kterého nic nepřijde',
     s13cbody:
-      'Dva řády naráz, plný svazek přes celou kapku. Každý řád si najde svůj úhel a mezi nimi zůstane klín, '
-      + 'do kterého nevychází nic — ani po jednom odrazu, ani po dvou, při žádném místě dopadu. '
-      + 'To je Alexandrův temný pás. Na obloze je to ten tmavší proužek mezi hlavní a vedlejší duhou.',
+      'Paprsek je nastavený na vedlejší duhu, a proto vstupuje spodní polovinou kapky — jen odtud '
+      + 'odejde po dvou odrazech dolů k pozorovateli. Horní polovinou by odešel nahoru, pryč. '
+      + 'Primární duha to má opačně. Proto jsou obě oči na stejné straně, 8° od sebe, a mezi nimi '
+      + 'zůstane klín, do kterého nevychází nic — ani po jednom odrazu, ani po dvou, při žádném '
+      + 'místě dopadu. To je Alexandrův temný pás.',
     s13title: 'Může být duh víc?',
     s13body:
-      'A takhle to dopadne na obloze. Dva prstence, ten vnější slabší a s obráceným pořadím barev, a mezi nimi Alexandrův temný pás — přesně ta mezera, ze které se obě křivky odvracely.',
+      'A takhle to dopadne na obloze. Pás leží přesně mezi červeným okrajem hlavní duhy na 42,4° '
+      + 'a červeným okrajem vedlejší na 50,4° — ano, je to ta mezera mezi dvěma červenými kruhy. '
+      + 'Temný je proto, že ven z kapky tam nemíří nic: za hlavní duhu se po jednom odrazu '
+      + 'nedostane nic a před vedlejší se po dvou nedostane nic. Vypněte a zapněte stínování pásu '
+      + 'a porovnejte ho s oblohou vně vedlejší duhy — tam světlo je, jen slabé.',
 
 /* ---- controls: the observer ---- */
     observerGroup: 'Pozorovatel',
@@ -2230,14 +2257,14 @@ const translations = {
 
     /* ---- graphs ---- */
     graphExitAngle: 'Exit angle',
-    graphDistribution: 'Ray distribution',
+    graphDistribution: 'Light by direction',
     graphExitAngleTitle: 'Exit angle versus impact parameter',
-    graphDistributionTitle: 'How many rays leave in each direction',
+    graphDistributionTitle: 'How much light leaves in each direction',
     axisImpact: 'impact parameter b/R',
     axisAngleAntisolar: 'angle from the antisolar direction φ [°]',
     axisAngleScattering: 'scattering angle Θ [°]',
     axisAngleDeviation: 'total deviation D [°]',
-    axisRayCount: 'relative brightness (rays per unit angle)',
+    axisRayCount: 'relative brightness — energy per unit solid angle',
     angleConvention: 'Angle plotted',
     angleAntisolar: 'φ — from the antisolar direction',
     angleScattering: 'Θ — scattering angle',
@@ -2250,7 +2277,13 @@ const translations = {
     graphExitExplain:
       "Every incoming ray is labelled by where it hits the droplet: b/R = 0 is dead centre, b/R = 1 grazes the edge. The curve gives the direction that ray leaves in. Near its turning point the curve is almost flat, so a whole band of impact parameters exits at nearly the same angle — that pile-up is the rainbow, and the angle it happens at is the bow's angular radius. Each wavelength has its own curve, each turning over at a slightly different angle; that is where the colours come from.",
     graphDistExplain:
-      'Rays are fired at random across the whole face of the droplet and counted by the direction they leave in. Most directions get a similar modest share. One does not: at the angle where the exit-angle curve turns over, the count spikes. The vertical axis is brightness and the horizontal one is angle — exactly what an eye measures sweeping the sky — so that spike is the bow, sitting at the angle you have to look at. Raise the ray count and it sharpens out of the noise on its own.',
+      'Samples land at random across the whole face of the droplet, each on an equal patch of it, '
+      + 'so each carries the same amount of incoming light. What gets added up is not their number '
+      + 'but their energy: how much survives the refractions and the bounces, spread over the solid '
+      + 'angle it leaves into. Most directions get a similar modest share. One does not — where the '
+      + 'exit-angle curve goes flat, a whole band of entry points piles into the same direction and '
+      + 'the energy spikes. That spike is the bow, at the angle you have to look at. Raise the '
+      + 'sample count and it sharpens out of the noise on its own.',
     extremumLabel: 'extremum → rainbow',
     rayCount: 'Number of rays',
     accumulate: 'Accumulate rays',
@@ -2412,6 +2445,14 @@ const translations = {
       'The bounces are there, the exit angle is not. This ray leaves nowhere near the extremum, so it scatters like any other and adds to no bow at all.',
     explHigherOrder:
       'Three bounces or more. What is left is a fraction of the primary, and it comes back on the wrong side of the sky — beside the Sun rather than opposite it.',
+    distSamples: 'samples',
+    explEnergyPlot:
+      'This plot is not a tally of rays, it is energy. Each sample lands on an equal patch of the '
+      + 'droplet face, so it carries equal light; it is weighted by the Fresnel budget '
+      + '(1−R)²·R^k, which is what survives the bounces; and it is divided by the solid angle of '
+      + 'the ring it leaves into. The height of the curve is therefore brightness in that '
+      + 'direction. Hence the sharp peak at 42° and zero immediately outside it — one bounce '
+      + 'never sends anything past the primary.',
     explCaustic:
       'Near this extremum, many different incoming rays leave the droplet in nearly the same direction. Light therefore becomes strongly concentrated in this direction. This concentration is called a caustic.',
     explObserverHeight:
@@ -2489,7 +2530,12 @@ const translations = {
       + 'up. Only ever one.',
     s13btitle: 'Why the colours flip',
     s13bbody:
-      'Open the plot and look at the two curves. The primary rises to a peak; the secondary falls to a trough. That single difference is the whole reversal: at a peak the longest wavelength turns over furthest out, at a trough it turns over furthest in. So red ends up outside the primary and inside the secondary.',
+      'Every colour has its own angle, because it has its own refractive index. With one bounce '
+      + 'red turns at 42.2° and violet at 40.5° — red is further from the antisolar point, so red '
+      + 'is on the outside. With two bounces red is at 50.7° and violet at 53.7°, and now it is '
+      + 'the other way round: violet is further out, red is nearer in. The plot shows why. The '
+      + 'primary curve has a peak and red peaks higher; the secondary curve has a trough and red '
+      + 'bottoms out lower. Same dispersion, reversed order.',
     explColourFlip:
       'Red turns over at {p1} in the primary and {p2} in the secondary; violet at {v1} and {v2}. One curve peaks and the other troughs, so the same spread of refractive index stacks the colours one way and then the other. The gap between them — {gap} of sky — is empty for the same reason: both curves turn away from it, so no once- or twice-reflected ray can land there.',
     turnMax: 'peak',
@@ -2569,7 +2615,12 @@ const translations = {
       'Measure the angle between the outgoing ray and the direction away from the Sun. The panel on the right shows φ, the angle from the antisolar direction.',
     s5title: 'Try different incoming rays',
     s5body:
-      'Sweep the whole range of the impact parameter and watch the graph below. The exit angle is not constant — but it does not grow without limit either.',
+      'Sweep the impact parameter and watch the graph below. The point is not that the angle is '
+      + 'largest somewhere — it is that the curve goes flat there. Flat means a whole band of '
+      + 'entry points leaves in nearly the same direction. Everywhere else the angle shifts with '
+      + 'every step you take and the light spreads out. Whether that flat spot is a peak or a '
+      + 'trough does not matter: one bounce gives a peak, two give a trough, and the bow is at '
+      + 'the turn either way.',
     s7title: 'Why is there a bright direction?',
     s7body:
       'The curve has an extremum. Near it the curve is almost flat, so many different incoming rays leave in almost the same direction. The graph below now counts rays by direction — raise the ray count and watch the spike grow.',
@@ -2605,12 +2656,19 @@ const translations = {
       "Water's refractive index depends on wavelength. Move dispersion from 0 % to 100 % and a single angle splits into a band of colours. The graph below splits with it, one curve per wavelength.",
     s13ctitle: 'The band nothing arrives in',
     s13cbody:
-      'Two orders at once, the beam covering the whole drop. Each order finds its own angle, and a wedge is '
-      + 'left between them that takes no light at all — not after one bounce, not after two, at no entry '
-      + "point. That is Alexander's dark band. In the sky it is the darker strip between the two bows.",
+      'The ray is set to the secondary, which is why it enters through the BOTTOM half of the '
+      + 'drop — only from there does two bounces send it down to the observer. Through the top '
+      + 'half it would leave upward, away. The primary is the other way round. That is why both '
+      + 'eyes sit on the same side, 8° apart, with a wedge between them that takes no light at '
+      + "all — not after one bounce, not after two, at no entry point. That is Alexander's band.",
     s13title: 'Can there be another rainbow?',
     s13body:
-      "And here is how it lands in the sky. Two rings, the outer one fainter and with its colours reversed, and between them Alexander's dark band — the very gap both curves were turning away from.",
+      'And here is how it lands in the sky. The band sits exactly between the primary’s red '
+      + 'rim at 42.4° and the secondary’s red rim at 50.4° — so yes, it is the gap between the '
+      + 'two red circles. It is dark because nothing leaves a droplet into it: one bounce never '
+      + 'gets past the primary, two bounces never get inside the secondary. Toggle the band '
+      + 'shading off and on, and compare it with the sky outside the secondary — there is light '
+      + 'there, just faint.',
 
 /* ---- controls: the observer ---- */
     observerGroup: 'Observer',
@@ -6093,7 +6151,7 @@ function createGraphView(canvas) {
       }
     }
 
-    label(ctx, `${t('rayCount')}: ${formatCount(accum.count)}`, box.x + box.w - 8, box.y + 12, {
+    label(ctx, `${formatCount(accum.count)} ${t('distSamples')}`, box.x + box.w - 8, box.y + 12, {
       align: 'right', color: '#e8eefc',
     });
     const peakDeg = peakAngle(shown, lo, bw);
@@ -8357,8 +8415,10 @@ const TUTORIAL = [
   {
     title: 's4title', body: 's4body',
     apply: {
+      // One ray: this step reads phi off a single exit, and the compact ray
+      // readout beside it describes that one ray.
       scene: 'droplet', reflections: 1, showNonRainbow: false, panel: 'guide',
-      graphOpen: false, show: { angles: true },
+      fanCount: 0, graphOpen: false, show: { angles: true },
     },
     focus: ['impactParameter', 'showAngles'],
     actions: [{
@@ -8427,7 +8487,7 @@ const TUTORIAL = [
       { label: '1 000', patch: { distRays: 1000 } },
       { label: '100 000', patch: { distRays: 100000 } },
     ],
-    note: 'explCaustic',
+    note: ['explCaustic', 'explEnergyPlot'],
   },
   {
     title: 's8title', body: 's8body',
@@ -8609,11 +8669,17 @@ const TUTORIAL = [
     title: 's13ctitle', body: 's13cbody',
     apply: {
       scene: 'droplet', panel: 'guide', wavelength: 650, dispersion: 1,
+      // Pinned to the SECONDARY's own entry point, which is in the lower half
+      // of the face. Left at the primary's +0.862 the secondary ray leaves
+      // upward, away from both eyes, and the step reads as if the secondary
+      // bow pointed at the sky instead of at the observer.
       reflections: 2, fanCount: 32, dropletZoom: 1,
       graphOpen: false, showNonRainbow: false,
       families: { 0: false, 1: true, 2: true, 3: false },
       show: { angles: true, normals: false, labels: true, renderedBow: false },
     },
+    // From the engine. -0.951 is not a number this file is allowed to know.
+    compute: () => ({ impact: bowEntry(2, indexModel()(650)) }),
     focus: ['reflections', 'impactParameter'],
     actions: [
       {
@@ -8634,8 +8700,11 @@ const TUTORIAL = [
       // Back to ground level: the reader may have climbed to 3 km on the
       // full-circle step, and the payoff is what the sky looks like from
       // where they actually stand.
+      // The Sun too: every other sky and rain step pins 15 deg, and this one
+      // did not. Arrive here with the Sun at 75 and the whole bow is below
+      // the horizon -- the payoff step showing an empty sky.
       scene: 'sky', view: 'eye', dispersion: 1, wavelength: 'white', reflections: 2,
-      graphOpen: false, observerHeight: 1.7,
+      graphOpen: false, observerHeight: 1.7, sunElevation: 15,
       families: { 0: false, 1: true, 2: true, 3: false },
       show: {
         primary: true, secondary: true, alexander: true, horizon: true, ground: true,
@@ -8655,7 +8724,20 @@ const TUTORIAL = [
 function applyStep(i) {
   const s = TUTORIAL[i];
   if (!s) return;
-  set({ ...s.apply, step: i });
+  // `apply` is a literal, so a step that needs a value out of the engine --
+  // an entry point, a bow angle -- supplies `compute()` instead of writing
+  // the number down. Applied after `apply`, so it wins.
+  const computed = typeof s.compute === 'function' ? s.compute() : null;
+  // activeOrders() reads `families`, not `reflections`, so a step that sets
+  // the count without the families keeps whatever the reader arrived with --
+  // jump into "try different incoming rays" from the secondary steps and it
+  // quietly plots two orders. Derive it, cumulatively, the way the control
+  // does. A step that states its own families still wins.
+  const k = s.apply.reflections;
+  const families = k === undefined || s.apply.families !== undefined
+    ? null
+    : { families: { 0: k === 0, 1: k >= 1, 2: k >= 2, 3: k >= 3 } };
+  set({ ...s.apply, ...families, ...computed, step: i });
 }
 
 function renderTutorial() {

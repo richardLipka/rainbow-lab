@@ -1825,3 +1825,45 @@ Two bugs the audit turned up:
   step sits at b = 0.7, where the markers read 97.3 % / 2.7 %. Prose quoting
   engine numbers has to quote them for the state the step actually sets --
   or, better, not quote them at all, which is what it does now.
+
+## Reader feedback pass: the plot, the flip, the band
+
+**The energy plot the reader asked for already existed, labelled as a ray
+tally.** `addRays()` samples `b = sqrt(random())` (equal AREA of the face, so
+equal incoming light), weights by `(1-R)^2 R^k`, and divides by `sin(phi)`.
+That is radiance -- energy per unit solid angle -- and the axis said "rays per
+unit angle". Measured, it peaks at 42.25 deg against the analytic 42.19, sits
+at 0.163 of peak at 30 deg (the lit sky inside the bow) and at **zero** just
+outside 42.4 (Alexander's band, already in the curve). Relabelled throughout;
+the sample count is now called samples, and `explEnergyPlot` says what the
+height means. No second plot was built, because there was nothing to build.
+
+**Step 6 was teaching the wrong idea.** "The exit angle does not grow without
+limit" invites "so why maximise it?" -- which is not the point. The point is
+that the curve goes FLAT: a whole band of entry points then leaves in one
+direction. Whether the flat spot is a peak (k=1) or a trough (k=2) carries no
+physics. Rewritten.
+
+**Step 16's colour flip was argued abstractly.** Now it quotes the app's own
+red and violet: k=1 red 42.19 / violet 40.52, k=2 red 50.69 / violet 53.71.
+
+**Step 17 contradicted itself.** It inherited the primary's entry point, so
+the secondary ray left UPWARD, away from both eyes, while the text talked
+about the band between them. It now pins the secondary's own entry -- lower
+half -- via a new `compute()` hook on a step, because -0.951 is not a number
+panels.js is allowed to contain.
+
+Three more sticky-state bugs of the same family, all found by jumping into
+each step from a deliberately hostile state rather than walking in order:
+
+- Steps 5, 6 and 8 set `reflections` without `families`, and `activeOrders()`
+  reads families. Fixed once in `applyStep`: a step that states a reflection
+  count and no families gets the cumulative set derived for it.
+- Step 5 did not pin `fanCount`, so the step that reads phi off a single exit
+  could arrive with a 60-ray beam.
+- Step 18 did not pin `sunElevation`. Arrive with the Sun at 75 deg and the
+  payoff step shows an empty sky: "the whole primary bow is below the horizon".
+
+The habit this keeps teaching: a step must pin everything it depends on, and
+the way to find what it does not pin is to jump into it from the worst state
+you can construct, never to walk the tutorial in order.

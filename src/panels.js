@@ -112,8 +112,10 @@ export const TUTORIAL = [
   {
     title: 's4title', body: 's4body',
     apply: {
+      // One ray: this step reads phi off a single exit, and the compact ray
+      // readout beside it describes that one ray.
       scene: 'droplet', reflections: 1, showNonRainbow: false, panel: 'guide',
-      graphOpen: false, show: { angles: true },
+      fanCount: 0, graphOpen: false, show: { angles: true },
     },
     focus: ['impactParameter', 'showAngles'],
     actions: [{
@@ -182,7 +184,7 @@ export const TUTORIAL = [
       { label: '1 000', patch: { distRays: 1000 } },
       { label: '100 000', patch: { distRays: 100000 } },
     ],
-    note: 'explCaustic',
+    note: ['explCaustic', 'explEnergyPlot'],
   },
   {
     title: 's8title', body: 's8body',
@@ -364,11 +366,17 @@ export const TUTORIAL = [
     title: 's13ctitle', body: 's13cbody',
     apply: {
       scene: 'droplet', panel: 'guide', wavelength: 650, dispersion: 1,
+      // Pinned to the SECONDARY's own entry point, which is in the lower half
+      // of the face. Left at the primary's +0.862 the secondary ray leaves
+      // upward, away from both eyes, and the step reads as if the secondary
+      // bow pointed at the sky instead of at the observer.
       reflections: 2, fanCount: 32, dropletZoom: 1,
       graphOpen: false, showNonRainbow: false,
       families: { 0: false, 1: true, 2: true, 3: false },
       show: { angles: true, normals: false, labels: true, renderedBow: false },
     },
+    // From the engine. -0.951 is not a number this file is allowed to know.
+    compute: () => ({ impact: bowEntry(2, indexModel()(650)) }),
     focus: ['reflections', 'impactParameter'],
     actions: [
       {
@@ -389,8 +397,11 @@ export const TUTORIAL = [
       // Back to ground level: the reader may have climbed to 3 km on the
       // full-circle step, and the payoff is what the sky looks like from
       // where they actually stand.
+      // The Sun too: every other sky and rain step pins 15 deg, and this one
+      // did not. Arrive here with the Sun at 75 and the whole bow is below
+      // the horizon -- the payoff step showing an empty sky.
       scene: 'sky', view: 'eye', dispersion: 1, wavelength: 'white', reflections: 2,
-      graphOpen: false, observerHeight: 1.7,
+      graphOpen: false, observerHeight: 1.7, sunElevation: 15,
       families: { 0: false, 1: true, 2: true, 3: false },
       show: {
         primary: true, secondary: true, alexander: true, horizon: true, ground: true,
@@ -410,7 +421,20 @@ export const TUTORIAL = [
 export function applyStep(i) {
   const s = TUTORIAL[i];
   if (!s) return;
-  set({ ...s.apply, step: i });
+  // `apply` is a literal, so a step that needs a value out of the engine --
+  // an entry point, a bow angle -- supplies `compute()` instead of writing
+  // the number down. Applied after `apply`, so it wins.
+  const computed = typeof s.compute === 'function' ? s.compute() : null;
+  // activeOrders() reads `families`, not `reflections`, so a step that sets
+  // the count without the families keeps whatever the reader arrived with --
+  // jump into "try different incoming rays" from the secondary steps and it
+  // quietly plots two orders. Derive it, cumulatively, the way the control
+  // does. A step that states its own families still wins.
+  const k = s.apply.reflections;
+  const families = k === undefined || s.apply.families !== undefined
+    ? null
+    : { families: { 0: k === 0, 1: k >= 1, 2: k >= 2, 3: k >= 3 } };
+  set({ ...s.apply, ...families, ...computed, step: i });
 }
 
 function renderTutorial() {
