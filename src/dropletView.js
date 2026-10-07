@@ -932,7 +932,16 @@ export function createDropletView(canvas) {
         label(ctx, text, O.clamp(x, half + 2, Math.max(half + 2, w - half - 2)), ty,
           { align: 'center', ...opts });
       };
-      centred(t('observerLabel'), y1, { color: active ? '#e0a83f' : '#93a3bd' });
+      // Say WHICH bow this eye is standing for. "Observer" twice over, with
+      // only a k=1 / k=2 to tell them apart, read as one observer drawn
+      // twice -- which is the opposite of the point when two of them are on
+      // screen precisely because each bow needs its own place to stand.
+      const who = observer.meetOrders
+        ? t('observerLabel')
+        : observer.kRef >= 1
+          ? `${t('observerLabel')} · ${t(bowNameKey(observer.kRef), { k: observer.kRef })}`
+          : t('observerLabel');
+      centred(who, y1, { color: active ? '#e0a83f' : '#93a3bd' });
       centred(belowLine2, y1 + 16, {
         color: '#6f86ab', font: '10px "IBM Plex Mono", ui-monospace, monospace',
       });

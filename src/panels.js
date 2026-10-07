@@ -50,19 +50,21 @@ export const TUTORIAL = [
       // alone makes that impossible to see. No band and no arrival arc: both
       // get their own steps later, and here they are the clutter standing
       // between the reader and "two bows, eight degrees apart".
-      // Zoomed out far enough to put the crossing of the two bow rays in
-      // frame -- it is 12.2 droplet radii out, and at zoom 1 it is nowhere
-      // near the canvas.
+      // TWO eyes, one per bow, each named for the bow it stands for. The
+      // general truth comes first: the two bows leave in different
+      // directions, so they need different places to stand. Step 2 then
+      // finds the single spot where those two places coincide, which is the
+      // special case and reads as a trick if it arrives first.
       scene: 'droplet', graph: 'exit', reflections: 2, dispersion: 1, wavelength: 'white',
       impact: 0.861, fanCount: 12, showNonRainbow: false, angleMode: 'antisolar',
-      dropletZoom: 25, graphOpen: false, sunElevation: 0,
+      dropletZoom: 1, graphOpen: false, sunElevation: 0,
       show: {
         angles: false, normals: false, labels: true, renderedBow: false,
-        alexander: false, arrival: false, walls: false, meetingEye: true,
+        alexander: false, arrival: false, walls: false, meetingEye: false,
       },
       families: { 0: false, 1: true, 2: true, 3: false },
     },
-    focus: ['reflections', 'dropletZoom'],
+    focus: ['reflections', 'bowRays'],
     actions: [
       {
         labelKey: 'bowName1',

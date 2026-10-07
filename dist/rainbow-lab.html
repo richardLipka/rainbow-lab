@@ -2037,17 +2037,18 @@ const translations = {
 
     s1title: 'Jedna kapka, dvě duhy',
     s1body:
-      'Tohle je cíl. Jedna kulová kapka v řezu, sluneční světlo zleva a jeden pozorovatel, '
-      + 'ke kterému dorazí obě duhy naráz: hlavní pod 42,4° od antisolárního bodu a vedlejší '
-      + 'pod 50,4°. Každá z nich přitom potřebuje jiný paprsek — vstupuje do kapky jinou výškou '
-      + 'a uvnitř se odrazí jinak často. Zkuste přepnout mezi oběma vstupními body. Zbytek '
-      + 'prohlídky rozebírá, proč to tak je.',
+      'Tohle je cíl. Jedna kulová kapka v řezu, sluneční světlo zleva — a DVA pozorovatelé. '
+      + 'Ne jeden. Jeden stojí tam, kam míří hlavní duha, 42,4° od antisolárního bodu; druhý '
+      + 'tam, kam míří vedlejší, 50,4°. Každá duha totiž odchází z kapky jiným směrem, takže '
+      + 'se na každou z nich stojí jinde. A každá potřebuje jiný paprsek — vstupuje do kapky '
+      + 'jinou výškou a uvnitř se odrazí jinak často. Zkuste přepnout mezi oběma vstupními body.',
     s1ctitle: 'Obě naráz jen z jednoho místa',
     s1cbody:
-      'Každá duha má svůj paprsek a ten letí pořád dál — kdekoli na něm stojíte, tu jednu duhu '
-      + 'uvidíte. Obě naráz je něco jiného. Ty dva paprsky vycházejí z různých míst kapky různými '
-      + 'směry, takže se protnou přesně v jednom bodě, 12,2 poloměru kapky daleko. Přepněte na '
-      + 'oko u každé duhy zvlášť a zpátky.',
+      'Dva pozorovatelé z předchozího kroku ale nemusí stát pořád zvlášť. Každý paprsek letí '
+      + 'pořád dál, takže tu svou duhu uvidíte kdekoli na něm. A protože ty dva paprsky vycházejí '
+      + 'z různých míst kapky různými směry, někde se musí protnout — přesně v jednom bodě, '
+      + '12,2 poloměru kapky daleko. Tam a nikde jinde splynou oba pozorovatelé v jednoho. '
+      + 'Přepněte mezi oběma pohledy.',
     eyeMeeting: 'Jedno oko tam, kde se protnou',
     eyePerBow: 'Oko u každé duhy zvlášť',
     explMeetingPoint:
@@ -2656,17 +2657,19 @@ const translations = {
 
     s1title: 'One drop, two rainbows',
     s1body:
-      'This is where we are going. One spherical drop in cross-section, sunlight from the left, '
-      + 'and one observer who gets both bows at once: the primary 42.4° from the antisolar point '
-      + 'and the secondary 50.4°. Each of them needs its own ray — entering the drop at a '
-      + 'different height, bouncing a different number of times inside. Try the two entry points. '
-      + 'Everything after this takes the picture apart.',
+      'This is where we are going. One spherical drop in cross-section, sunlight from the left — '
+      + 'and TWO observers. Not one. The first stands where the primary bow goes, 42.4° from the '
+      + 'antisolar point; the second where the secondary goes, 50.4°. The two bows leave the drop '
+      + 'in different directions, so each has its own place to stand. And each needs its own ray: '
+      + 'entering the drop at a different height, bouncing a different number of times inside. Try '
+      + 'the two entry points.',
     s1ctitle: 'Both at once, from one place only',
     s1cbody:
-      'Each bow has its own ray and that ray carries on for ever — stand anywhere along it and '
-      + 'you see that bow. Both at once is a different matter. The two rays leave different '
-      + 'points on the drop in different directions, so they cross at exactly one place, 12.2 '
-      + 'droplet radii out. Switch to an eye per bow and back.',
+      'Those two observers do not have to stay apart, though. Each ray carries on for ever, so '
+      + 'you see its bow from anywhere along it. And because the two rays leave different points '
+      + 'on the drop in different directions, somewhere they must cross — at exactly one place, '
+      + '12.2 droplet radii out. There and nowhere else the two observers become one. Switch '
+      + 'between the two views.',
     eyeMeeting: 'One eye where they cross',
     eyePerBow: 'An eye for each bow',
     explMeetingPoint:
@@ -5373,7 +5376,16 @@ function createDropletView(canvas) {
         label(ctx, text, O.clamp(x, half + 2, Math.max(half + 2, w - half - 2)), ty,
           { align: 'center', ...opts });
       };
-      centred(t('observerLabel'), y1, { color: active ? '#e0a83f' : '#93a3bd' });
+      // Say WHICH bow this eye is standing for. "Observer" twice over, with
+      // only a k=1 / k=2 to tell them apart, read as one observer drawn
+      // twice -- which is the opposite of the point when two of them are on
+      // screen precisely because each bow needs its own place to stand.
+      const who = observer.meetOrders
+        ? t('observerLabel')
+        : observer.kRef >= 1
+          ? `${t('observerLabel')} · ${t(bowNameKey(observer.kRef), { k: observer.kRef })}`
+          : t('observerLabel');
+      centred(who, y1, { color: active ? '#e0a83f' : '#93a3bd' });
       centred(belowLine2, y1 + 16, {
         color: '#6f86ab', font: '10px "IBM Plex Mono", ui-monospace, monospace',
       });
@@ -8727,19 +8739,21 @@ const TUTORIAL = [
       // alone makes that impossible to see. No band and no arrival arc: both
       // get their own steps later, and here they are the clutter standing
       // between the reader and "two bows, eight degrees apart".
-      // Zoomed out far enough to put the crossing of the two bow rays in
-      // frame -- it is 12.2 droplet radii out, and at zoom 1 it is nowhere
-      // near the canvas.
+      // TWO eyes, one per bow, each named for the bow it stands for. The
+      // general truth comes first: the two bows leave in different
+      // directions, so they need different places to stand. Step 2 then
+      // finds the single spot where those two places coincide, which is the
+      // special case and reads as a trick if it arrives first.
       scene: 'droplet', graph: 'exit', reflections: 2, dispersion: 1, wavelength: 'white',
       impact: 0.861, fanCount: 12, showNonRainbow: false, angleMode: 'antisolar',
-      dropletZoom: 25, graphOpen: false, sunElevation: 0,
+      dropletZoom: 1, graphOpen: false, sunElevation: 0,
       show: {
         angles: false, normals: false, labels: true, renderedBow: false,
-        alexander: false, arrival: false, walls: false, meetingEye: true,
+        alexander: false, arrival: false, walls: false, meetingEye: false,
       },
       families: { 0: false, 1: true, 2: true, 3: false },
     },
-    focus: ['reflections', 'dropletZoom'],
+    focus: ['reflections', 'bowRays'],
     actions: [
       {
         labelKey: 'bowName1',

@@ -1981,3 +1981,17 @@ a number the step had not earned yet -- and needs `dropletZoom: 25` to bring
 the crossing into frame. The eye with a world position is projected directly
 rather than walked out along `dir`, because `project()` also applies the Sun
 tilt and the two part company the moment the Sun is raised.
+
+### Two observers first, the crossing second
+
+I had the order backwards. Step 1 stood ONE eye at the crossing and stated
+the special case as if it were the normal one, with step 2 then correcting
+it. A reader meeting "one observer gets both bows" first has no reason to
+think it is unusual, and every later scene quietly contradicts it.
+
+Step 1 is back to two eyes, each now captioned with the bow it stands for
+rather than a bare `k=1` / `k=2` -- "Observer" printed twice with only an
+integer between them reads as one observer drawn twice, which is the exact
+opposite of the point. The body opens on "TWO observers. Not one." Step 2
+then takes those two and finds the one place they coincide, which only lands
+as a surprise if the general case came first.
