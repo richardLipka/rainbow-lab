@@ -380,12 +380,26 @@ export const translations = {
     startFree: 'Přejít do volného režimu',
     tutorialDone: 'Hotovo. Zbytek si zkuste sami.',
 
-    s1title: 'Dvě duhy, osm stupňů',
+    s1title: 'Jedna kapka, dvě duhy',
     s1body:
-      'Tohle je cíl. Jedna kulová kapka v řezu, sluneční světlo zleva a dvě oči: jedno 42,4° od '
-      + 'antisolárního bodu, druhé 50,4°. Mezi nimi je pás, do kterého nevychází nic. Každá duha '
-      + 'přitom potřebuje jiný paprsek — vstupuje jinou výškou a uvnitř se odrazí jinak často. '
-      + 'Zkuste přepnout mezi oběma vstupními body. Zbytek prohlídky rozebírá, proč to tak je.',
+      'Tohle je cíl. Jedna kulová kapka v řezu, sluneční světlo zleva a jeden pozorovatel, '
+      + 'ke kterému dorazí obě duhy naráz: hlavní pod 42,4° od antisolárního bodu a vedlejší '
+      + 'pod 50,4°. Každá z nich přitom potřebuje jiný paprsek — vstupuje do kapky jinou výškou '
+      + 'a uvnitř se odrazí jinak často. Zkuste přepnout mezi oběma vstupními body. Zbytek '
+      + 'prohlídky rozebírá, proč to tak je.',
+    s1ctitle: 'Obě naráz jen z jednoho místa',
+    s1cbody:
+      'Každá duha má svůj paprsek a ten letí pořád dál — kdekoli na něm stojíte, tu jednu duhu '
+      + 'uvidíte. Obě naráz je něco jiného. Ty dva paprsky vycházejí z různých míst kapky různými '
+      + 'směry, takže se protnou přesně v jednom bodě, 12,2 poloměru kapky daleko. Přepněte na '
+      + 'oko u každé duhy zvlášť a zpátky.',
+    eyeMeeting: 'Jedno oko tam, kde se protnou',
+    eyePerBow: 'Oko u každé duhy zvlášť',
+    explMeetingPoint:
+      'U kapky o poloměru 1 mm je ten průsečík 12 mm od ní. Nikdo nemá oko centimetr od kapky '
+      + 'deště — a právě proto obloha nefunguje takhle. Tam je každá kapka metry daleko, pošle '
+      + 'vám jednu jedinou duhu, a hlavní a vedlejší duha k vám přicházejí ze dvou úplně '
+      + 'různých skupin kapek. Tahle scéna je řez jednou kapkou zblízka, ne obloha.',
     s1btitle: 'Může jedna kapka udělat duhu?',
     s1bbody:
       'Zpátky na začátek, s prázdným obrázkem. Jedna kulová kapka v řezu, jeden paprsek zleva a '
@@ -985,13 +999,27 @@ export const translations = {
     startFree: 'Go to free mode',
     tutorialDone: 'Done. Now try the rest yourself.',
 
-    s1title: 'Two bows, eight degrees',
+    s1title: 'One drop, two rainbows',
     s1body:
-      'This is where we are going. One spherical drop in cross-section, sunlight from the left, and '
-      + 'two eyes: one 42.4° from the antisolar point, the other 50.4°. Between them sits a band '
-      + 'that receives nothing. Each bow needs its own ray — entering at a different height, '
-      + 'bouncing a different number of times inside. Try the two entry points. Everything after '
-      + 'this takes the picture apart.',
+      'This is where we are going. One spherical drop in cross-section, sunlight from the left, '
+      + 'and one observer who gets both bows at once: the primary 42.4° from the antisolar point '
+      + 'and the secondary 50.4°. Each of them needs its own ray — entering the drop at a '
+      + 'different height, bouncing a different number of times inside. Try the two entry points. '
+      + 'Everything after this takes the picture apart.',
+    s1ctitle: 'Both at once, from one place only',
+    s1cbody:
+      'Each bow has its own ray and that ray carries on for ever — stand anywhere along it and '
+      + 'you see that bow. Both at once is a different matter. The two rays leave different '
+      + 'points on the drop in different directions, so they cross at exactly one place, 12.2 '
+      + 'droplet radii out. Switch to an eye per bow and back.',
+    eyeMeeting: 'One eye where they cross',
+    eyePerBow: 'An eye for each bow',
+    explMeetingPoint:
+      'On a drop 1 mm across, that crossing is 12 mm away from it. Nobody holds an eye a '
+      + 'centimetre from a raindrop — which is exactly why the sky does not work this way. Up '
+      + 'there every drop is metres off and sends you one bow only, so the primary and the '
+      + 'secondary reach you from two completely different sets of droplets. This scene is one '
+      + 'drop close up, not the sky.',
     s1btitle: 'Can one raindrop create a rainbow?',
     s1bbody:
       'Back to the start, with an empty picture. One spherical drop in cross-section, one ray from '

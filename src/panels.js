@@ -50,16 +50,19 @@ export const TUTORIAL = [
       // alone makes that impossible to see. No band and no arrival arc: both
       // get their own steps later, and here they are the clutter standing
       // between the reader and "two bows, eight degrees apart".
+      // Zoomed out far enough to put the crossing of the two bow rays in
+      // frame -- it is 12.2 droplet radii out, and at zoom 1 it is nowhere
+      // near the canvas.
       scene: 'droplet', graph: 'exit', reflections: 2, dispersion: 1, wavelength: 'white',
       impact: 0.861, fanCount: 12, showNonRainbow: false, angleMode: 'antisolar',
-      dropletZoom: 1, graphOpen: false,
+      dropletZoom: 25, graphOpen: false, sunElevation: 0,
       show: {
         angles: false, normals: false, labels: true, renderedBow: false,
-        alexander: false, arrival: false, walls: false,
+        alexander: false, arrival: false, walls: false, meetingEye: true,
       },
       families: { 0: false, 1: true, 2: true, 3: false },
     },
-    focus: ['reflections', 'fanCount'],
+    focus: ['reflections', 'dropletZoom'],
     actions: [
       {
         labelKey: 'bowName1',
@@ -72,6 +75,33 @@ export const TUTORIAL = [
     ],
   },
   {
+    /* Why one eye and not two.
+       Each bow's ray carries on for ever, so ANY distance along it sees that
+       bow. Both at once is different: the two rays leave different points in
+       different directions and cross at exactly one place, 12.2 droplet radii
+       out. Scale that to a real drop and it is 12 mm, which is why the sky
+       cannot work this way and the two bows up there come from two different
+       sets of droplets. The chips put the eyes back per bow and take them
+       away again, so the difference is something you do rather than read. */
+    title: 's1ctitle', body: 's1cbody',
+    apply: {
+      scene: 'droplet', reflections: 2, dispersion: 1, wavelength: 'white',
+      impact: 0.861, fanCount: 0, dropletZoom: 25, sunElevation: 0,
+      graphOpen: false, panel: 'guide',
+      families: { 0: false, 1: true, 2: true, 3: false },
+      show: {
+        angles: false, normals: false, labels: true, renderedBow: false,
+        alexander: false, arrival: false, walls: false, meetingEye: true,
+      },
+    },
+    focus: ['dropletZoom', 'reflections'],
+    actions: [
+      { labelKey: 'eyeMeeting', patch: { show: { meetingEye: true } } },
+      { labelKey: 'eyePerBow', patch: { show: { meetingEye: false } } },
+    ],
+    note: 'explMeetingPoint',
+  },
+  {
     /* The blank slate that used to open the tutorial, now that the reader has
        seen what it is heading towards. Nothing on screen but one droplet and
        one ray that does not reflect at all. */
@@ -80,7 +110,12 @@ export const TUTORIAL = [
       scene: 'droplet', graph: 'exit', reflections: 0, dispersion: 0, wavelength: 'white',
       impact: 0.6, fanCount: 0, showNonRainbow: false, angleMode: 'antisolar',
       dropletZoom: 1, graphOpen: false,
-      show: { angles: false, normals: false, labels: true, renderedBow: false },
+      // Step 1 stands one eye at the crossing; from here each bow gets its
+      // own, because the rest of the guide is about one order at a time.
+      show: {
+        angles: false, normals: false, labels: true, renderedBow: false,
+        meetingEye: false,
+      },
       families: { 0: true, 1: false, 2: false, 3: false },
     },
     focus: ['impactParameter', 'wavelength'],

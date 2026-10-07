@@ -101,6 +101,17 @@ export const state = {
        whenever a beam is running, but the very first step is about two bows
        and two eyes and nothing else, so it can be asked to stand down. */
     arrival: true,
+    /* One observer standing where the bow rays actually cross, instead of one
+       eye per order placed along its own direction.
+
+       Two eyes answer "where would you have to stand for THIS bow"; they do
+       not answer "can one person see both". From a single droplet the two bow
+       rays leave different points in different directions, so they meet at
+       exactly one place -- 12.2 droplet radii out, which on a 1 mm drop is
+       12 mm. That is the honest answer, and it is also why the sky does not
+       work that way: nobody's eye is a centimetre from a raindrop, so up
+       there the two bows come from two different sets of droplets. */
+    meetingEye: false,
     /* Mark what happens at each surface the ray meets: how much goes through
        and how much reflects on. On by default, because the thing it settles
        is a misconception most explanations repeat -- that the bounces inside

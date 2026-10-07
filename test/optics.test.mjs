@@ -1233,3 +1233,44 @@ test('the per-wall losses multiply out to the Fresnel budget', () => {
     prev = s;
   }
 });
+
+test('the two bow rays from one droplet cross at a single point', () => {
+  // The single-droplet scene can stand ONE observer where both bows arrive.
+  // That place is the intersection of the two traced bow rays, and it has to
+  // be solved from the rays themselves -- an eye placed from the angles
+  // instead would sit off both of them.
+  const n = O.cauchyIndex(650);
+  const trace = (b, k) => O.traceRay({
+    origin: O.vec(-6, b, 0), dir: O.vec(1, 0, 0), center: O.vec(0, 0, 0),
+    radius: 1, n, reflections: k, exitLength: 6,
+  });
+  const a = trace(O.rainbowGeometry(n, 1).impactParameter, 1);
+  const b = trace(-O.rainbowGeometry(n, 2).impactParameter, 2);
+
+  const det = a.dirOut.x * -b.dirOut.y - -b.dirOut.x * a.dirOut.y;
+  assert.ok(Math.abs(det) > 1e-9, 'the two bow rays are not parallel');
+  const rx = b.exitPoint.x - a.exitPoint.x;
+  const ry = b.exitPoint.y - a.exitPoint.y;
+  const t = (rx * -b.dirOut.y - -b.dirOut.x * ry) / det;
+  const u = (a.dirOut.x * ry - rx * a.dirOut.y) / det;
+  assert.ok(t > 0 && u > 0, 'they cross ahead of the droplet, not behind it');
+
+  // The point is on BOTH rays, which is the whole claim.
+  const onA = { x: a.exitPoint.x + t * a.dirOut.x, y: a.exitPoint.y + t * a.dirOut.y };
+  const onB = { x: b.exitPoint.x + u * b.dirOut.x, y: b.exitPoint.y + u * b.dirOut.y };
+  close(onA.x, onB.x, 1e-9, 'the crossing is on the primary ray and the secondary ray');
+  close(onA.y, onB.y, 1e-9, 'likewise in y');
+
+  // Far enough out that no eye is ever there in the sky: on a 1 mm drop the
+  // crossing is over a centimetre away, which is why the two bows you
+  // actually see come from two different sets of droplets.
+  const radii = Math.hypot(onA.x, onA.y);
+  assert.ok(radii > 10 && radii < 15, `crossing at ${radii.toFixed(2)} droplet radii`);
+
+  // And it really does receive both bows: the angle to it from the droplet
+  // matches each order's own bow angle along its own ray.
+  for (const [k, p] of [[1, a], [2, b]]) {
+    close(p.antisolar * O.DEG, O.rainbowGeometry(n, k).antisolarDeg, 1e-9,
+      `k=${k} arrives at its own bow angle`);
+  }
+});

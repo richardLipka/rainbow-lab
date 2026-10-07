@@ -1953,3 +1953,31 @@ Pinning `alexander: true` on the band step, `arrival: true` on the arc step
 and `airObserver: false` on the final sky step was needed immediately. The
 rule is the one this file keeps relearning: a step must pin every flag it
 depends on, and adding a flag means auditing who depends on it.
+
+## One observer where the bow rays cross
+
+Two eyes answered "where would you stand for THIS bow" and never answered
+"can one person see both". From a single droplet the two bow rays leave
+different exit points in different directions, so they meet at exactly one
+place. Solved from the traced rays, never from the angles -- an eye placed
+from the angles would sit off both of them:
+
+| | |
+|---|---|
+| primary exits at | (0.202, -0.979), direction (-0.741, -0.672) |
+| secondary exits at | (-0.932, 0.361), direction (-0.634, -0.774) |
+| they cross at | (-8.461, -8.832) |
+| distance from the centre | **12.23 droplet radii** |
+
+`show.meetingEye` puts one eye there, captioned with both angles and with
+12.2 R / 12.2 mm. That second number is the point: on a real 1 mm drop the
+crossing is over a centimetre away, nobody's eye is ever there, and so in the
+sky the primary and the secondary reach you from two different sets of
+droplets. The scene is one drop close up, not the sky, and the new step 2
+says so.
+
+Step 1 is retitled "One drop, two rainbows" -- "Two bows, eight degrees" named
+a number the step had not earned yet -- and needs `dropletZoom: 25` to bring
+the crossing into frame. The eye with a world position is projected directly
+rather than walked out along `dir`, because `project()` also applies the Sun
+tilt and the two part company the moment the Sun is raised.

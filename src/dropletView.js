@@ -214,12 +214,59 @@ export function createDropletView(canvas) {
    * modes cannot drift apart, and 42 deg becomes something to find rather
    * than something the app quietly asserts.
    */
+  /**
+   * Where the bow rays of the two active orders actually cross, in world
+   * units, or null if they do not (parallel, or only one order on screen).
+   *
+   * Solved from the traced exit points and directions, never from the
+   * angles: if the trace and the formula ever disagreed, the eye would land
+   * off the rays and the picture would say so.
+   */
+  function meetingPoint(nRef) {
+    const orders = activeOrders().filter((k) => k >= 1);
+    if (orders.length !== 2) return null;
+    const rays = orders.map((k) => traceOne(650, nRef, k, bowEntry(k, nRef)).path);
+    if (rays.some((p) => !p.dirOut || !p.exitPoint)) return null;
+    const [a, b] = rays;
+    const det = a.dirOut.x * -b.dirOut.y - -b.dirOut.x * a.dirOut.y;
+    if (Math.abs(det) < 1e-9) return null;
+    const rx = b.exitPoint.x - a.exitPoint.x;
+    const ry = b.exitPoint.y - a.exitPoint.y;
+    const t = (rx * -b.dirOut.y - -b.dirOut.x * ry) / det;
+    if (!(t > 0)) return null;
+    return {
+      at: O.vec(a.exitPoint.x + t * a.dirOut.x, a.exitPoint.y + t * a.dirOut.y, 0),
+      orders,
+      radii: Math.hypot(a.exitPoint.x + t * a.dirOut.x, a.exitPoint.y + t * a.dirOut.y),
+    };
+  }
+
   function computeObservers() {
     const idx = indexModel();
     const nRef = idx(650); // red, the same reference wavelength used elsewhere
     const orders = activeOrders().filter((k) => k >= 1);
     const lambdas = activeLambdas();
     const observers = [];
+
+    // One observer, standing where both bow rays arrive.
+    const meet = state.show.meetingEye ? meetingPoint(nRef) : null;
+    if (meet) {
+      const bows = [];
+      for (const k of meet.orders) {
+        for (const lambda of lambdas) {
+          const g = O.rainbowGeometry(idx(lambda), k);
+          if (g) bows.push({ lambda, phi: g.antisolarDeg, k });
+        }
+      }
+      const geoRef = O.rainbowGeometry(nRef, meet.orders[0]);
+      return [{
+        valid: true, kRef: meet.orders[0], bows, at: meet.at, meetsRadii: meet.radii,
+        meetOrders: meet.orders,
+        dir: O.vnorm(meet.at), phiDeg: geoRef.antisolarDeg,
+        rainbowPhiDeg: geoRef.antisolarDeg, bowLambda: 650,
+      }];
+    }
+
     for (const kRef of orders) {
       const geo = O.rainbowGeometry(nRef, kRef);
       if (!geo) continue;
@@ -755,8 +802,15 @@ export function createDropletView(canvas) {
     if (uy < -1e-6) limits.push((margin - cy) / uy);
     for (const lim of limits) if (lim > 0) radius = Math.min(radius, lim);
 
-    const x = cx + ux * radius;
-    const y = cy + uy * radius;
+    // An eye with a world position stands THERE, clamping included: it is the
+    // crossing of two traced rays, and sliding it to a comfortable screen
+    // radius would move it off both of them. Projected directly rather than
+    // walked out along `dir`, because project() also applies the Sun tilt and
+    // the two would part company the moment the Sun was raised. The step that
+    // uses it picks a zoom that brings the crossing into frame.
+    const placed = observer.at ? project(observer.at) : null;
+    const x = placed ? placed.x : cx + ux * radius;
+    const y = placed ? placed.y : cy + uy * radius;
     const faceAngle = Math.atan2(cy - y, cx - x); // eye looks back at the droplet
     eyeScreen.push({ x, y, kRef: observer.kRef });
 
@@ -829,9 +883,15 @@ export function createDropletView(canvas) {
       // moves is which wavelength arrives at the eye.
       const manyColours = observer.bows && observer.bows.length > 1;
       const nm = manyColours && observer.bowLambda ? ` · ${observer.bowLambda} ${t('nm')}` : '';
-      const belowLine2 = observer.valid
-        ? `φ ≈ ${deg(observer.phiDeg, 1)}${observer.kRef ? ` · k=${observer.kRef}` : ''}`
-        : t('observerNoConcentration');
+      // The meeting eye receives BOTH bows, so it quotes both angles. One
+      // phi and one k would describe half of what is arriving at it.
+      const belowLine2 = !observer.valid
+        ? t('observerNoConcentration')
+        : observer.meetOrders
+          ? observer.meetOrders
+            .map((k) => deg(O.rainbowGeometry(indexModel()(650), k).antisolarDeg, 1))
+            .join(' + ')
+          : `φ ≈ ${deg(observer.phiDeg, 1)}${observer.kRef ? ` · k=${observer.kRef}` : ''}`;
       // Stack the caption upwards when a downward stack would not fit. The
       // eye's position is dictated by the optics -- for k=1 it lands on the
       // bottom margin at every zoom -- so the caption is the part that has to
@@ -876,11 +936,21 @@ export function createDropletView(canvas) {
       centred(belowLine2, y1 + 16, {
         color: '#6f86ab', font: '10px "IBM Plex Mono", ui-monospace, monospace',
       });
+      // How far out the crossing actually is, in the only units that make it
+      // mean anything: droplet radii, and what that is on a 1 mm drop.
+      const extra = observer.meetsRadii
+        ? `${num(observer.meetsRadii, 1)} R · ${num(observer.meetsRadii, 1)} mm`
+        : null;
+      if (extra) {
+        centred(extra, y1 + 28, {
+          color: '#c9a94f', font: '10px "IBM Plex Mono", ui-monospace, monospace',
+        });
+      }
       // Which colour this eye is actually catching, when more than one is in
       // play. The eye sits on its order's own bow by construction now, so
       // there is no "how far off" to report -- only which wavelength arrives.
       if (observer.valid && nm) {
-        centred(`${t('observerOnBow')}${nm}`, y1 + 32, {
+        centred(`${t('observerOnBow')}${nm}`, y1 + (extra ? 44 : 32), {
           color: '#6fd3a4', font: '10px "IBM Plex Mono", ui-monospace, monospace',
         });
       }
