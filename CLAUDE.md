@@ -1867,3 +1867,43 @@ each step from a deliberately hostile state rather than walking in order:
 The habit this keeps teaching: a step must pin everything it depends on, and
 the way to find what it does not pin is to jump into it from the worst state
 you can construct, never to walk the tutorial in order.
+
+## The airborne observer, and a copy pass over the guide
+
+**A second observer, in the sky scene.** `show.airObserver` (off by default)
+plus `state.airHeight` draws, dashed, the part of the SAME bow an observer
+flying above the shower reaches and this one does not. It is the same set of
+directions for both -- the bow depends on the angle from the antisolar point
+and on nothing else -- so what differs is only how far down each of them
+still has rain to look at. `airSeesDir()` assumes rain below the aircraft,
+because that is what being in the aircraft means here; it does not read
+`show.rainBelow`, which is about the ground observer. Every active order gets
+the treatment, so the secondary is dashed 8 deg further out for free. The
+readout counts the aircraft's share with the aircraft's own test, so the
+number and the arc on screen are one statement: at the Sun 15 deg, 40 % from
+the ground against 100 % from 3 km. New step 14, "What the aircraft sees".
+
+**Copy pass, both languages.** Two outright contradictions, found by reading
+the guide end to end rather than by testing:
+
+- Step 8 said "the graph below now counts rays by direction". It counts
+  energy, and had done since the plot was relabelled. It also opened on "the
+  curve has an extremum" two steps after step 6 deliberately stopped using
+  that word.
+- Step 17 CS still read "Stejna dispersion" -- an English word in a Czech
+  sentence, from an edit that failed silently when a later assertion in the
+  same script threw before the write.
+
+Smaller: step 3 repeated step 2's "nothing is drawn in advance" verbatim and
+now says what the slider actually changes; step 5 told the reader to "measure"
+an angle the app prints, and now says where phi is measured and why (the
+shadow of your own head); `explCaustic` dropped "extremum" for the bright
+lines on the bottom of a swimming pool; `explObserverAngle` moved from step 7,
+which is about ray counts, to step 5, which is about phi; Czech "je vedlejsi"
+("is beside the point") collided with "vedlejsi duha" and became "na tom
+nezalezi"; "there is soil" / "je hlina" became ground / zem.
+
+A scripting trap worth remembering: a Python edit script that asserts on
+several replacements and writes at the end loses ALL of them when one assert
+fails. Several fixes in this session appeared to land and had not. Write after
+each replacement, or verify by reading the value back, never by the exit code.

@@ -78,6 +78,8 @@ export const state = {
 
   /* sky / observer */
   sunElevation: 15,
+  /* How high the optional airborne observer is flying, in metres. */
+  airHeight: 3000,
   sunAzimuth: 180,
   observerHeight: 1.7,
   view: 'orbit', // 'orbit' | 'eye'
@@ -91,6 +93,10 @@ export const state = {
   /* visualisation toggles */
   show: {
     normals: false,
+    /* Show, on the same bow, the part of the circle an observer flying above
+       the shower would see and this one cannot. Off by default: it is a
+       second observer on a scene built around one. */
+    airObserver: false,
     /* Mark what happens at each surface the ray meets: how much goes through
        and how much reflects on. On by default, because the thing it settles
        is a misconception most explanations repeat -- that the bounces inside

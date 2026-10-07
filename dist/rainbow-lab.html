@@ -1805,6 +1805,12 @@ const translations = {
     showSecondary: 'Vedlejší duha',
     showHigherOrder: 'Vyšší řády',
     showSky: 'Obloha',
+    showAirObserver: 'Ukázat, co vidí letadlo',
+    airHeight: 'Výška letadla',
+    airHeightHint:
+      'Druhý pozorovatel, letící nad přeháňkou. Čárkovaně je dokreslená ta část téhož '
+      + 'oblouku, na kterou on dosáhne a vy ze země ne — pod sebou má déšť, vy tam máte zem.',
+    airObserverSees: 'z letadla ve výšce',
     rainBelow: 'Déšť i pod úrovní očí',
 
     /* ---- terminology ---- */
@@ -1879,7 +1885,9 @@ const translations = {
       + 'do kterého odejde. Výška křivky je proto jas v daném směru. Odtud ten ostrý vrchol na '
       + '42° a nula hned za ním — za hlavní duhu se po jednom odrazu nedostane vůbec nic.',
     explCaustic:
-      'V okolí tohoto extrému se mnoho různých paprsků odchyluje do velmi podobného směru. Světlo se proto v tomto směru výrazně koncentruje. Tento jev se nazývá kaustika.',
+      'Tam, kde se křivka zplošťuje, odchází celý pás vstupních bodů skoro jedním směrem, takže '
+      + 'se jejich světlo složí do stejného úzkého výseku oblohy. Takovému nahromadění se v '
+      + 'optice říká kaustika. Světlé čáry na dně bazénu jsou totéž.',
     explObserverHeight:
       'Úhlový poloměr duhy nezávisí na výšce pozorovatele. Výška mění jen to, jak velkou část kruhu může zakrýt obzor.',
     explNotOneReflection:
@@ -1956,10 +1964,11 @@ const translations = {
     s13btitle: 'Proč se barvy obracejí',
     s13bbody:
       'Každá barva má svůj vlastní úhel, protože má svůj index lomu. Červená u jednoho odrazu '
-      + 'končí na 42,2°, fialová na 40,5° — červená je tedy dál od antisolárního bodu, tedy nahoře. '
+      + 'končí na 42,2°, fialová na 40,5° — červená je dál od antisolárního bodu, takže leží '
+      + 'na vnějším okraji duhy. '
       + 'U dvou odrazů je červená na 50,7° a fialová na 53,7°, takže je to naopak: fialová je dál, '
       + 'červená blíž. Na grafu je vidět proč. Primární křivka má vrchol a ten vrchol je pro '
-      + 'červenou výš; vedlejší má sedlo a to sedlo je pro červenou níž. Stejná dispersion, '
+      + 'červenou výš; vedlejší má sedlo a to sedlo je pro červenou níž. Stejná disperze, '
       + 'obrácené pořadí.',
     explColourFlip:
       'Červená se v primární duze obrací u {p1} a ve vedlejší u {p2}, fialová u {v1} a u {v2}. Jedna křivka má vrchol, druhá sedlo — a tentýž rozptyl indexu lomu proto naskládá barvy jednou takhle a podruhé obráceně. Mezera mezi nimi, {gap} oblohy, je prázdná ze stejného důvodu: obě křivky se od ní odvracejí, takže do ní žádný paprsek s jedním ani dvěma odrazy nedopadne.',
@@ -2025,7 +2034,10 @@ const translations = {
       + 'z toho, co uvidíte, není nakreslené dopředu.',
     s2title: 'Sledujte paprsek',
     s2body:
-      'Táhněte posuvníkem parametru dopadu (nebo myší v kapce). Paprsek se láme podle Snellova zákona: sin θᵢ = n · sin θᵣ. Nic není nakresleno předem.',
+      'Táhněte posuvníkem parametru dopadu, nebo myší přímo v kapce. Kde paprsek dopadne, '
+      + 'rozhoduje o všem: povrch koule se od středu k okraji odklání, takže posun vstupního '
+      + 'bodu mění úhel, pod kterým paprsek na stěnu narazí. Zbytek udělá Snellův zákon: '
+      + 'sin θᵢ = n · sin θᵣ.',
     s3title: 'Přidejte vnitřní odraz',
     s3body:
       'Na zadní stěně se část světla odrazí zpět dovnitř. Jak velká? Značky na stěnách to říkají '
@@ -2035,17 +2047,23 @@ const translations = {
       + 'Sledujte dráhu R0 → R1 → R2 → R3 a čísla zároveň.',
     s4title: 'Kam paprsek míří?',
     s4body:
-      'Změřte úhel mezi vystupujícím paprskem a směrem od Slunce. Panel vpravo ukazuje φ — úhel od antisolárního směru.',
+      'Paprsek někam odchází. Úhel, který má smysl číst, se ale neměří u kapky, ale u vás: '
+      + 'postavte se zády ke Slunci a φ je úhel mezi kapkou a bodem přesně proti Slunci — tedy '
+      + 'stínem vaší hlavy. Panel vpravo ho ukazuje.',
     s5title: 'Zkuste jiné paprsky',
     s5body:
       'Projděte celý rozsah parametru dopadu a dívejte se na graf dole. Nejde o to, že někde je '
       + 'úhel největší — jde o to, že tam je křivka vodorovná. Plochá křivka znamená, že celý pás '
       + 'vstupních bodů odejde skoro stejným směrem. Jinde se úhel při každém posunu mění a světlo '
-      + 'se rozprostře. Jestli je ten plochý bod vrchol nebo sedlo, je vedlejší: u jednoho odrazu '
+      + 'se rozprostře. Jestli je ten plochý bod vrchol nebo sedlo, na tom nezáleží: u jednoho '
+      + 'odrazu '
       + 'vyjde vrchol, u dvou sedlo, a duha je v obou případech tam, kde se křivka obrací.',
     s7title: 'Proč existuje jasný směr?',
     s7body:
-      'Křivka má extrém. V jeho okolí je skoro plochá, takže mnoho různých vstupních paprsků odchází téměř stejným směrem. Graf dole teď počítá paprsky podle směru — zvyšte jejich počet a sledujte, jak vrchol roste.',
+      'Totéž ploché místo, teď spočítané. Graf dole sčítá světlo odcházející každým směrem — ne '
+      + 'kolik paprsků, ale kolik energie. Mimo duhu se světlo rozprostře natenko. V plochém '
+      + 'místě spadne celý pás vstupních bodů do úzkého rozmezí úhlů a křivka vyskočí. Zvyšte '
+      + 'počet vzorků a vrchol se vyloupne ze šumu.',
     s8title: 'Teď přidejte tisíce kapek',
     s8body:
       'Každá kapka dělá totéž. K pozorovateli se dostane světlo jen od těch kapek, které leží ve správném úhlu. Přidávejte kapky a sledujte, jak oblouk houstne.',
@@ -2071,6 +2089,17 @@ const translations = {
       'Oblouk nad kapkou počítá výstupní směry. Není to nakreslená duha — je to hustota: kolikrát '
       + 'paprsky odejdou právě tímhle směrem. Ve většině směrů skoro nic, v jednom hrb. '
       + 'Ten hrb je duha a jediný paprsek ho ukázat nedokáže.',
+    s11ctitle: 'Co vidí letadlo',
+    s11cbody:
+      'Stejná obloha, dva pozorovatelé. Vy stojíte na louce. Čárkovaně je zbytek téhož oblouku — '
+      + 'ta část, na kterou dosáhne někdo letící ve třech kilometrech, a vy ne. Na světle se nic '
+      + 'nezměnilo: duha je pro oba stejných 42° od antisolárního bodu. Změnilo se, co je pod '
+      + 'vámi. On tam má déšť, vy zem. Vedlejší duha dělá totéž o osm stupňů dál.',
+    explAirObserver:
+      'Kapky, které tvoří čárkovanou část, leží pod úrovní očí, takže jejich světlo míří vzhůru. '
+      + 'Na zemi je nikdo nechytí — tam, kde by musely být, je zem. Z letadla ano, a kruh se '
+      + 'uzavře. HyperPhysics to říká naplno: celý kruh duhy je z letadla vidět proto, že kapky '
+      + 'můžou padat i pod vámi.',
     s12title: 'Odkud jsou barvy?',
     s12body:
       'Index lomu vody závisí na vlnové délce. Posuňte disperzi z 0 % na 100 % a jediný úhel se rozpadne na pás barev. Graf dole se rozpadne s ním — na jednu křivku pro každou vlnovou délku.',
@@ -2379,6 +2408,12 @@ const translations = {
     showSecondary: 'Secondary rainbow',
     showHigherOrder: 'Higher orders',
     showSky: 'Sky',
+    showAirObserver: 'Show what the aircraft sees',
+    airHeight: 'Aircraft height',
+    airHeightHint:
+      'A second observer, flying above the shower. The dashed line continues the same bow into '
+      + 'the part they can reach and you cannot — they have rain below them, you have ground.',
+    airObserverSees: 'from an aircraft at',
     rainBelow: 'Rain below eye level too',
 
     /* ---- terminology ---- */
@@ -2454,7 +2489,9 @@ const translations = {
       + 'direction. Hence the sharp peak at 42° and zero immediately outside it — one bounce '
       + 'never sends anything past the primary.',
     explCaustic:
-      'Near this extremum, many different incoming rays leave the droplet in nearly the same direction. Light therefore becomes strongly concentrated in this direction. This concentration is called a caustic.',
+      'Where the curve flattens, a whole band of entry points leaves in almost one direction, so '
+      + 'the light from all of them lands in the same narrow slice of sky. Optics calls that '
+      + 'pile-up a caustic. The bright lines on the bottom of a swimming pool are the same thing.',
     explObserverHeight:
       "The angular radius of the rainbow does not depend on the observer's height. Height only changes how much of the circle the horizon can hide.",
     explNotOneReflection:
@@ -2602,7 +2639,10 @@ const translations = {
       + 'at a time, and nothing you see is drawn in advance.',
     s2title: 'Trace the ray',
     s2body:
-      "Drag the impact-parameter slider (or drag inside the droplet). The ray bends according to Snell's law: sin θᵢ = n · sin θᵣ. Nothing here is drawn in advance.",
+      'Drag the impact-parameter slider, or drag inside the droplet itself. Where the ray lands '
+      + 'decides everything: a sphere tilts away from you as you go out towards the rim, so '
+      + 'moving the entry point changes the angle the ray strikes at. Snell’s law does the rest: '
+      + 'sin θᵢ = n · sin θᵣ.',
     s3title: 'Add internal reflection',
     s3body:
       'At the back wall part of the light reflects back inside. How much? The wall markers say, '
@@ -2612,7 +2652,10 @@ const translations = {
       + 'path R0 → R1 → R2 → R3 and watch the numbers with it.',
     s4title: 'Where does the outgoing ray point?',
     s4body:
-      'Measure the angle between the outgoing ray and the direction away from the Sun. The panel on the right shows φ, the angle from the antisolar direction.',
+      'The ray leaves in some direction. But the angle worth reading is not measured at the '
+      + 'droplet — it is measured at you. Stand with the Sun behind you: φ is the angle between '
+      + 'the droplet and the point directly opposite the Sun, which is the shadow of your own '
+      + 'head. The panel on the right prints it.',
     s5title: 'Try different incoming rays',
     s5body:
       'Sweep the impact parameter and watch the graph below. The point is not that the angle is '
@@ -2623,7 +2666,10 @@ const translations = {
       + 'the turn either way.',
     s7title: 'Why is there a bright direction?',
     s7body:
-      'The curve has an extremum. Near it the curve is almost flat, so many different incoming rays leave in almost the same direction. The graph below now counts rays by direction — raise the ray count and watch the spike grow.',
+      'The same flat spot, now counted. The plot below adds up the light leaving in each '
+      + 'direction — not how many rays, but how much energy. Away from the bow the light spreads '
+      + 'thin. At the flat spot a whole band of entry points lands in one narrow range of angles '
+      + 'and the curve spikes. Raise the sample count and the spike sharpens out of the noise.',
     s8title: 'Now add thousands of droplets',
     s8body:
       'Every droplet does the same thing. Light reaches the observer only from droplets that lie at the right angle. Raise the droplet count and watch the bow fill in.',
@@ -2651,6 +2697,18 @@ const translations = {
       'The arc above the droplet counts exit directions. It is not a drawn rainbow — it is a '
       + 'density: how often rays leave along each direction. Most directions get almost nothing; '
       + 'one gets a bulge. That bulge is the bow, and a single ray cannot show it.',
+    s11ctitle: 'What the aircraft sees',
+    s11cbody:
+      'Same sky, two observers. You are standing in a field. The dashed line is the rest of the '
+      + 'same bow — the part someone flying at three kilometres gets and you do not. Nothing about '
+      + 'the light changed: the bow is the same 42° from the antisolar point for both of you. What '
+      + 'changed is what is underneath. They have rain down there, you have ground. The secondary '
+      + 'does the same thing eight degrees further out.',
+    explAirObserver:
+      'The droplets making the dashed part sit below eye level, so their light travels upward. On '
+      + 'the ground nobody catches it — where those droplets would have to be, there is ground. From '
+      + 'an aircraft there is rain, and the circle closes. HyperPhysics puts it plainly: the whole '
+      + 'circle can be seen from a plane because droplets can be falling both above and below you.',
     s12title: 'Where do the colours come from?',
     s12body:
       "Water's refractive index depends on wavelength. Move dispersion from 0 % to 100 % and a single angle splits into a band of colours. The graph below splits with it, one curve per wavelength.",
@@ -2941,6 +2999,8 @@ const state = {
 
   /* sky / observer */
   sunElevation: 15,
+  /* How high the optional airborne observer is flying, in metres. */
+  airHeight: 3000,
   sunAzimuth: 180,
   observerHeight: 1.7,
   view: 'orbit', // 'orbit' | 'eye'
@@ -2954,6 +3014,10 @@ const state = {
   /* visualisation toggles */
   show: {
     normals: false,
+    /* Show, on the same bow, the part of the circle an observer flying above
+       the shower would see and this one cannot. Off by default: it is a
+       second observer on a scene built around one. */
+    airObserver: false,
     /* Mark what happens at each surface the ray meets: how much goes through
        and how much reflects on. On by default, because the thing it settles
        is a misconception most explanations repeat -- that the bounces inside
@@ -7075,8 +7139,32 @@ function createSkyView(canvas) {
    * at about 1.7 km up, and stays there, which is why an aircraft sees a
    * closed ring and a hilltop does not.
    */
+  function downLimitDeg(heightM) {
+    return Math.asin(O.clamp(heightM / RAIN_PATH_MIN, 0, 1)) * O.DEG;
+  }
+
   function rainDownLimitDeg() {
-    return Math.asin(O.clamp(state.observerHeight / RAIN_PATH_MIN, 0, 1)) * O.DEG;
+    return downLimitDeg(state.observerHeight);
+  }
+
+  /**
+   * Can an observer flying at state.airHeight see this direction?
+   *
+   * The premise of the overlay is that they are above a shower, so rain below
+   * them is given rather than toggled -- that is what being in the aircraft
+   * means here. Everything else is the same geometry: the bow is the same set
+   * of directions for both observers, because it depends on the angle from
+   * the antisolar point and on nothing else. What differs is how far down
+   * each of them still has rain to look at.
+   */
+  function airSeesDir(d) {
+    const el = Math.asin(O.clamp(d.y, -1, 1)) * O.DEG;
+    return el > 0 || el > -downLimitDeg(state.airHeight);
+  }
+
+  /** Directions the aircraft gets and the observer on the ground does not. */
+  function airOnlyDir(d) {
+    return state.show.airObserver && airSeesDir(d) && !visibleDir(d);
   }
 
   /**
@@ -7350,6 +7438,24 @@ function createSkyView(canvas) {
             strokePath(ctx, seg, colorFor(ring.lambda, alpha), width);
           }
         }
+        // The same bow, continued into the sky only the aircraft has rain in.
+        // Dashed and thin, because it is not light this observer receives.
+        if (!state.show.airObserver) continue;
+        let arun = [];
+        const aruns = [];
+        for (const d of ring.pts) {
+          if (airOnlyDir(d)) arun.push(d);
+          else {
+            if (arun.length > 1) aruns.push(arun);
+            arun = [];
+          }
+        }
+        if (arun.length > 1) aruns.push(arun);
+        for (const r of aruns) {
+          for (const seg of clipPolyline(cam, r)) {
+            strokePath(ctx, seg, colorFor(ring.lambda, alpha * 0.5), width * 0.7, [5, 4]);
+          }
+        }
       }
     }
 
@@ -7532,6 +7638,18 @@ function createSkyView(canvas) {
     const share = visibleShare(O.antisolarDirection(state.sunElevation, state.sunAzimuth), geo.antisolarDeg);
     put(`${t('bowVisible')}: ${num(share * 100, 0)} %`, '#cfe0ff');
     put(`${t('rainSeenBelow')}: ${state.show.rainBelow ? deg(rainDownLimitDeg(), 1) : '—'}`, '#8ea3c6');
+    if (state.show.airObserver) {
+      // Counted with the aircraft's own test, so the number and the dashed
+      // arc on screen are the same statement.
+      const anti = O.antisolarDirection(state.sunElevation, state.sunAzimuth);
+      let seen = 0;
+      const steps = 720;
+      for (let i = 0; i < steps; i++) {
+        if (airSeesDir(O.bowDirection(anti, geo.antisolarDeg, (i / steps) * 360))) seen++;
+      }
+      put(`${t('airObserverSees')} ${num(state.airHeight, 0)} ${t('metres')}: ` +
+        `${num((seen / steps) * 100, 0)} %`, '#ffd79a');
+    }
     put(`${t('horizonDip')}: ${deg(dip, 3)}`, '#8ea3c6');
     if (share <= 0) {
       label(ctx, t('bowBelowHorizon'), 12, y + 4, { color: '#ff9a8a' });
@@ -8421,6 +8539,7 @@ const TUTORIAL = [
       fanCount: 0, graphOpen: false, show: { angles: true },
     },
     focus: ['impactParameter', 'showAngles'],
+    note: 'explObserverAngle',
     actions: [{
       labelKey: 'extremumLabel',
       // From the engine, not written down: 0.861 was a literal sitting in
@@ -8472,7 +8591,7 @@ const TUTORIAL = [
     ],
     // The arc above the droplet IS the stacking, counted. It draws only with
     // a beam on screen, so this is the first step that can talk about it.
-    note: ['explArrivalArc', 'explObserverAngle'],
+    note: 'explArrivalArc',
   },
   {
     title: 's7title', body: 's7body',
@@ -8591,6 +8710,31 @@ const TUTORIAL = [
       { label: '3 km', patch: { observerHeight: 3000, show: { rainBelow: true } } },
     ],
     note: 'explFullCircle',
+  },
+  {
+    /* The second observer. Step 13 establishes that the bottom of the circle
+       needs rain below the eye; this one puts someone up there and draws the
+       part of the SAME bow they get. Both orders, because the secondary does
+       exactly the same thing eight degrees further out. */
+    title: 's11ctitle', body: 's11cbody',
+    apply: {
+      scene: 'sky', view: 'eye', sunElevation: 15, observerHeight: 1.7,
+      airHeight: 3000, graphOpen: false, reflections: 2, wavelength: 'white',
+      dispersion: 1, families: { 0: false, 1: true, 2: true, 3: false },
+      show: {
+        primary: true, secondary: true, airObserver: true, alexander: true,
+        cone: false, horizon: true, ground: true, rainBelow: false,
+        renderedBow: false, antisolar: true, labels: true,
+      },
+    },
+    focus: ['showAirObserver', 'airHeight'],
+    actions: [
+      { label: '1 km', patch: { airHeight: 1000 } },
+      { label: '3 km', patch: { airHeight: 3000 } },
+      { label: '10 km', patch: { airHeight: 10000 } },
+      { labelKey: 'showAirObserver', patch: { show: { airObserver: false } } },
+    ],
+    note: 'explAirObserver',
   },
   {
     title: 's12title', body: 's12body',
@@ -9861,6 +10005,7 @@ const VIS_TOGGLES = [
   { scenes: ['sky'], key: 'alexander', labelKey: 'showAlexander' },
   { scenes: ['sky'], key: 'sky', labelKey: 'showSky' },
   { scenes: ['drops', 'field', 'sky'], key: 'rainBelow', labelKey: 'rainBelow' },
+  { scenes: ['sky'], key: 'airObserver', labelKey: 'showAirObserver' },
 ];
 
 function buildControls() {
@@ -10075,6 +10220,16 @@ function buildControls() {
         format: (v) => deg(v, 1),
         onInput: (v) => set({ sunElevation: v }),
       })),
+      // How high the optional second observer is flying. Only offered with
+      // the overlay on -- a height for an observer nobody is drawing is a
+      // control with nothing to control.
+      c(['sky'], () => slider({
+        labelKey: 'airHeight', min: 0, max: HEIGHT_STOPS.length - 1, step: 0.01,
+        get: () => heightToSlider(state.airHeight),
+        format: (v) => `${num(sliderToHeight(v), 0)} m`,
+        onInput: (v) => set({ airHeight: sliderToHeight(v) }),
+        hintKey: 'airHeightHint',
+      }), () => state.show.airObserver),
       c(SPACE, () => slider({
         labelKey: 'sunAzimuth', min: 0, max: 360, step: 1,
         get: () => state.sunAzimuth,

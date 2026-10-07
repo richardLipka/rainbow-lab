@@ -118,6 +118,7 @@ export const TUTORIAL = [
       fanCount: 0, graphOpen: false, show: { angles: true },
     },
     focus: ['impactParameter', 'showAngles'],
+    note: 'explObserverAngle',
     actions: [{
       labelKey: 'extremumLabel',
       // From the engine, not written down: 0.861 was a literal sitting in
@@ -169,7 +170,7 @@ export const TUTORIAL = [
     ],
     // The arc above the droplet IS the stacking, counted. It draws only with
     // a beam on screen, so this is the first step that can talk about it.
-    note: ['explArrivalArc', 'explObserverAngle'],
+    note: 'explArrivalArc',
   },
   {
     title: 's7title', body: 's7body',
@@ -288,6 +289,31 @@ export const TUTORIAL = [
       { label: '3 km', patch: { observerHeight: 3000, show: { rainBelow: true } } },
     ],
     note: 'explFullCircle',
+  },
+  {
+    /* The second observer. Step 13 establishes that the bottom of the circle
+       needs rain below the eye; this one puts someone up there and draws the
+       part of the SAME bow they get. Both orders, because the secondary does
+       exactly the same thing eight degrees further out. */
+    title: 's11ctitle', body: 's11cbody',
+    apply: {
+      scene: 'sky', view: 'eye', sunElevation: 15, observerHeight: 1.7,
+      airHeight: 3000, graphOpen: false, reflections: 2, wavelength: 'white',
+      dispersion: 1, families: { 0: false, 1: true, 2: true, 3: false },
+      show: {
+        primary: true, secondary: true, airObserver: true, alexander: true,
+        cone: false, horizon: true, ground: true, rainBelow: false,
+        renderedBow: false, antisolar: true, labels: true,
+      },
+    },
+    focus: ['showAirObserver', 'airHeight'],
+    actions: [
+      { label: '1 km', patch: { airHeight: 1000 } },
+      { label: '3 km', patch: { airHeight: 3000 } },
+      { label: '10 km', patch: { airHeight: 10000 } },
+      { labelKey: 'showAirObserver', patch: { show: { airObserver: false } } },
+    ],
+    note: 'explAirObserver',
   },
   {
     title: 's12title', body: 's12body',

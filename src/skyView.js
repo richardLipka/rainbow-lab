@@ -160,8 +160,32 @@ export function createSkyView(canvas) {
    * at about 1.7 km up, and stays there, which is why an aircraft sees a
    * closed ring and a hilltop does not.
    */
+  function downLimitDeg(heightM) {
+    return Math.asin(O.clamp(heightM / RAIN_PATH_MIN, 0, 1)) * O.DEG;
+  }
+
   function rainDownLimitDeg() {
-    return Math.asin(O.clamp(state.observerHeight / RAIN_PATH_MIN, 0, 1)) * O.DEG;
+    return downLimitDeg(state.observerHeight);
+  }
+
+  /**
+   * Can an observer flying at state.airHeight see this direction?
+   *
+   * The premise of the overlay is that they are above a shower, so rain below
+   * them is given rather than toggled -- that is what being in the aircraft
+   * means here. Everything else is the same geometry: the bow is the same set
+   * of directions for both observers, because it depends on the angle from
+   * the antisolar point and on nothing else. What differs is how far down
+   * each of them still has rain to look at.
+   */
+  function airSeesDir(d) {
+    const el = Math.asin(O.clamp(d.y, -1, 1)) * O.DEG;
+    return el > 0 || el > -downLimitDeg(state.airHeight);
+  }
+
+  /** Directions the aircraft gets and the observer on the ground does not. */
+  function airOnlyDir(d) {
+    return state.show.airObserver && airSeesDir(d) && !visibleDir(d);
   }
 
   /**
@@ -435,6 +459,24 @@ export function createSkyView(canvas) {
             strokePath(ctx, seg, colorFor(ring.lambda, alpha), width);
           }
         }
+        // The same bow, continued into the sky only the aircraft has rain in.
+        // Dashed and thin, because it is not light this observer receives.
+        if (!state.show.airObserver) continue;
+        let arun = [];
+        const aruns = [];
+        for (const d of ring.pts) {
+          if (airOnlyDir(d)) arun.push(d);
+          else {
+            if (arun.length > 1) aruns.push(arun);
+            arun = [];
+          }
+        }
+        if (arun.length > 1) aruns.push(arun);
+        for (const r of aruns) {
+          for (const seg of clipPolyline(cam, r)) {
+            strokePath(ctx, seg, colorFor(ring.lambda, alpha * 0.5), width * 0.7, [5, 4]);
+          }
+        }
       }
     }
 
@@ -617,6 +659,18 @@ export function createSkyView(canvas) {
     const share = visibleShare(O.antisolarDirection(state.sunElevation, state.sunAzimuth), geo.antisolarDeg);
     put(`${t('bowVisible')}: ${num(share * 100, 0)} %`, '#cfe0ff');
     put(`${t('rainSeenBelow')}: ${state.show.rainBelow ? deg(rainDownLimitDeg(), 1) : '—'}`, '#8ea3c6');
+    if (state.show.airObserver) {
+      // Counted with the aircraft's own test, so the number and the dashed
+      // arc on screen are the same statement.
+      const anti = O.antisolarDirection(state.sunElevation, state.sunAzimuth);
+      let seen = 0;
+      const steps = 720;
+      for (let i = 0; i < steps; i++) {
+        if (airSeesDir(O.bowDirection(anti, geo.antisolarDeg, (i / steps) * 360))) seen++;
+      }
+      put(`${t('airObserverSees')} ${num(state.airHeight, 0)} ${t('metres')}: ` +
+        `${num((seen / steps) * 100, 0)} %`, '#ffd79a');
+    }
     put(`${t('horizonDip')}: ${deg(dip, 3)}`, '#8ea3c6');
     if (share <= 0) {
       label(ctx, t('bowBelowHorizon'), 12, y + 4, { color: '#ff9a8a' });

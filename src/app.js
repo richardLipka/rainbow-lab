@@ -488,6 +488,7 @@ const VIS_TOGGLES = [
   { scenes: ['sky'], key: 'alexander', labelKey: 'showAlexander' },
   { scenes: ['sky'], key: 'sky', labelKey: 'showSky' },
   { scenes: ['drops', 'field', 'sky'], key: 'rainBelow', labelKey: 'rainBelow' },
+  { scenes: ['sky'], key: 'airObserver', labelKey: 'showAirObserver' },
 ];
 
 function buildControls() {
@@ -702,6 +703,16 @@ function buildControls() {
         format: (v) => deg(v, 1),
         onInput: (v) => set({ sunElevation: v }),
       })),
+      // How high the optional second observer is flying. Only offered with
+      // the overlay on -- a height for an observer nobody is drawing is a
+      // control with nothing to control.
+      c(['sky'], () => slider({
+        labelKey: 'airHeight', min: 0, max: HEIGHT_STOPS.length - 1, step: 0.01,
+        get: () => heightToSlider(state.airHeight),
+        format: (v) => `${num(sliderToHeight(v), 0)} m`,
+        onInput: (v) => set({ airHeight: sliderToHeight(v) }),
+        hintKey: 'airHeightHint',
+      }), () => state.show.airObserver),
       c(SPACE, () => slider({
         labelKey: 'sunAzimuth', min: 0, max: 360, step: 1,
         get: () => state.sunAzimuth,
