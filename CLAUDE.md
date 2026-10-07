@@ -1995,3 +1995,35 @@ integer between them reads as one observer drawn twice, which is the exact
 opposite of the point. The body opens on "TWO observers. Not one." Step 2
 then takes those two and finds the one place they coincide, which only lands
 as a surprise if the general case came first.
+
+## The distribution plot peaked in the wrong place
+
+Reported: the shape was not highest where the rainbow is. Two causes, both
+real.
+
+**The solid-angle division blows up at the antisolar point.** Brightness here
+is energy per unit SOLID angle, and the annulus at phi shrinks like sin(phi),
+so `1/sin(phi)` amplifies whatever lands near zero. Measured: a single sample
+at 1.25 deg is boosted **45.8x** and outweighs **thirty** samples at the bow.
+With a few dozen samples the tallest thing on the plot was noise sitting in
+the observer's own shadow. The divergence is geometrically real -- a vanishing
+annulus does concentrate what lands in it -- but it is a different effect from
+the one this plot is about, and at phi = 0 geometric optics has nothing useful
+to say. `distRange()` now starts at 5 deg (boost 11.5x, bow wins on any honest
+count) and stops 5 deg short at the far end for the orders that reach it.
+
+**The label was reading physics off noise.** One label served both "where the
+engine says the bow is" and "where these samples happened to pile up". At
+seven samples it printed `extremum -> rainbow 1.25 deg`. They are now two
+labels: the engine's extremum in green on the dashed line, and the tallest
+sampled bin in pale blue. Watching the second walk onto the first as the count
+climbs is the step's whole point, and it could not do that while they were
+the same number.
+
+The step also starts at 2000 samples rather than 40, so the reader's first
+impression of the plot is a shape and not a picket fence; the chips still go
+down to 10 to show it falling apart.
+
+Verified by replicating the accumulator at 200k samples: the curve peaks at
+42.07 against the engine's 42.19 for red and 40.50 against 40.52 for violet,
+both inside one bin width.

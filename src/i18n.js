@@ -70,6 +70,7 @@ export const translations = {
       + 'podobně málo. Do jednoho ne — tam, kde je křivka výstupního úhlu plochá, se do téhož '
       + 'směru nahrne celý pás vstupních bodů a energie vyskočí. Ten vrchol je duha a leží u '
       + 'úhlu, pod kterým ji uvidíte. Zvyšte počet vzorků a vyloupne se ze šumu sám.',
+    distPeakLabel: 'nejvyšší vzorkovaný bin',
     extremumLabel: 'extrém → duha',
     rayCount: 'Počet paprsků',
     accumulate: 'Přidávat paprsky',
@@ -687,6 +688,7 @@ export const translations = {
       + 'exit-angle curve goes flat, a whole band of entry points piles into the same direction and '
       + 'the energy spikes. That spike is the bow, at the angle you have to look at. Raise the '
       + 'sample count and it sharpens out of the noise on its own.',
+    distPeakLabel: 'tallest sampled bin',
     extremumLabel: 'extremum → rainbow',
     rayCount: 'Number of rays',
     accumulate: 'Accumulate rays',

@@ -222,8 +222,11 @@ export const TUTORIAL = [
   {
     title: 's7title', body: 's7body',
     apply: {
+      // Enough samples that the shape is already a shape. At 40 it was a
+      // handful of spikes and the reader's first impression of the plot
+      // was noise; the chips still go down to 10 to show it falling apart.
       scene: 'droplet', graph: 'dist', graphOpen: true, reflections: 1, fanCount: 25,
-      distRays: 40,
+      distRays: 2000,
     },
     focus: ['rayCount'],
     actions: [

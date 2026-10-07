@@ -1717,6 +1717,7 @@ const translations = {
       + 'podobně málo. Do jednoho ne — tam, kde je křivka výstupního úhlu plochá, se do téhož '
       + 'směru nahrne celý pás vstupních bodů a energie vyskočí. Ten vrchol je duha a leží u '
       + 'úhlu, pod kterým ji uvidíte. Zvyšte počet vzorků a vyloupne se ze šumu sám.',
+    distPeakLabel: 'nejvyšší vzorkovaný bin',
     extremumLabel: 'extrém → duha',
     rayCount: 'Počet paprsků',
     accumulate: 'Přidávat paprsky',
@@ -2334,6 +2335,7 @@ const translations = {
       + 'exit-angle curve goes flat, a whole band of entry points piles into the same direction and '
       + 'the energy spikes. That spike is the bow, at the angle you have to look at. Raise the '
       + 'sample count and it sharpens out of the noise on its own.',
+    distPeakLabel: 'tallest sampled bin',
     extremumLabel: 'extremum → rainbow',
     rayCount: 'Number of rays',
     accumulate: 'Accumulate rays',
@@ -6046,12 +6048,31 @@ function createGraphView(canvas) {
     ].join('|');
   }
 
+  /**
+   * The slice of sky this plot covers.
+   *
+   * Deliberately not starting at zero. Brightness here is energy per unit
+   * SOLID angle, and the annulus at phi shrinks like sin(phi), so the
+   * division blows up at the antisolar point: measured, one stray sample at
+   * 1.25 deg is boosted 45.8x and outweighs thirty samples at the bow. With a
+   * few dozen samples the tallest thing on the plot was noise sitting in the
+   * observer's own shadow, and it was being labelled as the rainbow.
+   *
+   * The divergence is geometrically real -- a vanishing annulus does
+   * concentrate whatever lands in it -- but it is a different effect from the
+   * one this plot is about, and at phi = 0 geometric optics has nothing
+   * useful to say anyway. Five degrees in, the boost is 11.5x and the bow
+   * wins on any honest sample count. Same at the far end for the orders that
+   * reach it.
+   */
+  const DIST_EDGE_DEG = 5;
+
   function distRange() {
     const orders = activeOrders();
     const maxK = Math.max(...orders);
     const minK = Math.min(...orders);
-    if (maxK <= 2 && minK >= 1) return [0, 90];
-    return [0, 180];
+    if (maxK <= 2 && minK >= 1) return [DIST_EDGE_DEG, 90];
+    return [DIST_EDGE_DEG, 180 - DIST_EDGE_DEG];
   }
 
   const BINS = 540;
@@ -6413,10 +6434,21 @@ function createGraphView(canvas) {
     label(ctx, `${formatCount(accum.count)} ${t('distSamples')}`, box.x + box.w - 8, box.y + 12, {
       align: 'right', color: '#e8eefc',
     });
+    // Two different claims, kept apart. The engine's extremum is where the
+    // rainbow IS; the samples' tallest bin is where this many samples HAPPEN
+    // to have piled up. They were one label before, so a handful of samples
+    // could put "extremum -> rainbow" on a noise spike. Watching the second
+    // walk towards the first as the count climbs is the step's whole point.
+    const refGeo = O.rainbowGeometry(idx(activeLambdas().includes(650) ? 650 : activeLambdas()[0]),
+      Math.max(1, Math.min(...activeOrders().filter((k) => k >= 1))));
+    if (refGeo && refGeo.antisolarDeg >= lo && refGeo.antisolarDeg <= hi) {
+      label(ctx, `${t('extremumLabel')} ${deg(refGeo.antisolarDeg, 2)}`,
+        fx(refGeo.antisolarDeg), box.y + 12, { align: 'center', color: '#6fd3a4' });
+    }
     const peakDeg = peakAngle(shown, lo, bw);
     if (peakDeg !== null) {
-      label(ctx, `${t('extremumLabel')} ${deg(peakDeg, 2)}`, fx(peakDeg), box.y + 30, {
-        align: 'center', color: '#6fd3a4',
+      label(ctx, `${t('distPeakLabel')} ${deg(peakDeg, 2)}`, fx(peakDeg), box.y + 30, {
+        align: 'center', color: '#cfe0ff',
       });
     }
   }
@@ -8903,8 +8935,11 @@ const TUTORIAL = [
   {
     title: 's7title', body: 's7body',
     apply: {
+      // Enough samples that the shape is already a shape. At 40 it was a
+      // handful of spikes and the reader's first impression of the plot
+      // was noise; the chips still go down to 10 to show it falling apart.
       scene: 'droplet', graph: 'dist', graphOpen: true, reflections: 1, fanCount: 25,
-      distRays: 40,
+      distRays: 2000,
     },
     focus: ['rayCount'],
     actions: [
