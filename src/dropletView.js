@@ -670,6 +670,14 @@ export function createDropletView(canvas) {
   const ARRIVAL_BIN = 1.2 * Math.PI / 180;
   const ARRIVAL_BAR = 26;
 
+  /** Bring d into (-pi, pi]. */
+  function wrapPi(d) {
+    let x = d;
+    while (x <= -Math.PI) x += 2 * Math.PI;
+    while (x > Math.PI) x -= 2 * Math.PI;
+    return x;
+  }
+
   function drawArrivalArc(ctx) {
     // Pointless with one ray on screen: a pile-up needs a population, and the
     // reader has not asked to see one.
@@ -680,60 +688,90 @@ export function createDropletView(canvas) {
     if (!groups.length) return;
 
     ctx.save();
-    let lo = Infinity;
-    let hi = -Infinity;
-    for (const g of groups) for (const a of g.angs) { if (a < lo) lo = a; if (a > hi) hi = a; }
-    ctx.strokeStyle = 'rgba(126,150,196,0.28)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(layout.cx, layout.cy, r, lo - 0.04, hi + 0.04);
-    ctx.stroke();
-
     for (const g of groups) {
+      /*
+       * Bearings come out of atan2 in (-pi, pi], and a beam covering the
+       * whole face sends order 1 out across that seam: the exits run from
+       * +137.8 deg up through 180 and back down to -137.8. Sorted as raw
+       * numbers that reads as a set spanning the full 360 with a 276 deg
+       * hole in it, and the filled profile closed the hole with a chord
+       * straight across the droplet. That chord was the bump -- a bigger one
+       * than either caustic, sitting where no light goes at all, while the
+       * genuine peaks at +-138 were pushed out to the ends of the shape and
+       * read as its edges.
+       *
+       * Unwrapped around the group's own circular mean, the same exits
+       * become one contiguous stretch and the seam disappears.
+       */
+      let sx = 0;
+      let sy = 0;
+      for (const a of g.angs) { sx += Math.cos(a); sy += Math.sin(a); }
+      const mid = Math.atan2(sy, sx);
       const bins = new Map();
       for (const a of g.angs) {
-        const b = Math.round(a / ARRIVAL_BIN);
-        bins.set(b, (bins.get(b) || 0) + 1);
+        const key = Math.round((mid + wrapPi(a - mid)) / ARRIVAL_BIN);
+        bins.set(key, (bins.get(key) || 0) + 1);
       }
       const keys = [...bins.keys()].sort((x, y) => x - y);
       const peak = Math.max(...bins.values());
       if (!(peak > 0) || keys.length < 3) continue;
-      // Filled, not hatched. Two hundred separate bars read as texture; the
-      // same numbers as one filled curve read as a shape with a spike on it,
-      // which is the entire message.
-      const dens = (i) => {
-        const c0 = bins.get(keys[i]) || 0;
-        const cm = bins.get(keys[i - 1]) || c0;
-        const cp = bins.get(keys[i + 1]) || c0;
+
+      // Split where the exits genuinely stop. An order whose light leaves in
+      // two separated bands gets two shapes, not one shape bridging the
+      // emptiness between them.
+      const runs = [];
+      let run = [keys[0]];
+      for (let i = 1; i < keys.length; i++) {
+        if (keys[i] - keys[i - 1] <= 3) run.push(keys[i]);
+        else { runs.push(run); run = [keys[i]]; }
+      }
+      runs.push(run);
+
+      const dens = (ks, i) => {
+        const c0 = bins.get(ks[i]) || 0;
+        const cm = bins.get(ks[i - 1]) || c0;
+        const cp = bins.get(ks[i + 1]) || c0;
         return (cm + 2 * c0 + cp) / 4;
       };
-      const rad = (i) => r + 3 + ARRIVAL_BAR * Math.sqrt(dens(i) / peak);
-      ctx.beginPath();
-      for (let i = 0; i < keys.length; i++) {
-        const a = keys[i] * ARRIVAL_BIN;
-        const x = layout.cx + Math.cos(a) * rad(i);
-        const y = layout.cy + Math.sin(a) * rad(i);
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
+
+      for (const ks of runs) {
+        if (ks.length < 3) continue;
+        // The baseline under this run only, so it stops where the light does.
+        ctx.strokeStyle = 'rgba(126,150,196,0.28)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(layout.cx, layout.cy, r,
+          ks[0] * ARRIVAL_BIN - 0.02, ks[ks.length - 1] * ARRIVAL_BIN + 0.02);
+        ctx.stroke();
+
+        const rad = (i) => r + 3 + ARRIVAL_BAR * Math.sqrt(dens(ks, i) / peak);
+        const at = (i, rr) => ({
+          x: layout.cx + Math.cos(ks[i] * ARRIVAL_BIN) * rr,
+          y: layout.cy + Math.sin(ks[i] * ARRIVAL_BIN) * rr,
+        });
+        ctx.beginPath();
+        for (let i = 0; i < ks.length; i++) {
+          const p = at(i, rad(i));
+          if (i === 0) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
+        }
+        for (let i = ks.length - 1; i >= 0; i--) {
+          const p = at(i, r);
+          ctx.lineTo(p.x, p.y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = colorFor(g.lambda, 0.22);
+        ctx.fill();
+        ctx.strokeStyle = colorFor(g.lambda, 0.9);
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        for (let i = 0; i < ks.length; i++) {
+          const p = at(i, rad(i));
+          if (i === 0) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
+        }
+        ctx.stroke();
       }
-      for (let i = keys.length - 1; i >= 0; i--) {
-        const a = keys[i] * ARRIVAL_BIN;
-        ctx.lineTo(layout.cx + Math.cos(a) * r, layout.cy + Math.sin(a) * r);
-      }
-      ctx.closePath();
-      ctx.fillStyle = colorFor(g.lambda, 0.22);
-      ctx.fill();
-      ctx.strokeStyle = colorFor(g.lambda, 0.9);
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      for (let i = 0; i < keys.length; i++) {
-        const a = keys[i] * ARRIVAL_BIN;
-        const x = layout.cx + Math.cos(a) * rad(i);
-        const y = layout.cy + Math.sin(a) * rad(i);
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
     }
     ctx.restore();
 
@@ -767,7 +805,14 @@ export function createDropletView(canvas) {
     }
 
     if (!state.show.labels) return;
-    const mid = (lo + hi) / 2;
+    // Named at the circular mean of everything on the arc. lo/hi went away
+    // with the single-span version: a set that straddles the atan2 seam has
+    // no meaningful min or max, which is the whole bug this function just
+    // stopped having.
+    let mx = 0;
+    let my = 0;
+    for (const g of groups) for (const a of g.angs) { mx += Math.cos(a); my += Math.sin(a); }
+    const mid = Math.atan2(my, mx);
     label(ctx, t('arrivalArcLabel'),
       O.clamp(layout.cx + Math.cos(mid) * (r + ARRIVAL_BAR + 18), 62, layout.w - 62),
       O.clamp(layout.cy + Math.sin(mid) * (r + ARRIVAL_BAR + 18), 14, layout.h - 26), {

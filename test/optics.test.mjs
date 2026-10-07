@@ -1274,3 +1274,64 @@ test('the two bow rays from one droplet cross at a single point', () => {
       `k=${k} arrives at its own bow angle`);
   }
 });
+
+test('a full-face beam sends order 1 out across the atan2 seam', () => {
+  // The arrival arc in the droplet scene bins exit BEARINGS. With the beam
+  // covering the whole face, order 1 leaves across the +-180 seam: from
+  // about +138 up through 180 and back down to -138. Sorted as raw numbers
+  // that looks like a set spanning the full circle with a huge hole in it,
+  // and a filled profile closed the hole with a chord across the droplet --
+  // a bump bigger than either caustic, sitting where no light goes.
+  const n = O.cauchyIndex(650);
+  const trace = (b, k) => O.traceRay({
+    origin: O.vec(-6, b, 0), dir: O.vec(1, 0, 0), center: O.vec(0, 0, 0),
+    radius: 1, n, reflections: k, exitLength: 6,
+  });
+  const bearings = [];
+  for (let i = 0; i < 200; i++) {
+    const b = -1 + (2 * (i + 0.5)) / 200;
+    const p = trace(b, 1);
+    if (p.dirOut) bearings.push(Math.atan2(-p.dirOut.y, p.dirOut.x));
+  }
+  assert.ok(bearings.length > 150, 'the beam produces exits all the way across');
+
+  // Raw: a false span of nearly the whole circle.
+  const rawSpan = (Math.max(...bearings) - Math.min(...bearings)) * O.DEG;
+  assert.ok(rawSpan > 300, `raw bearings span ${rawSpan.toFixed(0)} deg, i.e. the seam is crossed`);
+
+  // Unwrapped around the circular mean, the same exits are one contiguous
+  // stretch with no gap bigger than a couple of bins.
+  const wrapPi = (d) => {
+    let x = d;
+    while (x <= -Math.PI) x += 2 * Math.PI;
+    while (x > Math.PI) x -= 2 * Math.PI;
+    return x;
+  };
+  let sx = 0;
+  let sy = 0;
+  for (const a of bearings) { sx += Math.cos(a); sy += Math.sin(a); }
+  const mid = Math.atan2(sy, sx);
+  const un = bearings.map((a) => mid + wrapPi(a - mid)).sort((p, q) => p - q);
+  const span = (un[un.length - 1] - un[0]) * O.DEG;
+  assert.ok(span > 60 && span < 120, `unwrapped span ${span.toFixed(0)} deg`);
+  let gap = 0;
+  for (let i = 1; i < un.length; i++) gap = Math.max(gap, (un[i] - un[i - 1]) * O.DEG);
+  assert.ok(gap < 5, `largest gap between neighbouring exits ${gap.toFixed(2)} deg`);
+
+  // And the densest bearing really is the bow's, not something near the axis.
+  const BIN = 1.2 * O.RAD;
+  const bins = new Map();
+  for (const a of un) {
+    const key = Math.round(a / BIN);
+    bins.set(key, (bins.get(key) || 0) + 1);
+  }
+  let bestKey = null;
+  for (const [key, c] of bins) if (bestKey === null || c > bins.get(bestKey)) bestKey = key;
+  const peakDeg = bestKey * BIN * O.DEG;
+  const bowDeg = Math.atan2(
+    -trace(O.rainbowGeometry(n, 1).impactParameter, 1).dirOut.y,
+    trace(O.rainbowGeometry(n, 1).impactParameter, 1).dirOut.x
+  ) * O.DEG;
+  const off = Math.abs(wrapPi((peakDeg - bowDeg) * O.RAD)) * O.DEG;
+  assert.ok(off < 3, `densest bearing ${peakDeg.toFixed(1)} vs bow ${bowDeg.toFixed(1)}`);
+});

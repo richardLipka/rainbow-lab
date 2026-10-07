@@ -2068,3 +2068,32 @@ separate attempts -- clicking the Tutorial tab gives 0, setting `state.mode`
 directly gives 3, because the header handler calls `applyStep` first and a
 direct set skips it. Likely a test artefact. Not chased further; recorded
 rather than claimed clean.
+
+## The arrival arc bulged where no light goes
+
+Reported: the red profile around the droplet had a big bump in the middle of
+the drop and none where the bow forms. The binning was never wrong -- the
+busiest bearing bins sit at +-138 deg, which IS the bow -- so the fault was
+entirely in the drawing.
+
+`atan2` returns (-pi, pi], and a beam covering the whole face sends order 1
+out **across that seam**: from +137.8 deg up through 180 and back down to
+-137.8. Sorted as raw numbers that reads as a set spanning 360 deg with a
+**276 deg hole** in it, and the filled profile closed the hole with a chord
+straight across the droplet. That chord was the bump -- larger than either
+caustic, sitting exactly where no order-1 light goes -- and it pushed the two
+genuine peaks out to the ends of the shape where they read as edges.
+
+Fixed by unwrapping each group's bearings around its own circular mean, which
+makes the same exits one contiguous stretch (largest neighbour gap 1.2 deg),
+then splitting on real gaps so an order whose light leaves in two separated
+bands gets two shapes instead of one bridging the emptiness. `lo`/`hi` went
+with it: a set straddling the seam has no meaningful min or max, and the arc's
+own caption now anchors to the circular mean too.
+
+A test pins all of it: raw span > 300 deg (the seam really is crossed),
+unwrapped span 60-120 deg with no gap over 5 deg, and the densest bearing
+within 3 deg of the bow ray's.
+
+Worth remembering generally: any time this project bins or sorts an angle from
+`atan2`, the seam is a bug waiting unless the set is unwrapped first.
