@@ -15,7 +15,7 @@ import { t, deg, num } from './i18n.js';
 import { fitCanvas, strokePath, label, arrowHead, capture } from './ui.js';
 import { NEAR, SUN_FAR, CLICK_SLOP, makeCamera, clipPolyline, clampToCanvas } from './camera3d.js';
 import { drawDropletBeam } from './beam3d.js';
-import { colorFor, bowNameKey, alexanderCaption } from './rays.js';
+import { colorFor, bowNameKey, alexanderCaption, orderDim } from './rays.js';
 
 /**
  * How many wavelengths the bow is drawn from, and how many points per circle.
@@ -440,8 +440,11 @@ export function createSkyView(canvas) {
     for (const band of bowBands(anti)) {
       // Wide enough that neighbouring wavelengths overlap rather than leaving
       // sky between them -- the band has to read as one bow, not as a stack.
+      // Weaker for every extra bounce, by the Fresnel budget rather than by
+      // eye: the secondary really does carry a third of the primary's light.
+      const dim = orderDim(band.k, indexModel()(650));
       const width = band.k === 1 ? 2.4 : 1.9;
-      const alpha = band.k === 1 ? 0.95 : 0.72;
+      const alpha = 0.95 * dim;
       for (const ring of band.rings) {
         // split into runs of visible directions, so the horizon does the cutting
         let run = [];

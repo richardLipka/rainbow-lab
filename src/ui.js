@@ -104,6 +104,35 @@ export function slider(opts) {
 }
 
 /** Checkbox bound to a boolean getter. */
+/**
+ * A displayed formula, as real MathML.
+ *
+ * Browsers have parsed and laid out MathML natively for years, so subscripts
+ * sit under the baseline and fractions stack properly without a library --
+ * which matters here, because the whole application ships as one HTML file
+ * and a typesetting library from a CDN would break it offline and inside the
+ * published artifact.
+ *
+ * The markup is written in the source, never built from user input, so
+ * innerHTML is the parser doing its job rather than a hole.
+ */
+export function mathml(markup, cls = 'formula') {
+  const node = el('div', { class: cls });
+  node.innerHTML = `<math display="block">${markup}</math>`;
+  return node;
+}
+
+/** Shorthand for the pieces these formulas keep repeating. */
+export const M = {
+  sub: (base, sub) => `<msub><mi>${base}</mi><mi>${sub}</mi></msub>`,
+  frac: (num, den) => `<mfrac>${num}${den}</mfrac>`,
+  row: (...xs) => `<mrow>${xs.join('')}</mrow>`,
+  op: (x) => `<mo>${x}</mo>`,
+  n: (x) => `<mn>${x}</mn>`,
+  i: (x) => `<mi>${x}</mi>`,
+  sup: (base, p) => `<msup>${base}<mn>${p}</mn></msup>`,
+};
+
 export function toggle(labelKey, get, onChange, opts = {}) {
   const input = el('input', {
     type: 'checkbox',

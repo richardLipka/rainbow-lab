@@ -1907,3 +1907,49 @@ A scripting trap worth remembering: a Python edit script that asserts on
 several replacements and writes at the end loses ALL of them when one assert
 fails. Several fixes in this session appeared to land and had not. Write after
 each replacement, or verify by reading the value back, never by the exit code.
+
+## Weaker higher orders, the aircraft in both 3-D scenes, and real MathML
+
+**`orderDim(k, n)` in rays.js** is the one place a higher order's ink is
+decided: `sqrt(survives_k / survives_1)` from the Fresnel budget. Raw it would
+be 0.35 for the secondary and 0.18 for the tertiary -- honest about the energy
+and useless as a picture -- so the square root is the compromise, and it is
+the ONLY fudge: the ordering and the ratios come from the engine. Primary 1.0,
+secondary 0.589, tertiary 0.424, fourth 0.331 at 650 nm. Used by the sky
+rings, the field droplets (bucketed by order as well as wavelength now) and
+the traced rays in the droplet scene.
+
+The rendered bow needed nothing: `spectralProfile` already feeds `orders`
+through `angularDistribution`, which already applies (1-R)^2 R^k, and the
+secondary measures **0.103** of the primary's luminance there. Checked before
+changing it.
+
+**The aircraft overlay is now in the field scene too**, with `downLimitDeg()`
+copied verbatim from skyView and `RAIN_PATH_MIN` matching at 2000 m. That
+duplication is deliberate: the two 3-D scenes are the same claim seen twice
+and a reader moving between them must not find the aircraft reaching
+different angles in each. Every active order gets a ghost ring, so the
+aircraft's secondary appears 8 deg further out, dimmed by `orderDim`.
+
+**Formulas are real MathML.** No library: browsers have laid MathML out
+natively for years, and the whole application ships as one HTML file, so a
+CDN typesetter would break it offline and inside the published artifact.
+Verified in the browser before committing to it -- `mfrac` lays out 36 px
+tall against 16 for a plain line, and the namespace comes back as MathML.
+`mathml()` and `M` live in ui.js; the markup is written in source and never
+built from input.
+
+### New show flags, and what they broke
+
+`show.arrival` (the exit-direction arc) and `show.alexander` (now honoured by
+the droplet, rain and field scenes, not just the sky) exist so step 1 can
+switch both off: its job is two bows, two eyes, eight degrees, in white light,
+and the arc and the band are the clutter between the reader and that. Step 1
+also drops to 12 rays, because white light is six wavelengths and 24 rays over
+two orders is 300 lines.
+
+But a step that switches a shared flag OFF hands that off to every later step.
+Pinning `alexander: true` on the band step, `arrival: true` on the arc step
+and `airObserver: false` on the final sky step was needed immediately. The
+rule is the one this file keeps relearning: a step must pin every flag it
+depends on, and adding a flag means auditing who depends on it.

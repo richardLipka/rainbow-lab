@@ -485,10 +485,11 @@ const VIS_TOGGLES = [
   },
   { scenes: ALL, key: 'labels', labelKey: 'showLabels' },
   { scenes: ['droplet', 'sky'], key: 'wavelengthLabels', labelKey: 'showWavelengthLabels' },
-  { scenes: ['sky'], key: 'alexander', labelKey: 'showAlexander' },
+  { scenes: ['droplet', 'drops', 'field', 'sky'], key: 'alexander', labelKey: 'showAlexander' },
+  { scenes: ['droplet'], key: 'arrival', labelKey: 'showArrival' },
   { scenes: ['sky'], key: 'sky', labelKey: 'showSky' },
   { scenes: ['drops', 'field', 'sky'], key: 'rainBelow', labelKey: 'rainBelow' },
-  { scenes: ['sky'], key: 'airObserver', labelKey: 'showAirObserver' },
+  { scenes: ['field', 'sky'], key: 'airObserver', labelKey: 'showAirObserver' },
 ];
 
 function buildControls() {
@@ -706,7 +707,7 @@ function buildControls() {
       // How high the optional second observer is flying. Only offered with
       // the overlay on -- a height for an observer nobody is drawing is a
       // control with nothing to control.
-      c(['sky'], () => slider({
+      c(['field', 'sky'], () => slider({
         labelKey: 'airHeight', min: 0, max: HEIGHT_STOPS.length - 1, step: 0.01,
         get: () => heightToSlider(state.airHeight),
         format: (v) => `${num(sliderToHeight(v), 0)} m`,

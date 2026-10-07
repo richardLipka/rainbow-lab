@@ -9,7 +9,7 @@ import * as O from './optics.js';
 import { state, set, indexModel, activeOrders, activeLambdas } from './state.js';
 import {
   buildRays, distanceFromExtremum, colorFor, traceOne, BOW_MATCH_DEG, bowNameKey, sharedPrefix,
-  orderColor, alexanderCaption, bowEntry,
+  orderColor, alexanderCaption, bowEntry, orderDim,
 } from './rays.js';
 import { t, deg, num } from './i18n.js';
 import { fitCanvas, strokePath, label, arrowHead, angleArc, capture } from './ui.js';
@@ -387,6 +387,8 @@ export function createDropletView(canvas) {
    */
   function rayStyle(ray, force = null) {
     const reaches = force === null ? reachesEye(ray) : force;
+    // Each extra bounce leaves with less light, and the picture says so.
+    const dim = orderDim(ray.k, ray.n);
     // greyMix is the primary cue (see colorFor): a ray that misses the
     // observer loses most of its hue, so with a whole fan on screen the few
     // that matter stand out by colour and not merely by being a little less
@@ -397,9 +399,15 @@ export function createDropletView(canvas) {
       // orders, and at the old 0.4 they read as a thicket rather than as a
       // background the few bright ones stand out from. The ones that pile up
       // are the subject; the rest are there to be outnumbered.
-      return { alpha: reaches ? 1 : 0.2, width: reaches ? 2.4 : 0.7, greyMix: reaches ? 0 : 0.92, reaches };
+      return {
+        alpha: (reaches ? 1 : 0.2) * dim, width: reaches ? 2.4 : 0.7,
+        greyMix: reaches ? 0 : 0.92, reaches,
+      };
     }
-    return { alpha: reaches ? 1 : 0.62, width: reaches ? 2.4 : 1.3, greyMix: reaches ? 0 : 0.72, reaches };
+    return {
+      alpha: (reaches ? 1 : 0.62) * dim, width: reaches ? 2.4 : 1.3,
+      greyMix: reaches ? 0 : 0.72, reaches,
+    };
   }
 
   /**
@@ -595,7 +603,7 @@ export function createDropletView(canvas) {
   function drawArrivalArc(ctx) {
     // Pointless with one ray on screen: a pile-up needs a population, and the
     // reader has not asked to see one.
-    if (state.fanCount <= 0) return;
+    if (!state.show.arrival || state.fanCount <= 0) return;
     const r = layout.s * ARRIVAL_R;
     if (r < 40) return;
     const { groups } = buildArrival();
@@ -1173,6 +1181,9 @@ export function createDropletView(canvas) {
    * show it.
    */
   function drawAlexanderBand(ctx) {
+    // One flag for "shade Alexander's band", shared with the rain, field and
+    // sky scenes, so switching it off switches it off everywhere.
+    if (!state.show.alexander) return;
     const orders = activeOrders().filter((k) => k === 1 || k === 2);
     if (orders.length < 2) return;
     const nRef = indexModel()(650);

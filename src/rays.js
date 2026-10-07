@@ -153,6 +153,29 @@ export function bowEntry(k, n, refOrder = null) {
 }
 
 /**
+ * How bright order k should be DRAWN relative to the primary.
+ *
+ * Straight from the Fresnel budget: (1-R)^2 R^k survives for each order, so
+ * the secondary carries 1.768 % against the primary's 5.095 %, a third as
+ * much, and the tertiary 0.914 %. Drawing that ratio raw would put the
+ * secondary at 35 % and the tertiary at 18 % of the primary's ink, which is
+ * honest about the energy and useless as a picture -- the same reason the
+ * rendered bow raises its radiance to a power before painting it. The square
+ * root is that compromise, and it is the ONLY place a fudge enters: the
+ * ordering and the ratios are the engine's.
+ *
+ * Returns 1 for the primary, about 0.59 for the secondary, 0.42 for the
+ * tertiary with water at 650 nm.
+ */
+export function orderDim(k, n) {
+  if (k <= 1) return 1;
+  const base = O.bowBrightness(n, 1);
+  const here = O.bowBrightness(n, k);
+  if (!base || !here || !(base.survives > 0)) return 1;
+  return Math.sqrt(O.clamp(here.survives / base.survives, 0, 1));
+}
+
+/**
  * Chrome colour for reflection order k, shared by every scene.
  *
  * It started out private to the droplet view while the rain cross-section

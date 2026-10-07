@@ -18,7 +18,9 @@ import { t, deg, num } from './i18n.js';
 import { fitCanvas, strokePath, label, capture, arrowHead } from './ui.js';
 import { NEAR, SUN_FAR, CLICK_SLOP, makeCamera, clipPolyline, clampToCanvas } from './camera3d.js';
 import { drawDropletBeam } from './beam3d.js';
-import { colorFor, fieldTest, BOW_MATCH_DEG, orderColor, alexanderCaption } from './rays.js';
+import {
+  colorFor, fieldTest, BOW_MATCH_DEG, orderColor, alexanderCaption, orderDim,
+} from './rays.js';
 
 /** Near and far edge of the rain volume, in world units. */
 const R_MIN = 0.3;
@@ -196,12 +198,70 @@ export function createFieldView(canvas) {
 
     const answers = classify();
     drawAlexander(ctx, anti);
+    drawAirBow(ctx, anti);
     drawDroplets(ctx, answers, w, h);
     drawPick(ctx, answers, anti, sun, w, h);
 
     drawAxis(ctx, sun, anti, w, h);
     if (state.view === 'orbit') drawObserver(ctx);
     drawReadout(ctx, answers, w, h);
+  }
+
+  /**
+   * The same rule the sky scene uses for how far below eye level there is
+   * still rain to look at. Kept identical on purpose: the two 3-D scenes are
+   * the same claim seen two ways, and a reader who moves between them should
+   * not find the aircraft reaching different angles in each.
+   */
+  const RAIN_PATH_MIN_M = 2000;
+
+  function downLimitDeg(heightM) {
+    return Math.asin(O.clamp(heightM / RAIN_PATH_MIN_M, 0, 1)) * O.DEG;
+  }
+
+  /**
+   * The part of each bow an observer flying at state.airHeight would get and
+   * this one would not, drawn as a ghost ring.
+   *
+   * The bow is the same set of directions for both of them -- it depends on
+   * the angle from the antisolar point and on nothing else. What differs is
+   * how far down each still has rain. Every active order gets its own ring,
+   * dimmed by the Fresnel budget, so the aircraft's secondary shows up eight
+   * degrees further out and correspondingly fainter.
+   */
+  function drawAirBow(ctx, anti) {
+    if (!state.show.airObserver) return;
+    const idx = indexModel();
+    const lam = state.wavelength === 'white' ? 650 : state.wavelength;
+    const nRef = idx(650);
+    const mine = state.show.rainBelow ? downLimitDeg(state.observerHeight) : 0;
+    const theirs = downLimitDeg(state.airHeight);
+    if (theirs <= mine) return;
+    const orders = [];
+    if (state.show.primary) orders.push(1);
+    if (state.show.secondary) orders.push(2);
+    if (state.show.higher) orders.push(3);
+    for (const k of orders) {
+      const geo = O.rainbowGeometry(idx(lam), k);
+      if (!geo) continue;
+      const circle = O.rainbowCircle(anti, geo.antisolarDeg, 360);
+      let run = [];
+      const runs = [];
+      for (const d of circle) {
+        const el = Math.asin(O.clamp(d.y, -1, 1)) * O.DEG;
+        if (el <= -mine && el > -theirs) run.push(d);
+        else {
+          if (run.length > 1) runs.push(run);
+          run = [];
+        }
+      }
+      if (run.length > 1) runs.push(run);
+      for (const r of runs) {
+        for (const seg of clipPolyline(cam, r)) {
+          strokePath(ctx, seg, colorFor(lam, 0.55 * orderDim(k, nRef)), 2, [6, 5]);
+        }
+      }
+    }
   }
 
   /**
@@ -214,7 +274,7 @@ export function createFieldView(canvas) {
    * wide and has a name.
    */
   function drawAlexander(ctx, anti) {
-    if (!state.show.primary || !state.show.secondary) return;
+    if (!state.show.alexander || !state.show.primary || !state.show.secondary) return;
     const { band, text } = alexanderCaption(indexModel());
     if (!(band.outerDeg > band.innerDeg)) return;
     for (const [phi, k] of [[band.innerDeg, 1], [band.outerDeg, 2]]) {
@@ -296,7 +356,9 @@ export function createFieldView(canvas) {
       hitN++;
       const lam = answers.lambda[i];
       if (lam > 0) {
-        const key = Math.round(lam / LAMBDA_BUCKET) * LAMBDA_BUCKET;
+        // Bucketed by order as well as wavelength: the secondary's droplets
+        // carry a third of the light and are drawn that much fainter.
+        const key = `${Math.round(lam / LAMBDA_BUCKET) * LAMBDA_BUCKET}|${answers.order[i]}`;
         let path = buckets.get(key);
         if (!path) {
           path = new Path2D();
@@ -317,8 +379,10 @@ export function createFieldView(canvas) {
       ctx.fillStyle = 'rgba(150,175,215,0.22)';
       ctx.fill(grey);
     }
-    for (const [lam, path] of buckets) {
-      ctx.fillStyle = colorFor(lam, 0.95);
+    const nRef = indexModel()(650);
+    for (const [key, path] of buckets) {
+      const [lam, k] = key.split('|').map(Number);
+      ctx.fillStyle = colorFor(lam, 0.95 * orderDim(k, nRef));
       ctx.fill(path);
     }
   }

@@ -97,6 +97,10 @@ export const state = {
        the shower would see and this one cannot. Off by default: it is a
        second observer on a scene built around one. */
     airObserver: false,
+    /* The exit-direction density arc around the droplet. Worth having on
+       whenever a beam is running, but the very first step is about two bows
+       and two eyes and nothing else, so it can be asked to stand down. */
+    arrival: true,
     /* Mark what happens at each surface the ray meets: how much goes through
        and how much reflects on. On by default, because the thing it settles
        is a misconception most explanations repeat -- that the bounces inside

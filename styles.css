@@ -553,6 +553,19 @@ select {
   color: #e2ecff;
   overflow-x: auto;
 }
+/* Real MathML, laid out by the browser. A serif face because that is what
+   maths is set in, and the mono face the surrounding code uses makes an
+   mfrac look like ASCII art. */
+.formula math {
+  font-family: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+  font-size: 15px;
+  font-style: normal;
+  color: #e8f0ff;
+}
+.formula math mi { font-style: italic; }
+.formula math mo { padding: 0 0.12em; }
+.formula math mfrac { padding: 0 0.1em; }
+
 .conv li { font-family: var(--mono); font-size: 11px; }
 
 .math-table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 10.5px; margin-bottom: 10px; }

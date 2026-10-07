@@ -187,7 +187,7 @@ export function createDropsView(canvas) {
     // bows have to be on screen for it to mean anything: on its own the
     // primary has an outside, not a gap. Drawn before the direction lines so
     // they read as its edges.
-    if (state.show.primary && state.show.secondary) {
+    if (state.show.alexander && state.show.primary && state.show.secondary) {
       const { band: ab, text } = alexanderCaption(idx);
       if (ab.outerDeg > ab.innerDeg) {
         const R = s * 1.35;

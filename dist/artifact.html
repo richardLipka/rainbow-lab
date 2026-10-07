@@ -558,6 +558,19 @@ select {
   color: #e2ecff;
   overflow-x: auto;
 }
+/* Real MathML, laid out by the browser. A serif face because that is what
+   maths is set in, and the mono face the surrounding code uses makes an
+   mfrac look like ASCII art. */
+.formula math {
+  font-family: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+  font-size: 15px;
+  font-style: normal;
+  color: #e8f0ff;
+}
+.formula math mi { font-style: italic; }
+.formula math mo { padding: 0 0.12em; }
+.formula math mfrac { padding: 0 0.1em; }
+
 .conv li { font-family: var(--mono); font-size: 11px; }
 
 .math-table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 10.5px; margin-bottom: 10px; }
@@ -1792,6 +1805,7 @@ const translations = {
     showHorizon: 'Obzor',
     showGround: 'Země',
     showRenderedBow: 'Vykreslit duhu',
+    showArrival: 'Oblouk výstupních směrů',
     showAlexander: 'Alexandrův temný pás',
     showPrimary: 'Primární duha',
     showSecondary: 'Vedlejší duha',
@@ -2395,6 +2409,7 @@ const translations = {
     showHorizon: 'Horizon',
     showGround: 'Ground',
     showRenderedBow: 'Render the bow',
+    showArrival: 'Arc of exit directions',
     showAlexander: "Alexander's dark band",
     showPrimary: 'Primary rainbow',
     showSecondary: 'Secondary rainbow',
@@ -3010,6 +3025,10 @@ const state = {
        the shower would see and this one cannot. Off by default: it is a
        second observer on a scene built around one. */
     airObserver: false,
+    /* The exit-direction density arc around the droplet. Worth having on
+       whenever a beam is running, but the very first step is about two bows
+       and two eyes and nothing else, so it can be asked to stand down. */
+    arrival: true,
     /* Mark what happens at each surface the ray meets: how much goes through
        and how much reflects on. On by default, because the thing it settles
        is a misconception most explanations repeat -- that the bounces inside
@@ -3243,6 +3262,35 @@ function slider(opts) {
 }
 
 /** Checkbox bound to a boolean getter. */
+/**
+ * A displayed formula, as real MathML.
+ *
+ * Browsers have parsed and laid out MathML natively for years, so subscripts
+ * sit under the baseline and fractions stack properly without a library --
+ * which matters here, because the whole application ships as one HTML file
+ * and a typesetting library from a CDN would break it offline and inside the
+ * published artifact.
+ *
+ * The markup is written in the source, never built from user input, so
+ * innerHTML is the parser doing its job rather than a hole.
+ */
+function mathml(markup, cls = 'formula') {
+  const node = el('div', { class: cls });
+  node.innerHTML = `<math display="block">${markup}</math>`;
+  return node;
+}
+
+/** Shorthand for the pieces these formulas keep repeating. */
+const M = {
+  sub: (base, sub) => `<msub><mi>${base}</mi><mi>${sub}</mi></msub>`,
+  frac: (num, den) => `<mfrac>${num}${den}</mfrac>`,
+  row: (...xs) => `<mrow>${xs.join('')}</mrow>`,
+  op: (x) => `<mo>${x}</mo>`,
+  n: (x) => `<mn>${x}</mn>`,
+  i: (x) => `<mi>${x}</mi>`,
+  sup: (base, p) => `<msup>${base}<mn>${p}</mn></msup>`,
+};
+
 function toggle(labelKey, get, onChange, opts = {}) {
   const input = el('input', {
     type: 'checkbox',
@@ -3702,6 +3750,29 @@ function bowEntry(k, n, refOrder = null) {
   const ref = refOrder ?? (orders.length ? orders[0] : k);
   const side = k === ref ? 1 : bowExitSide(n, ref) * bowExitSide(n, k);
   return side * geo.impactParameter;
+}
+
+/**
+ * How bright order k should be DRAWN relative to the primary.
+ *
+ * Straight from the Fresnel budget: (1-R)^2 R^k survives for each order, so
+ * the secondary carries 1.768 % against the primary's 5.095 %, a third as
+ * much, and the tertiary 0.914 %. Drawing that ratio raw would put the
+ * secondary at 35 % and the tertiary at 18 % of the primary's ink, which is
+ * honest about the energy and useless as a picture -- the same reason the
+ * rendered bow raises its radiance to a power before painting it. The square
+ * root is that compromise, and it is the ONLY place a fudge enters: the
+ * ordering and the ratios are the engine's.
+ *
+ * Returns 1 for the primary, about 0.59 for the secondary, 0.42 for the
+ * tertiary with water at 650 nm.
+ */
+function orderDim(k, n) {
+  if (k <= 1) return 1;
+  const base = O.bowBrightness(n, 1);
+  const here = O.bowBrightness(n, k);
+  if (!base || !here || !(base.survives > 0)) return 1;
+  return Math.sqrt(O.clamp(here.survives / base.survives, 0, 1));
 }
 
 /**
@@ -4710,6 +4781,8 @@ function createDropletView(canvas) {
    */
   function rayStyle(ray, force = null) {
     const reaches = force === null ? reachesEye(ray) : force;
+    // Each extra bounce leaves with less light, and the picture says so.
+    const dim = orderDim(ray.k, ray.n);
     // greyMix is the primary cue (see colorFor): a ray that misses the
     // observer loses most of its hue, so with a whole fan on screen the few
     // that matter stand out by colour and not merely by being a little less
@@ -4720,9 +4793,15 @@ function createDropletView(canvas) {
       // orders, and at the old 0.4 they read as a thicket rather than as a
       // background the few bright ones stand out from. The ones that pile up
       // are the subject; the rest are there to be outnumbered.
-      return { alpha: reaches ? 1 : 0.2, width: reaches ? 2.4 : 0.7, greyMix: reaches ? 0 : 0.92, reaches };
+      return {
+        alpha: (reaches ? 1 : 0.2) * dim, width: reaches ? 2.4 : 0.7,
+        greyMix: reaches ? 0 : 0.92, reaches,
+      };
     }
-    return { alpha: reaches ? 1 : 0.62, width: reaches ? 2.4 : 1.3, greyMix: reaches ? 0 : 0.72, reaches };
+    return {
+      alpha: (reaches ? 1 : 0.62) * dim, width: reaches ? 2.4 : 1.3,
+      greyMix: reaches ? 0 : 0.72, reaches,
+    };
   }
 
   /**
@@ -4918,7 +4997,7 @@ function createDropletView(canvas) {
   function drawArrivalArc(ctx) {
     // Pointless with one ray on screen: a pile-up needs a population, and the
     // reader has not asked to see one.
-    if (state.fanCount <= 0) return;
+    if (!state.show.arrival || state.fanCount <= 0) return;
     const r = layout.s * ARRIVAL_R;
     if (r < 40) return;
     const { groups } = buildArrival();
@@ -5496,6 +5575,9 @@ function createDropletView(canvas) {
    * show it.
    */
   function drawAlexanderBand(ctx) {
+    // One flag for "shade Alexander's band", shared with the rain, field and
+    // sky scenes, so switching it off switches it off everywhere.
+    if (!state.show.alexander) return;
     const orders = activeOrders().filter((k) => k === 1 || k === 2);
     if (orders.length < 2) return;
     const nRef = indexModel()(650);
@@ -6448,7 +6530,7 @@ function createDropsView(canvas) {
     // bows have to be on screen for it to mean anything: on its own the
     // primary has an outside, not a gap. Drawn before the direction lines so
     // they read as its edges.
-    if (state.show.primary && state.show.secondary) {
+    if (state.show.alexander && state.show.primary && state.show.secondary) {
       const { band: ab, text } = alexanderCaption(idx);
       if (ab.outerDeg > ab.innerDeg) {
         const R = s * 1.35;
@@ -7411,8 +7493,11 @@ function createSkyView(canvas) {
     for (const band of bowBands(anti)) {
       // Wide enough that neighbouring wavelengths overlap rather than leaving
       // sky between them -- the band has to read as one bow, not as a stack.
+      // Weaker for every extra bounce, by the Fresnel budget rather than by
+      // eye: the secondary really does carry a third of the primary's light.
+      const dim = orderDim(band.k, indexModel()(650));
       const width = band.k === 1 ? 2.4 : 1.9;
-      const alpha = band.k === 1 ? 0.95 : 0.72;
+      const alpha = 0.95 * dim;
       for (const ring of band.rings) {
         // split into runs of visible directions, so the horizon does the cutting
         let run = [];
@@ -8065,12 +8150,70 @@ function createFieldView(canvas) {
 
     const answers = classify();
     drawAlexander(ctx, anti);
+    drawAirBow(ctx, anti);
     drawDroplets(ctx, answers, w, h);
     drawPick(ctx, answers, anti, sun, w, h);
 
     drawAxis(ctx, sun, anti, w, h);
     if (state.view === 'orbit') drawObserver(ctx);
     drawReadout(ctx, answers, w, h);
+  }
+
+  /**
+   * The same rule the sky scene uses for how far below eye level there is
+   * still rain to look at. Kept identical on purpose: the two 3-D scenes are
+   * the same claim seen two ways, and a reader who moves between them should
+   * not find the aircraft reaching different angles in each.
+   */
+  const RAIN_PATH_MIN_M = 2000;
+
+  function downLimitDeg(heightM) {
+    return Math.asin(O.clamp(heightM / RAIN_PATH_MIN_M, 0, 1)) * O.DEG;
+  }
+
+  /**
+   * The part of each bow an observer flying at state.airHeight would get and
+   * this one would not, drawn as a ghost ring.
+   *
+   * The bow is the same set of directions for both of them -- it depends on
+   * the angle from the antisolar point and on nothing else. What differs is
+   * how far down each still has rain. Every active order gets its own ring,
+   * dimmed by the Fresnel budget, so the aircraft's secondary shows up eight
+   * degrees further out and correspondingly fainter.
+   */
+  function drawAirBow(ctx, anti) {
+    if (!state.show.airObserver) return;
+    const idx = indexModel();
+    const lam = state.wavelength === 'white' ? 650 : state.wavelength;
+    const nRef = idx(650);
+    const mine = state.show.rainBelow ? downLimitDeg(state.observerHeight) : 0;
+    const theirs = downLimitDeg(state.airHeight);
+    if (theirs <= mine) return;
+    const orders = [];
+    if (state.show.primary) orders.push(1);
+    if (state.show.secondary) orders.push(2);
+    if (state.show.higher) orders.push(3);
+    for (const k of orders) {
+      const geo = O.rainbowGeometry(idx(lam), k);
+      if (!geo) continue;
+      const circle = O.rainbowCircle(anti, geo.antisolarDeg, 360);
+      let run = [];
+      const runs = [];
+      for (const d of circle) {
+        const el = Math.asin(O.clamp(d.y, -1, 1)) * O.DEG;
+        if (el <= -mine && el > -theirs) run.push(d);
+        else {
+          if (run.length > 1) runs.push(run);
+          run = [];
+        }
+      }
+      if (run.length > 1) runs.push(run);
+      for (const r of runs) {
+        for (const seg of clipPolyline(cam, r)) {
+          strokePath(ctx, seg, colorFor(lam, 0.55 * orderDim(k, nRef)), 2, [6, 5]);
+        }
+      }
+    }
   }
 
   /**
@@ -8083,7 +8226,7 @@ function createFieldView(canvas) {
    * wide and has a name.
    */
   function drawAlexander(ctx, anti) {
-    if (!state.show.primary || !state.show.secondary) return;
+    if (!state.show.alexander || !state.show.primary || !state.show.secondary) return;
     const { band, text } = alexanderCaption(indexModel());
     if (!(band.outerDeg > band.innerDeg)) return;
     for (const [phi, k] of [[band.innerDeg, 1], [band.outerDeg, 2]]) {
@@ -8165,7 +8308,9 @@ function createFieldView(canvas) {
       hitN++;
       const lam = answers.lambda[i];
       if (lam > 0) {
-        const key = Math.round(lam / LAMBDA_BUCKET) * LAMBDA_BUCKET;
+        // Bucketed by order as well as wavelength: the secondary's droplets
+        // carry a third of the light and are drawn that much fainter.
+        const key = `${Math.round(lam / LAMBDA_BUCKET) * LAMBDA_BUCKET}|${answers.order[i]}`;
         let path = buckets.get(key);
         if (!path) {
           path = new Path2D();
@@ -8186,8 +8331,10 @@ function createFieldView(canvas) {
       ctx.fillStyle = 'rgba(150,175,215,0.22)';
       ctx.fill(grey);
     }
-    for (const [lam, path] of buckets) {
-      ctx.fillStyle = colorFor(lam, 0.95);
+    const nRef = indexModel()(650);
+    for (const [key, path] of buckets) {
+      const [lam, k] = key.split('|').map(Number);
+      ctx.fillStyle = colorFor(lam, 0.95 * orderDim(k, nRef));
       ctx.fill(path);
     }
   }
@@ -8459,10 +8606,17 @@ const TUTORIAL = [
        picture apart; this step only says what the picture is. */
     title: 's1title', body: 's1body',
     apply: {
-      scene: 'droplet', graph: 'exit', reflections: 2, dispersion: 1, wavelength: 650,
-      impact: 0.861, fanCount: 24, showNonRainbow: false, angleMode: 'antisolar',
+      // White light, because the destination is two COLOURED bows and red
+      // alone makes that impossible to see. No band and no arrival arc: both
+      // get their own steps later, and here they are the clutter standing
+      // between the reader and "two bows, eight degrees apart".
+      scene: 'droplet', graph: 'exit', reflections: 2, dispersion: 1, wavelength: 'white',
+      impact: 0.861, fanCount: 12, showNonRainbow: false, angleMode: 'antisolar',
       dropletZoom: 1, graphOpen: false,
-      show: { angles: true, normals: false, labels: true, renderedBow: false },
+      show: {
+        angles: false, normals: false, labels: true, renderedBow: false,
+        alexander: false, arrival: false, walls: false,
+      },
       families: { 0: false, 1: true, 2: true, 3: false },
     },
     focus: ['reflections', 'fanCount'],
@@ -8568,7 +8722,10 @@ const TUTORIAL = [
       // rather than the mean-index 41.9 that dispersion=0 produces.
       scene: 'droplet', graph: 'exit', reflections: 1, fanCount: 4, dispersion: 1,
       wavelength: 650, impact: 0.861, dropletZoom: 2.6,
-      panel: 'guide', graphOpen: false, show: { angles: true, normals: false, labels: true },
+      panel: 'guide', graphOpen: false,
+      // Step 1 switches the arc off to keep its own picture clean; this is
+      // the step whose note is about the arc, so it switches it back.
+      show: { angles: true, normals: false, labels: true, arrival: true },
       families: { 0: false, 1: true, 2: false, 3: false },
     },
     focus: ['fanCount', 'impactParameter'],
@@ -8762,7 +8919,10 @@ const TUTORIAL = [
       reflections: 2, fanCount: 45, dropletZoom: 1,
       graphOpen: false, showNonRainbow: false,
       families: { 0: false, 1: true, 2: true, 3: false },
-      show: { angles: false, normals: false, labels: true, renderedBow: false },
+      show: {
+        angles: false, normals: false, labels: true, renderedBow: false,
+        arrival: true, alexander: false,
+      },
     },
     focus: ['impactParameter', 'bowRays'],
     actions: [
@@ -8812,7 +8972,11 @@ const TUTORIAL = [
       reflections: 2, fanCount: 32, dropletZoom: 1,
       graphOpen: false, showNonRainbow: false,
       families: { 0: false, 1: true, 2: true, 3: false },
-      show: { angles: true, normals: false, labels: true, renderedBow: false },
+      // The band IS this step, so it says so rather than inheriting it.
+      show: {
+        angles: true, normals: false, labels: true, renderedBow: false,
+        alexander: true, arrival: false,
+      },
     },
     // From the engine. -0.951 is not a number this file is allowed to know.
     compute: () => ({ impact: bowEntry(2, indexModel()(650)) }),
@@ -8845,6 +9009,9 @@ const TUTORIAL = [
       show: {
         primary: true, secondary: true, alexander: true, horizon: true, ground: true,
         renderedBow: true, cone: false, wavelengthLabels: true, rainBelow: false,
+        // The aircraft had its own step; here it would just add dashed arcs
+        // across the band this step is about.
+        airObserver: false,
       },
     },
     focus: ['showSecondary', 'showAlexander', 'showRenderedBow'],
@@ -9417,13 +9584,13 @@ function renderMath() {
     el('p', { class: 'note warn' }, t('mathWarning')),
 
     el('h3', {}, t('mathDeviation')),
-    el('div', { class: 'formula' }, 'D_k(θᵢ) = 2 (θᵢ − θᵣ) + k (180° − 2 θᵣ)'),
+    mathml('<mrow><msub><mi>D</mi><mi>k</mi></msub><mo>(</mo><msub><mi>&#x3B8;</mi><mi>i</mi></msub><mo>)</mo><mo>=</mo><mn>2</mn><mo>(</mo><msub><mi>&#x3B8;</mi><mi>i</mi></msub><mo>&#x2212;</mo><msub><mi>&#x3B8;</mi><mi>r</mi></msub><mo>)</mo><mo>+</mo><mi>k</mi><mo>(</mo><mn>180</mn><mo>&#xB0;</mo><mo>&#x2212;</mo><mn>2</mn><msub><mi>&#x3B8;</mi><mi>r</mi></msub><mo>)</mo></mrow>'),
     el('p', { class: 'note' }, t('mathDeviationNote')),
 
     el('h3', {}, t('mathExtremum')),
-    el('div', { class: 'formula' }, 'dD_k/dθᵢ = 2 − 2(k+1) · dθᵣ/dθᵢ = 0'),
+    mathml('<mrow><mfrac><mrow><mi>d</mi><msub><mi>D</mi><mi>k</mi></msub></mrow><mrow><mi>d</mi><msub><mi>&#x3B8;</mi><mi>i</mi></msub></mrow></mfrac><mo>=</mo><mn>2</mn><mo>&#x2212;</mo><mn>2</mn><mo>(</mo><mi>k</mi><mo>+</mo><mn>1</mn><mo>)</mo><mo>&#x22C5;</mo><mfrac><mrow><mi>d</mi><msub><mi>&#x3B8;</mi><mi>r</mi></msub></mrow><mrow><mi>d</mi><msub><mi>&#x3B8;</mi><mi>i</mi></msub></mrow></mfrac><mo>=</mo><mn>0</mn></mrow>'),
     el('p', { class: 'note' }, t('mathExtremumNote')),
-    el('div', { class: 'formula' }, 'cos²θᵢ = (n² − 1) / ((k+1)² − 1)'),
+    mathml('<mrow><msup><mrow><mi>cos</mi></mrow><mn>2</mn></msup><mo>&#x2061;</mo><msub><mi>&#x3B8;</mi><mi>i</mi></msub><mo>=</mo><mfrac><mrow><msup><mi>n</mi><mn>2</mn></msup><mo>&#x2212;</mo><mn>1</mn></mrow><mrow><msup><mrow><mo>(</mo><mi>k</mi><mo>+</mo><mn>1</mn><mo>)</mo></mrow><mn>2</mn></msup><mo>&#x2212;</mo><mn>1</mn></mrow></mfrac></mrow>'),
 
     el('h3', {}, t('mathResult')),
     el('div', { class: 'panel-block' },
@@ -9994,10 +10161,11 @@ const VIS_TOGGLES = [
   },
   { scenes: ALL, key: 'labels', labelKey: 'showLabels' },
   { scenes: ['droplet', 'sky'], key: 'wavelengthLabels', labelKey: 'showWavelengthLabels' },
-  { scenes: ['sky'], key: 'alexander', labelKey: 'showAlexander' },
+  { scenes: ['droplet', 'drops', 'field', 'sky'], key: 'alexander', labelKey: 'showAlexander' },
+  { scenes: ['droplet'], key: 'arrival', labelKey: 'showArrival' },
   { scenes: ['sky'], key: 'sky', labelKey: 'showSky' },
   { scenes: ['drops', 'field', 'sky'], key: 'rainBelow', labelKey: 'rainBelow' },
-  { scenes: ['sky'], key: 'airObserver', labelKey: 'showAirObserver' },
+  { scenes: ['field', 'sky'], key: 'airObserver', labelKey: 'showAirObserver' },
 ];
 
 function buildControls() {
@@ -10215,7 +10383,7 @@ function buildControls() {
       // How high the optional second observer is flying. Only offered with
       // the overlay on -- a height for an observer nobody is drawing is a
       // control with nothing to control.
-      c(['sky'], () => slider({
+      c(['field', 'sky'], () => slider({
         labelKey: 'airHeight', min: 0, max: HEIGHT_STOPS.length - 1, step: 0.01,
         get: () => heightToSlider(state.airHeight),
         format: (v) => `${num(sliderToHeight(v), 0)} m`,

@@ -5,7 +5,7 @@
 import * as O from './optics.js';
 import { state, set, indexModel, activeLambdas, activeOrders } from './state.js';
 import { t, deg, num, CLASS_KEY, CLASS_EXPLAIN } from './i18n.js';
-import { el, row, segmented } from './ui.js';
+import { el, row, segmented, mathml, M } from './ui.js';
 import {
   traceOne, distanceFromExtremum, dropReport, colorIdFor, DROP_ORDERS,
   orderLedger, bowNameKey, fieldReport, BOW_MATCH_DEG, nearestColorId, bowEntry,
@@ -46,10 +46,17 @@ export const TUTORIAL = [
        picture apart; this step only says what the picture is. */
     title: 's1title', body: 's1body',
     apply: {
-      scene: 'droplet', graph: 'exit', reflections: 2, dispersion: 1, wavelength: 650,
-      impact: 0.861, fanCount: 24, showNonRainbow: false, angleMode: 'antisolar',
+      // White light, because the destination is two COLOURED bows and red
+      // alone makes that impossible to see. No band and no arrival arc: both
+      // get their own steps later, and here they are the clutter standing
+      // between the reader and "two bows, eight degrees apart".
+      scene: 'droplet', graph: 'exit', reflections: 2, dispersion: 1, wavelength: 'white',
+      impact: 0.861, fanCount: 12, showNonRainbow: false, angleMode: 'antisolar',
       dropletZoom: 1, graphOpen: false,
-      show: { angles: true, normals: false, labels: true, renderedBow: false },
+      show: {
+        angles: false, normals: false, labels: true, renderedBow: false,
+        alexander: false, arrival: false, walls: false,
+      },
       families: { 0: false, 1: true, 2: true, 3: false },
     },
     focus: ['reflections', 'fanCount'],
@@ -155,7 +162,10 @@ export const TUTORIAL = [
       // rather than the mean-index 41.9 that dispersion=0 produces.
       scene: 'droplet', graph: 'exit', reflections: 1, fanCount: 4, dispersion: 1,
       wavelength: 650, impact: 0.861, dropletZoom: 2.6,
-      panel: 'guide', graphOpen: false, show: { angles: true, normals: false, labels: true },
+      panel: 'guide', graphOpen: false,
+      // Step 1 switches the arc off to keep its own picture clean; this is
+      // the step whose note is about the arc, so it switches it back.
+      show: { angles: true, normals: false, labels: true, arrival: true },
       families: { 0: false, 1: true, 2: false, 3: false },
     },
     focus: ['fanCount', 'impactParameter'],
@@ -349,7 +359,10 @@ export const TUTORIAL = [
       reflections: 2, fanCount: 45, dropletZoom: 1,
       graphOpen: false, showNonRainbow: false,
       families: { 0: false, 1: true, 2: true, 3: false },
-      show: { angles: false, normals: false, labels: true, renderedBow: false },
+      show: {
+        angles: false, normals: false, labels: true, renderedBow: false,
+        arrival: true, alexander: false,
+      },
     },
     focus: ['impactParameter', 'bowRays'],
     actions: [
@@ -399,7 +412,11 @@ export const TUTORIAL = [
       reflections: 2, fanCount: 32, dropletZoom: 1,
       graphOpen: false, showNonRainbow: false,
       families: { 0: false, 1: true, 2: true, 3: false },
-      show: { angles: true, normals: false, labels: true, renderedBow: false },
+      // The band IS this step, so it says so rather than inheriting it.
+      show: {
+        angles: true, normals: false, labels: true, renderedBow: false,
+        alexander: true, arrival: false,
+      },
     },
     // From the engine. -0.951 is not a number this file is allowed to know.
     compute: () => ({ impact: bowEntry(2, indexModel()(650)) }),
@@ -432,6 +449,9 @@ export const TUTORIAL = [
       show: {
         primary: true, secondary: true, alexander: true, horizon: true, ground: true,
         renderedBow: true, cone: false, wavelengthLabels: true, rainBelow: false,
+        // The aircraft had its own step; here it would just add dashed arcs
+        // across the band this step is about.
+        airObserver: false,
       },
     },
     focus: ['showSecondary', 'showAlexander', 'showRenderedBow'],
@@ -1004,13 +1024,13 @@ function renderMath() {
     el('p', { class: 'note warn' }, t('mathWarning')),
 
     el('h3', {}, t('mathDeviation')),
-    el('div', { class: 'formula' }, 'D_k(θᵢ) = 2 (θᵢ − θᵣ) + k (180° − 2 θᵣ)'),
+    mathml('<mrow><msub><mi>D</mi><mi>k</mi></msub><mo>(</mo><msub><mi>&#x3B8;</mi><mi>i</mi></msub><mo>)</mo><mo>=</mo><mn>2</mn><mo>(</mo><msub><mi>&#x3B8;</mi><mi>i</mi></msub><mo>&#x2212;</mo><msub><mi>&#x3B8;</mi><mi>r</mi></msub><mo>)</mo><mo>+</mo><mi>k</mi><mo>(</mo><mn>180</mn><mo>&#xB0;</mo><mo>&#x2212;</mo><mn>2</mn><msub><mi>&#x3B8;</mi><mi>r</mi></msub><mo>)</mo></mrow>'),
     el('p', { class: 'note' }, t('mathDeviationNote')),
 
     el('h3', {}, t('mathExtremum')),
-    el('div', { class: 'formula' }, 'dD_k/dθᵢ = 2 − 2(k+1) · dθᵣ/dθᵢ = 0'),
+    mathml('<mrow><mfrac><mrow><mi>d</mi><msub><mi>D</mi><mi>k</mi></msub></mrow><mrow><mi>d</mi><msub><mi>&#x3B8;</mi><mi>i</mi></msub></mrow></mfrac><mo>=</mo><mn>2</mn><mo>&#x2212;</mo><mn>2</mn><mo>(</mo><mi>k</mi><mo>+</mo><mn>1</mn><mo>)</mo><mo>&#x22C5;</mo><mfrac><mrow><mi>d</mi><msub><mi>&#x3B8;</mi><mi>r</mi></msub></mrow><mrow><mi>d</mi><msub><mi>&#x3B8;</mi><mi>i</mi></msub></mrow></mfrac><mo>=</mo><mn>0</mn></mrow>'),
     el('p', { class: 'note' }, t('mathExtremumNote')),
-    el('div', { class: 'formula' }, 'cos²θᵢ = (n² − 1) / ((k+1)² − 1)'),
+    mathml('<mrow><msup><mrow><mi>cos</mi></mrow><mn>2</mn></msup><mo>&#x2061;</mo><msub><mi>&#x3B8;</mi><mi>i</mi></msub><mo>=</mo><mfrac><mrow><msup><mi>n</mi><mn>2</mn></msup><mo>&#x2212;</mo><mn>1</mn></mrow><mrow><msup><mrow><mo>(</mo><mi>k</mi><mo>+</mo><mn>1</mn><mo>)</mo></mrow><mn>2</mn></msup><mo>&#x2212;</mo><mn>1</mn></mrow></mfrac></mrow>'),
 
     el('h3', {}, t('mathResult')),
     el('div', { class: 'panel-block' },
