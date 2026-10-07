@@ -372,6 +372,8 @@ export const translations = {
     /* ---- droplet size note ---- */
 
     /* ---- tutorial ---- */
+    tourHere: 'Prohlídka běží — krok {n} z {total}',
+    tourBack: 'Zpět na průvodce',
     tutorial: 'Průvodce',
     step: 'Krok',
     of: 'z',
@@ -993,6 +995,8 @@ export const translations = {
     /* ---- droplet size note ---- */
 
     /* ---- tutorial ---- */
+    tourHere: 'Guided tour — step {n} of {total}',
+    tourBack: 'Back to the guide',
     tutorial: 'Tutorial',
     step: 'Step',
     of: 'of',

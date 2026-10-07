@@ -1144,6 +1144,19 @@ export function renderPanel(container) {
   container.append(tabs);
 
   const body = el('div', { class: 'panel-body' });
+  // Clicking a ray, a droplet or a bow jumps this panel to "Ray data", which
+  // in guided mode silently replaces the step the reader was on. The tab
+  // still reads "Tutorial", but nothing says which step, and getting back
+  // means noticing that tab and guessing. So the tour announces itself and
+  // offers the way back.
+  if (state.mode === 'tutorial' && state.panel !== 'guide') {
+    body.append(el('div', { class: 'tour-banner' },
+      el('span', {}, t('tourHere', { n: state.step + 1, total: TUTORIAL.length })),
+      el('button', {
+        class: 'btn tiny', type: 'button',
+        onclick: () => set({ panel: 'guide' }),
+      }, t('tourBack'))));
+  }
   let nodes;
   if (state.panel === 'ray') nodes = renderRayInfo();
   else if (state.panel === 'math') nodes = renderMath();

@@ -256,7 +256,24 @@ export function strokePath(ctx, pts, style, width = 1.5, dash = null) {
   ctx.restore();
 }
 
+/**
+ * Somewhere to report every label anchor as it is drawn.
+ *
+ * A view that needs to know which anchors are taken sets this for the span of
+ * one frame. Done here rather than by wrapping label() in the view, because
+ * the bundler concatenates every module into one scope and drops import
+ * aliases -- `import { label as drawLabel }` resolves in the dev page and is
+ * undefined in dist, which is exactly the kind of break that only shows up in
+ * the built file.
+ */
+let labelSink = null;
+
+export function setLabelSink(fn) {
+  labelSink = fn;
+}
+
 export function label(ctx, text, x, y, opts = {}) {
+  if (labelSink) labelSink(x, y);
   ctx.save();
   ctx.font = opts.font || '11px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif';
   ctx.textAlign = opts.align || 'left';

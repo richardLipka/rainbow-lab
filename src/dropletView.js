@@ -12,7 +12,9 @@ import {
   orderColor, alexanderCaption, bowEntry, orderDim,
 } from './rays.js';
 import { t, deg, num } from './i18n.js';
-import { fitCanvas, strokePath, label, arrowHead, angleArc, capture } from './ui.js';
+import {
+  fitCanvas, strokePath, label, arrowHead, angleArc, capture, setLabelSink,
+} from './ui.js';
 
 /** Rays classified into one of these families are the ones a real observer
  * would actually see as a bright rainbow -- everything else is scattered
@@ -45,6 +47,14 @@ export function createDropletView(canvas) {
      each re-deriving the geometry. */
   let eyes = [];
   let eyeScreen = [];
+  /* Every label anchor used this frame.
+     Reserving them one by one meant remembering to do it, and the ones that
+     got forgotten -- the bow ticks on the entry track, the R-segment names --
+     were exactly the ones the wall captions landed on. So the scene's own
+     label() records as it draws, and the wall captions, which run last and
+     are attached to points that move with the ray, step around all of it. */
+  let reserved = [];
+  const reserve = (x, y) => reserved.push({ x, y });
 
   /**
    * The scene is traced along +x and DRAWN rotated by the Sun's elevation, so
@@ -111,6 +121,8 @@ export function createDropletView(canvas) {
       s, w, h, zoom,
     };
     eyeScreen = [];
+    reserved = [];
+    setLabelSink(reserve);
 
     drawBackground(ctx, w, h);
     drawDroplet(ctx);
@@ -171,7 +183,6 @@ export function createDropletView(canvas) {
       // steering -- rather than an arbitrary last-built ray, so the detail
       // view never silently jumps to a family the user didn't ask about.
       const ref = main.find((r) => r.k === state.reflections) ?? main[main.length - 1];
-      if (state.show.walls) drawWallMarks(ctx, ref);
       if (state.show.angles) drawAngles(ctx, ref);
       if (state.show.labels) drawSegmentLabels(ctx, ref);
       if (state.show.angles && ref.path.dirOut) drawExitAngle(ctx, ref);
@@ -179,6 +190,11 @@ export function createDropletView(canvas) {
     }
     drawArrivalArc(ctx);
     drawImpactHandle(ctx);
+    // After the handle and the fixed labels, so the wall captions know
+    // which anchors are already taken and can step clear of them.
+    if (state.show.walls && main.length) {
+      drawWallMarks(ctx, main.find((r) => r.k === state.reflections) ?? main[main.length - 1]);
+    }
     for (const observer of observers) drawObserver(ctx, observer, reachingKs.has(observer.kRef));
     drawLegend(ctx, w, h, rays);
     if (state.show.labels) {
@@ -186,6 +202,9 @@ export function createDropletView(canvas) {
         color: '#6f86ab', font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
       });
     }
+    // Released at the end of the frame: the other scenes draw labels too and
+    // have no use for this view's reservations.
+    setLabelSink(null);
   }
 
   /**
@@ -365,8 +384,12 @@ export function createDropletView(canvas) {
       // (away from the Sun, continuing forward) -- so its label belongs on
       // the far side of the droplet from the Sun icon, not next to it.
       const end = project({ x: 5.6, y: 0 });
-      label(ctx, t('antisolarPoint'),
-        O.clamp(end.x, 70, w - 14), O.clamp(end.y - 13, 14, h - 16), {
+      const ax = O.clamp(end.x, 70, w - 14);
+      // Lifted well clear of the axis: at small impact parameters a wall
+      // marker lands on the axis at the right-hand rim, and the two were
+      // printing over each other.
+      const ay = O.clamp(end.y - 30, 14, h - 16);
+      label(ctx, t('antisolarPoint'), ax, ay, {
           align: 'right', color: '#8fa4c8', bg: false,
           font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
         });
@@ -998,7 +1021,7 @@ export function createDropletView(canvas) {
     // droplet a couple of hundred pixels across, and two lines at each one
     // overlapped into a smear. The ring is always drawn; the caption gives
     // way, exactly as the bow ticks on the entry track do.
-    const placed = [];
+    const placed = reserved.slice();
 
     for (let vi = 0; vi < p.vertices.length; vi++) {
       const v = p.vertices[vi];
@@ -1045,17 +1068,43 @@ export function createDropletView(canvas) {
       ctx.restore();
 
       if (!state.show.labels) continue;
-      const push = O.vnorm(O.vsub(v.point, O.vec(0, 0, 0)));
-      const lab = project(O.vadd(v.point, O.vmul(push, 0.3)));
       const text = tir
         ? t('wallTotal')
         : v.type === 'reflection'
           ? `${t('wallPartial')} ${num(R * 100, 1)} %`
           : `${t('wallThrough')} ${num((1 - R) * 100, 1)} %`;
-      const lx = O.clamp(lab.x, 58, layout.w - 58);
-      const ly = O.clamp(lab.y, 14, layout.h - 28);
-      if (placed.some((q) => Math.abs(q.x - lx) < 96 && Math.abs(q.y - ly) < 26)) continue;
-      placed.push({ x: lx, y: ly });
+      // Pushed radially off the sphere, and if that spot is taken, pushed
+      // further. These two numbers are the point of the marker -- dropping
+      // them on the first clash threw away the data the reader came for, and
+      // at small impact parameters that was most of them.
+      const push = O.vnorm(O.vsub(v.point, O.vec(0, 0, 0)));
+      const free = (p) => !placed.some(
+        (q) => Math.abs(q.x - p.x) < 104 && Math.abs(q.y - p.y) < 26);
+      // Candidates fanned around the outward normal, not just stacked along
+      // it: at a low impact parameter the entry wall faces straight at the
+      // entry-point track, so every radial candidate landed in the same
+      // crowded strip and the caption was dropped. Swinging the direction
+      // finds room beside the obstruction instead of behind it.
+      let spot = null;
+      search:
+      for (const out of [0.55, 1.0, 1.5]) {
+        for (const swing of [0, -40, 40, -75, 75, -110, 110]) {
+          const a = swing * O.RAD;
+          const dir = O.vec(
+            push.x * Math.cos(a) - push.y * Math.sin(a),
+            push.x * Math.sin(a) + push.y * Math.cos(a), 0);
+          const lab = project(O.vadd(v.point, O.vmul(dir, out)));
+          const cand = {
+            x: O.clamp(lab.x, 58, layout.w - 58),
+            y: O.clamp(lab.y, 14, layout.h - 28),
+          };
+          if (free(cand)) { spot = cand; break search; }
+        }
+      }
+      if (!spot) continue;
+      const lx = spot.x;
+      const ly = spot.y;
+      placed.push(spot);
       label(ctx, text, lx, ly, {
         align: 'center',
         color: tir ? '#ffcf6a' : v.type === 'reflection' ? '#8fd8ff' : '#9fe3b6',
@@ -1355,8 +1404,9 @@ export function createDropletView(canvas) {
       // only one of them leaves the reader looking for a second control that
       // sets the angle, and there isn't one.
       const thetaDeg = Math.asin(O.clamp(Math.abs(state.impact), 0, 1)) * O.DEG;
-      label(ctx, `b/R = ${num(state.impact, 3)} · θᵢ = ${deg(thetaDeg, 1)}`,
-        O.clamp(at.x, 74, layout.w - 74), O.clamp(at.y - 16, 14, layout.h - 16),
+      const hx = O.clamp(at.x, 74, layout.w - 74);
+      const hy = O.clamp(at.y - 16, 14, layout.h - 16);
+      label(ctx, `b/R = ${num(state.impact, 3)} · θᵢ = ${deg(thetaDeg, 1)}`, hx, hy,
         { align: 'center', color: '#cfe0ff' });
     }
   }

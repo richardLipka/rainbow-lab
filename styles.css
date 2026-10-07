@@ -566,6 +566,24 @@ select {
 .formula math mo { padding: 0 0.12em; }
 .formula math mfrac { padding: 0 0.1em; }
 
+/* "You are still on the tour" — shown in the side panel whenever guided mode
+   is running but the reader has been bounced to another tab by clicking
+   something in the scene. */
+.tour-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  font-size: 11.5px;
+  color: var(--fg);
+}
+.tour-banner .btn.tiny { white-space: nowrap; }
+
 .conv li { font-family: var(--mono); font-size: 11px; }
 
 .math-table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 10.5px; margin-bottom: 10px; }

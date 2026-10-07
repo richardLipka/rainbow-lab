@@ -2027,3 +2027,44 @@ down to 10 to show it falling apart.
 Verified by replicating the accumulator at 200k samples: the curve peaks at
 42.07 against the engine's 42.19 for red and 40.50 against 40.52 for violet,
 both inside one bin width.
+
+## Exports, the energy captions, and not losing the tour
+
+**Exports all work.** Checked by intercepting the anchor and `toBlob`: four
+scene exports and both graph exports fire, produce distinct dated filenames,
+render at 3x (1374x1638 for a scene, 3000x768 for a graph), carry real content
+(7-58 per cent of pixels lit), include the credit strip (4311 lit pixels in
+the bottom band), and restore the canvas to its on-screen size afterwards.
+
+**The energy captions were colliding, not missing.** At b = 0.4 the entry
+caption sat under the impact-handle label and the bounce caption sat on
+"Antisolar point". Three changes: the antisolar label lifted off the axis,
+the wall captions pushed further out, and candidate positions fanned around
+the outward normal (3 distances x 7 swing angles) instead of stacked along it
+-- every radial candidate landed in the same crowded strip, so the caption was
+dropped and the reader lost the number. The values themselves track the ray
+correctly; the panel row matches `path.intensity` across the range.
+
+Rather than reserving label anchors one at a time -- and forgetting the bow
+ticks and the R-segment names, which is exactly where the captions landed --
+`ui.label()` now reports every anchor to an optional sink that the droplet
+view sets for the span of a frame.
+
+**`import { label as drawLabel }` broke only in `dist/`.** The bundler strips
+imports and concatenates into one scope; it does not carry aliases, so
+`drawLabel` was undefined in the built file while the dev page was fine. The
+collision checker does not catch this. The label sink exists partly to avoid
+needing the alias at all. Always exercise `dist/`, not just the dev page.
+
+**Guided mode now says so.** Clicking a ray jumps the panel to "Ray data",
+which silently replaced the step. A banner appears on any non-guide tab while
+the tour is running: "Guided tour — step N of M" with a button back.
+
+### Unresolved
+
+A `tutorial step 20 (droplet): controls not on screen` warning appears in some
+instrumented sweeps and could not be reproduced through the real UI in three
+separate attempts -- clicking the Tutorial tab gives 0, setting `state.mode`
+directly gives 3, because the header handler calls `applyStep` first and a
+direct set skips it. Likely a test artefact. Not chased further; recorded
+rather than claimed clean.

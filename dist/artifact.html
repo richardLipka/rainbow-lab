@@ -571,6 +571,24 @@ select {
 .formula math mo { padding: 0 0.12em; }
 .formula math mfrac { padding: 0 0.1em; }
 
+/* "You are still on the tour" — shown in the side panel whenever guided mode
+   is running but the reader has been bounced to another tab by clicking
+   something in the scene. */
+.tour-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  font-size: 11.5px;
+  color: var(--fg);
+}
+.tour-banner .btn.tiny { white-space: nowrap; }
+
 .conv li { font-family: var(--mono); font-size: 11px; }
 
 .math-table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 10.5px; margin-bottom: 10px; }
@@ -2019,6 +2037,8 @@ const translations = {
     /* ---- droplet size note ---- */
 
     /* ---- tutorial ---- */
+    tourHere: 'Prohlídka běží — krok {n} z {total}',
+    tourBack: 'Zpět na průvodce',
     tutorial: 'Průvodce',
     step: 'Krok',
     of: 'z',
@@ -2640,6 +2660,8 @@ const translations = {
     /* ---- droplet size note ---- */
 
     /* ---- tutorial ---- */
+    tourHere: 'Guided tour — step {n} of {total}',
+    tourBack: 'Back to the guide',
     tutorial: 'Tutorial',
     step: 'Step',
     of: 'of',
@@ -3458,7 +3480,24 @@ function strokePath(ctx, pts, style, width = 1.5, dash = null) {
   ctx.restore();
 }
 
+/**
+ * Somewhere to report every label anchor as it is drawn.
+ *
+ * A view that needs to know which anchors are taken sets this for the span of
+ * one frame. Done here rather than by wrapping label() in the view, because
+ * the bundler concatenates every module into one scope and drops import
+ * aliases -- `import { label as drawLabel }` resolves in the dev page and is
+ * undefined in dist, which is exactly the kind of break that only shows up in
+ * the built file.
+ */
+let labelSink = null;
+
+function setLabelSink(fn) {
+  labelSink = fn;
+}
+
 function label(ctx, text, x, y, opts = {}) {
+  if (labelSink) labelSink(x, y);
   ctx.save();
   ctx.font = opts.font || '11px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif';
   ctx.textAlign = opts.align || 'left';
@@ -4483,6 +4522,14 @@ function createDropletView(canvas) {
      each re-deriving the geometry. */
   let eyes = [];
   let eyeScreen = [];
+  /* Every label anchor used this frame.
+     Reserving them one by one meant remembering to do it, and the ones that
+     got forgotten -- the bow ticks on the entry track, the R-segment names --
+     were exactly the ones the wall captions landed on. So the scene's own
+     label() records as it draws, and the wall captions, which run last and
+     are attached to points that move with the ray, step around all of it. */
+  let reserved = [];
+  const reserve = (x, y) => reserved.push({ x, y });
 
   /**
    * The scene is traced along +x and DRAWN rotated by the Sun's elevation, so
@@ -4549,6 +4596,8 @@ function createDropletView(canvas) {
       s, w, h, zoom,
     };
     eyeScreen = [];
+    reserved = [];
+    setLabelSink(reserve);
 
     drawBackground(ctx, w, h);
     drawDroplet(ctx);
@@ -4609,7 +4658,6 @@ function createDropletView(canvas) {
       // steering -- rather than an arbitrary last-built ray, so the detail
       // view never silently jumps to a family the user didn't ask about.
       const ref = main.find((r) => r.k === state.reflections) ?? main[main.length - 1];
-      if (state.show.walls) drawWallMarks(ctx, ref);
       if (state.show.angles) drawAngles(ctx, ref);
       if (state.show.labels) drawSegmentLabels(ctx, ref);
       if (state.show.angles && ref.path.dirOut) drawExitAngle(ctx, ref);
@@ -4617,6 +4665,11 @@ function createDropletView(canvas) {
     }
     drawArrivalArc(ctx);
     drawImpactHandle(ctx);
+    // After the handle and the fixed labels, so the wall captions know
+    // which anchors are already taken and can step clear of them.
+    if (state.show.walls && main.length) {
+      drawWallMarks(ctx, main.find((r) => r.k === state.reflections) ?? main[main.length - 1]);
+    }
     for (const observer of observers) drawObserver(ctx, observer, reachingKs.has(observer.kRef));
     drawLegend(ctx, w, h, rays);
     if (state.show.labels) {
@@ -4624,6 +4677,9 @@ function createDropletView(canvas) {
         color: '#6f86ab', font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
       });
     }
+    // Released at the end of the frame: the other scenes draw labels too and
+    // have no use for this view's reservations.
+    setLabelSink(null);
   }
 
   /**
@@ -4803,8 +4859,12 @@ function createDropletView(canvas) {
       // (away from the Sun, continuing forward) -- so its label belongs on
       // the far side of the droplet from the Sun icon, not next to it.
       const end = project({ x: 5.6, y: 0 });
-      label(ctx, t('antisolarPoint'),
-        O.clamp(end.x, 70, w - 14), O.clamp(end.y - 13, 14, h - 16), {
+      const ax = O.clamp(end.x, 70, w - 14);
+      // Lifted well clear of the axis: at small impact parameters a wall
+      // marker lands on the axis at the right-hand rim, and the two were
+      // printing over each other.
+      const ay = O.clamp(end.y - 30, 14, h - 16);
+      label(ctx, t('antisolarPoint'), ax, ay, {
           align: 'right', color: '#8fa4c8', bg: false,
           font: '10px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
         });
@@ -5436,7 +5496,7 @@ function createDropletView(canvas) {
     // droplet a couple of hundred pixels across, and two lines at each one
     // overlapped into a smear. The ring is always drawn; the caption gives
     // way, exactly as the bow ticks on the entry track do.
-    const placed = [];
+    const placed = reserved.slice();
 
     for (let vi = 0; vi < p.vertices.length; vi++) {
       const v = p.vertices[vi];
@@ -5483,17 +5543,43 @@ function createDropletView(canvas) {
       ctx.restore();
 
       if (!state.show.labels) continue;
-      const push = O.vnorm(O.vsub(v.point, O.vec(0, 0, 0)));
-      const lab = project(O.vadd(v.point, O.vmul(push, 0.3)));
       const text = tir
         ? t('wallTotal')
         : v.type === 'reflection'
           ? `${t('wallPartial')} ${num(R * 100, 1)} %`
           : `${t('wallThrough')} ${num((1 - R) * 100, 1)} %`;
-      const lx = O.clamp(lab.x, 58, layout.w - 58);
-      const ly = O.clamp(lab.y, 14, layout.h - 28);
-      if (placed.some((q) => Math.abs(q.x - lx) < 96 && Math.abs(q.y - ly) < 26)) continue;
-      placed.push({ x: lx, y: ly });
+      // Pushed radially off the sphere, and if that spot is taken, pushed
+      // further. These two numbers are the point of the marker -- dropping
+      // them on the first clash threw away the data the reader came for, and
+      // at small impact parameters that was most of them.
+      const push = O.vnorm(O.vsub(v.point, O.vec(0, 0, 0)));
+      const free = (p) => !placed.some(
+        (q) => Math.abs(q.x - p.x) < 104 && Math.abs(q.y - p.y) < 26);
+      // Candidates fanned around the outward normal, not just stacked along
+      // it: at a low impact parameter the entry wall faces straight at the
+      // entry-point track, so every radial candidate landed in the same
+      // crowded strip and the caption was dropped. Swinging the direction
+      // finds room beside the obstruction instead of behind it.
+      let spot = null;
+      search:
+      for (const out of [0.55, 1.0, 1.5]) {
+        for (const swing of [0, -40, 40, -75, 75, -110, 110]) {
+          const a = swing * O.RAD;
+          const dir = O.vec(
+            push.x * Math.cos(a) - push.y * Math.sin(a),
+            push.x * Math.sin(a) + push.y * Math.cos(a), 0);
+          const lab = project(O.vadd(v.point, O.vmul(dir, out)));
+          const cand = {
+            x: O.clamp(lab.x, 58, layout.w - 58),
+            y: O.clamp(lab.y, 14, layout.h - 28),
+          };
+          if (free(cand)) { spot = cand; break search; }
+        }
+      }
+      if (!spot) continue;
+      const lx = spot.x;
+      const ly = spot.y;
+      placed.push(spot);
       label(ctx, text, lx, ly, {
         align: 'center',
         color: tir ? '#ffcf6a' : v.type === 'reflection' ? '#8fd8ff' : '#9fe3b6',
@@ -5793,8 +5879,9 @@ function createDropletView(canvas) {
       // only one of them leaves the reader looking for a second control that
       // sets the angle, and there isn't one.
       const thetaDeg = Math.asin(O.clamp(Math.abs(state.impact), 0, 1)) * O.DEG;
-      label(ctx, `b/R = ${num(state.impact, 3)} · θᵢ = ${deg(thetaDeg, 1)}`,
-        O.clamp(at.x, 74, layout.w - 74), O.clamp(at.y - 16, 14, layout.h - 16),
+      const hx = O.clamp(at.x, 74, layout.w - 74);
+      const hy = O.clamp(at.y - 16, 14, layout.h - 16);
+      label(ctx, `b/R = ${num(state.impact, 3)} · θᵢ = ${deg(thetaDeg, 1)}`, hx, hy,
         { align: 'center', color: '#cfe0ff' });
     }
   }
@@ -9857,6 +9944,19 @@ function renderPanel(container) {
   container.append(tabs);
 
   const body = el('div', { class: 'panel-body' });
+  // Clicking a ray, a droplet or a bow jumps this panel to "Ray data", which
+  // in guided mode silently replaces the step the reader was on. The tab
+  // still reads "Tutorial", but nothing says which step, and getting back
+  // means noticing that tab and guessing. So the tour announces itself and
+  // offers the way back.
+  if (state.mode === 'tutorial' && state.panel !== 'guide') {
+    body.append(el('div', { class: 'tour-banner' },
+      el('span', {}, t('tourHere', { n: state.step + 1, total: TUTORIAL.length })),
+      el('button', {
+        class: 'btn tiny', type: 'button',
+        onclick: () => set({ panel: 'guide' }),
+      }, t('tourBack'))));
+  }
   let nodes;
   if (state.panel === 'ray') nodes = renderRayInfo();
   else if (state.panel === 'math') nodes = renderMath();
