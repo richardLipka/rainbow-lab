@@ -4,7 +4,7 @@
  */
 import * as O from './optics.js';
 import { t, setLang, getLang, num, deg, LANGS } from './i18n.js';
-import { state, set, subscribe, indexModel, activeOrders } from './state.js';
+import { state, set, subscribe, indexModel, activeOrders, resetPatch } from './state.js';
 import { bowNameKey, bowEntry } from './rays.js';
 import { el, clear, group, slider, toggle, segmented, select, collectSyncers, setRenderScale } from './ui.js';
 import { FAV_LOGO } from './assets.js';
@@ -756,9 +756,14 @@ function buildControls() {
            the answer, so it must not be hidden, but it is not where anyone
            starts. --- */
     sceneGroup('indexGroup', [
-      c(ALL, () => select('indexModel',
-        [{ value: 'table', labelKey: 'indexTable' }, { value: 'cauchy', labelKey: 'indexCauchy' }],
-        () => state.indexMode, (v) => set({ indexMode: v }))),
+      // What the drop is made of, not "which curve fits water best". The old
+      // table-vs-Cauchy select asked the reader to pick a numerical method,
+      // which is a developer's question; this one asks a physical one, and
+      // water still means exactly the tabulated model everything is tested
+      // against.
+      c(ALL, () => select('material',
+        O.MATERIALS.map((m) => ({ value: m.id, labelKey: `mat_${m.id}` })),
+        () => state.material, (v) => set({ material: v }))),
       c(ALL, () => slider({
         labelKey: 'indexScale', min: 0.85, max: 1.15, step: 0.001,
         get: () => state.indexScale,
@@ -825,24 +830,12 @@ function sliderToHeight(v) {
 }
 
 function resetState() {
-  set({
-    wavelength: 'white', dispersion: 1, impact: 0.861, reflections: 1,
-    dropletZoom: 1, indexMode: 'table', indexScale: 1,
-    dropsObserverX: 0, dropsObserverY: 0,
-    showNonRainbow: false, fanCount: 0, families: { 0: false, 1: true, 2: false, 3: false },
-    angleMode: 'antisolar', distRays: 60, distAccumulate: false, graphOpen: false,
-    dropCount: 1, dropsAnimate: false, fieldCount: 60000,
-    sunElevation: 15, sunAzimuth: 180, observerHeight: 1.7,
-    view: 'orbit', camYaw: -35, camPitch: 14, camDist: 3.1,
-    eyeAzimuth: 0, eyeElevation: 12, fov: 75,
-    selectedRay: null, selectedDrop: null, skyPick: null, fieldPick: null,
-    show: {
-      normals: false, angles: true, labels: true, wavelengthLabels: false, walls: true,
-      droplets: true, cone: true, antisolar: true, horizon: true, ground: true,
-      renderedBow: false, alexander: true, primary: true, secondary: false,
-      higher: false, sky: true, rainBelow: false,
-    },
-  });
+  // One definition of "the defaults", shared with every tutorial step, so a
+  // field added to the store cannot end up resettable in one of the two and
+  // sticky in the other. It did: show.arrival, show.airObserver and
+  // show.meetingEye were all missing from the list this function used to
+  // carry, so Reset left them wherever the last step had put them.
+  set(resetPatch());
   graph.reset();
   views.drops.reset();
   views.sky.reset();
@@ -926,7 +919,7 @@ function panelKey() {
       })()
     : '';
   const mathPart =
-    state.panel === 'math' ? `${state.reflections}|${state.dispersion}|${state.indexMode}|${state.indexScale}` : '';
+    state.panel === 'math' ? `${state.reflections}|${state.dispersion}|${state.material}|${state.indexScale}` : '';
   // The many-droplets readout is about a clicked droplet, so it moves with
   // the droplet, the observer, the Sun and the index model -- everything
   // dropReport() reads.
@@ -934,7 +927,7 @@ function panelKey() {
     state.scene === 'drops' && state.panel === 'ray'
       ? (() => {
           const d = state.selectedDrop;
-          return `${d ? `${d.x.toFixed(4)},${d.y.toFixed(4)}` : '-'}|${state.sunElevation}|${state.dropsObserverX}|${state.dropsObserverY}|${state.dispersion}|${state.indexMode}|${state.indexScale}`;
+          return `${d ? `${d.x.toFixed(4)},${d.y.toFixed(4)}` : '-'}|${state.sunElevation}|${state.dropsObserverX}|${state.dropsObserverY}|${state.dispersion}|${state.material}|${state.indexScale}`;
         })()
       : '';
   // The sky readout is about a clicked point on a bow, so it moves with the
@@ -943,7 +936,7 @@ function panelKey() {
     state.scene === 'sky' && state.panel === 'ray'
       ? (() => {
           const k = state.skyPick;
-          return `${k ? `${k.k},${k.lambda},${k.roll.toFixed(2)}` : '-'}|${state.sunElevation}|${state.sunAzimuth}|${state.dispersion}|${state.indexMode}|${state.indexScale}`;
+          return `${k ? `${k.k},${k.lambda},${k.roll.toFixed(2)}` : '-'}|${state.sunElevation}|${state.sunAzimuth}|${state.dispersion}|${state.material}|${state.indexScale}`;
         })()
       : '';
   // The field readout is about a clicked droplet in space, so it moves with
@@ -953,12 +946,12 @@ function panelKey() {
     state.scene === 'field' && state.panel === 'ray'
       ? (() => {
           const d = state.fieldPick;
-          return `${d ? `${d.x.toFixed(4)},${d.y.toFixed(4)},${d.z.toFixed(4)}` : '-'}|${state.sunElevation}|${state.sunAzimuth}|${state.wavelength}|${state.dispersion}|${state.indexMode}|${state.indexScale}|${state.show.primary}${state.show.secondary}${state.show.higher}`;
+          return `${d ? `${d.x.toFixed(4)},${d.y.toFixed(4)},${d.z.toFixed(4)}` : '-'}|${state.sunElevation}|${state.sunAzimuth}|${state.wavelength}|${state.dispersion}|${state.material}|${state.indexScale}|${state.show.primary}${state.show.secondary}${state.show.higher}`;
         })()
       : '';
   const guidePart =
     state.mode === 'free' && state.panel === 'guide'
-      ? `${state.dispersion}|${state.indexMode}|${state.indexScale}|${state.show.renderedBow}`
+      ? `${state.dispersion}|${state.material}|${state.indexScale}|${state.show.renderedBow}`
       : '';
   return `${state.panel}|${state.scene}|${state.step}|${rayPart}|${mathPart}|${dropPart}|${skyPart}|${fieldPart}|${guidePart}`;
 }

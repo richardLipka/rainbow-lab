@@ -151,6 +151,39 @@ export function makeIndexModel(opts = {}) {
 /** Default model: tabulated values, full dispersion. */
 export const defaultIndex = makeIndexModel();
 
+/**
+ * What the drop is made of.
+ *
+ * Each entry carries its own Cauchy pair, fitted to that substance's
+ * published indices at the hydrogen F (486.1 nm) and C (656.3 nm) lines, so
+ * the amount a material spreads colour is its own property rather than
+ * water's dispersion scaled up. The fits reproduce the published n at the
+ * sodium D line to better than 3e-4 -- checked in the unit tests, because a
+ * preset nobody can verify is just a number someone typed.
+ *
+ * Water keeps `mode: 'table'`, which is the tabulated six colours the whole
+ * app was built and tested against; every other material is continuous.
+ *
+ * Diamond is in the list for the one thing it does NOT do: k=1 needs
+ * cos(theta_i) = sqrt((n^2-1)/3), which has no solution above n = 2, so a
+ * diamond sphere has no primary bow at all. `rainbowGeometry` returns null
+ * there and the scenes draw what is left.
+ */
+export const MATERIALS = [
+  { id: 'water', mode: 'table', cauchy: CAUCHY },
+  { id: 'seawater', mode: 'cauchy', cauchy: { A: 1.33049, B: 0.003177 } },
+  { id: 'ice', mode: 'cauchy', cauchy: { A: 1.30137, B: 0.002832 } },
+  { id: 'acrylic', mode: 'cauchy', cauchy: { A: 1.47880, B: 0.004481 } },
+  { id: 'crown', mode: 'cauchy', cauchy: { A: 1.50452, B: 0.004219 } },
+  { id: 'flint', mode: 'cauchy', cauchy: { A: 1.68970, B: 0.013416 } },
+  { id: 'diamond', mode: 'cauchy', cauchy: { A: 2.37891, B: 0.013348 } },
+];
+
+/** A material by id, falling back to water rather than to undefined. */
+export function materialById(id) {
+  return MATERIALS.find((m) => m.id === id) || MATERIALS[0];
+}
+
 /* =========================================================================
  * 3. Interface physics: Snell, reflection, Fresnel
  * =======================================================================*/
@@ -967,6 +1000,10 @@ export function alexandersBand(indexModel = defaultIndex) {
   const p1v = rainbowGeometry(nViolet, 1);
   const p2r = rainbowGeometry(nRed, 2);
   const p2v = rainbowGeometry(nViolet, 2);
+  // No band without both of its edges. An index above 2 removes the
+  // one-bounce bow entirely, and a gap between a bow and nothing is not a
+  // gap -- callers get null and say so instead of drawing a wedge.
+  if (!p1r || !p1v || !p2r || !p2v) return null;
   const innerDeg = Math.max(p1r.antisolarDeg, p1v.antisolarDeg);
   const outerDeg = Math.min(p2r.antisolarDeg, p2v.antisolarDeg);
   return {

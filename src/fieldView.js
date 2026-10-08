@@ -105,7 +105,7 @@ export function createFieldView(canvas) {
   function classKey() {
     return [
       state.fieldCount, state.sunElevation, state.sunAzimuth, state.wavelength,
-      state.dispersion, state.indexMode, state.indexScale, state.observerHeight,
+      state.dispersion, state.material, state.indexScale, state.observerHeight,
       state.show.primary, state.show.secondary, state.show.higher, state.show.rainBelow,
     ].join('|');
   }
@@ -275,7 +275,9 @@ export function createFieldView(canvas) {
    */
   function drawAlexander(ctx, anti) {
     if (!state.show.alexander || !state.show.primary || !state.show.secondary) return;
-    const { band, text } = alexanderCaption(indexModel());
+    const cap = alexanderCaption(indexModel());
+    if (!cap) return;
+    const { band, text } = cap;
     if (!(band.outerDeg > band.innerDeg)) return;
     for (const [phi, k] of [[band.innerDeg, 1], [band.outerDeg, 2]]) {
       const circle = O.rainbowCircle(anti, phi, 180);

@@ -1335,3 +1335,119 @@ test('a full-face beam sends order 1 out across the atan2 seam', () => {
   const off = Math.abs(wrapPi((peakDeg - bowDeg) * O.RAD)) * O.DEG;
   assert.ok(off < 3, `densest bearing ${peakDeg.toFixed(1)} vs bow ${bowDeg.toFixed(1)}`);
 });
+
+/* ==========================================================================
+ * Material presets
+ * ======================================================================== */
+
+/**
+ * Published refractive indices at the sodium D line, against which each
+ * preset's two-point Cauchy fit is checked. A preset nobody can verify is
+ * just a number somebody typed.
+ */
+const MATERIAL_ND = {
+  seawater: 1.33984,
+  ice: 1.30980,
+  acrylic: 1.49139,
+  crown: 1.51680,
+  flint: 1.72825,
+  diamond: 2.41730,
+};
+
+test('every material preset reproduces its published index at 589 nm', () => {
+  // Water is not in the table above on purpose: its coefficients are fitted
+  // to NAMED_COLORS, the six-value teaching table the whole app is built on,
+  // which the engine documents as approximate. It lands 1e-3 off the
+  // published 1.33304, and moving it would change every angle in the app.
+  for (const m of O.MATERIALS) {
+    if (!(m.id in MATERIAL_ND)) continue;
+    const idx = O.makeIndexModel({ mode: 'cauchy', cauchy: m.cauchy });
+    const err = Math.abs(idx(589.3) - MATERIAL_ND[m.id]);
+    assert.ok(err < 5e-4, `${m.id}: n(589.3) = ${idx(589.3).toFixed(5)} vs ${MATERIAL_ND[m.id]}`);
+  }
+});
+
+test('water still means the tabulated model, exactly', () => {
+  const water = O.materialById('water');
+  assert.equal(water.mode, 'table');
+  const idx = O.makeIndexModel({ mode: water.mode, cauchy: water.cauchy });
+  for (const c of O.NAMED_COLORS) assert.equal(idx(c.lambda), c.n);
+  // ... and that it is the model every other test in this file assumes.
+  const def = O.makeIndexModel();
+  assert.equal(idx(650), def(650));
+});
+
+test('every material disperses the right way round', () => {
+  // Normal dispersion: violet bends more than red, in all of them.
+  for (const m of O.MATERIALS) {
+    const idx = O.makeIndexModel({ mode: 'cauchy', cauchy: m.cauchy });
+    assert.ok(idx(420) > idx(650), `${m.id} violet ${idx(420)} vs red ${idx(650)}`);
+  }
+});
+
+test('materialById falls back to water rather than to undefined', () => {
+  assert.equal(O.materialById('water').id, 'water');
+  assert.equal(O.materialById('no such thing').id, 'water');
+  assert.equal(O.materialById(undefined).id, 'water');
+});
+
+test('above n = 2 the one-bounce bow stops existing', () => {
+  // cos(theta_i) = sqrt((n^2 - 1) / ((k+1)^2 - 1)) has no solution once the
+  // numerator passes the denominator: n > 2 for k = 1, n > 3 for k = 2.
+  assert.equal(O.rainbowGeometry(2.05, 1), null);
+  assert.ok(O.rainbowGeometry(1.999, 1));
+  assert.ok(O.rainbowGeometry(2.05, 2));
+  assert.equal(O.rainbowGeometry(3.05, 2), null);
+
+  // And the one material that is actually over the line behaves that way.
+  const diamond = O.materialById('diamond');
+  const idx = O.makeIndexModel({ mode: 'cauchy', cauchy: diamond.cauchy });
+  assert.ok(idx(650) > 2);
+  assert.equal(O.rainbowGeometry(idx(650), 1), null);
+  assert.ok(O.rainbowGeometry(idx(650), 2));
+  // No pair of bows, so no band between them.
+  assert.equal(O.alexandersBand(idx), null);
+});
+
+test('a lower index pushes the primary out and pulls the secondary in', () => {
+  // Ice sits below water and the two bows all but swap places -- the one
+  // claim the material presets exist to let a reader check.
+  const water = O.makeIndexModel();
+  const ice = O.makeIndexModel({ mode: 'cauchy', cauchy: O.materialById('ice').cauchy });
+  const w1 = O.rainbowGeometry(water(650), 1).antisolarDeg;
+  const w2 = O.rainbowGeometry(water(650), 2).antisolarDeg;
+  const i1 = O.rainbowGeometry(ice(650), 1).antisolarDeg;
+  const i2 = O.rainbowGeometry(ice(650), 2).antisolarDeg;
+  assert.ok(w2 - w1 > 7, `water gap ${(w2 - w1).toFixed(2)}`);
+  assert.ok(i1 > w1, `ice primary ${i1.toFixed(2)} vs water ${w1.toFixed(2)}`);
+  assert.ok(i2 < w2, `ice secondary ${i2.toFixed(2)} vs water ${w2.toFixed(2)}`);
+  assert.ok(Math.abs(i2 - i1) < 2.5, `ice gap ${(i2 - i1).toFixed(2)}`);
+});
+
+test('a tutorial step starts from the defaults, not from the reader', async () => {
+  // state.js debounces its DOM sync against rAF; there is no DOM here.
+  globalThis.requestAnimationFrame = globalThis.requestAnimationFrame
+    || ((cb) => setTimeout(cb, 0));
+  const { state, set, resetPatch } = await import('../src/state.js');
+  const { TUTORIAL, applyStep } = await import('../src/panels.js');
+  const defaults = resetPatch();
+  for (let i = 0; i < TUTORIAL.length; i++) {
+    set({
+      material: 'flint', indexScale: 1.14, dispersion: 0.17, fanCount: 60,
+      distAccumulate: true, show: { labels: false, arrival: false },
+    });
+    applyStep(i);
+    const declared = TUTORIAL[i].apply;
+    for (const key of ['material', 'indexScale', 'dispersion', 'fanCount', 'distAccumulate']) {
+      if (key in declared) continue;
+      assert.deepEqual(state[key], defaults[key],
+        `step ${i + 1} inherited ${key} = ${state[key]}`);
+    }
+    const shown = declared.show || {};
+    for (const key of ['labels', 'arrival']) {
+      if (key in shown) continue;
+      assert.equal(state.show[key], defaults.show[key],
+        `step ${i + 1} inherited show.${key}`);
+    }
+  }
+});

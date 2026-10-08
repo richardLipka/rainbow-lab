@@ -17,7 +17,7 @@ almost certainly how a bug gets in (see "Lessons from bugs found" below).
 
 ```bash
 node server.mjs        # dev server on :5178 (or next free port)
-node --test test/optics.test.mjs   # 55 unit tests over the engine
+node --test test/optics.test.mjs   # 72 unit tests over the engine
 node tools-check-collisions.mjs    # top-level name clashes across the bundle
 node build.mjs          # writes dist/rainbow-lab.html and dist/artifact.html
 ```
@@ -69,7 +69,7 @@ app.js         assembly + render loop
 | `src/fieldView.js` | Mode D — the many-droplets test run on a 3-D volume of rain. |
 | `src/panels.js` | Tutorial script, ray readout, mathematics panel, questions. |
 | `src/app.js` | Shell, controls, the reactive update pipeline (see below), render loop. |
-| `test/optics.test.mjs` | 55 tests over the engine — ray-sphere, Snell, extremum vs. numeric search, classification, sky geometry, the Fresnel budget per reflection order, the droplet-field test, the drawn side of each bow, and the ray classes checked against Nussenzveig. |
+| `test/optics.test.mjs` | 72 tests over the engine — ray-sphere, Snell, extremum vs. numeric search, classification, sky geometry, the Fresnel budget per reflection order, the droplet-field test, the drawn side of each bow, and the ray classes checked against Nussenzveig. |
 
 ## Angle conventions — read this before changing any angle-related code
 
@@ -1373,7 +1373,7 @@ Snell's law (scalar and vector forms agree), Fresnel limits, the analytic
 extremum against an independent numeric (golden-section) search, the
 headline 42°/51° values, classification for every ray family, sky/horizon
 geometry, the bow-direction and scattering-angle constructors, and more —
-55 tests, all should stay green.
+72 tests, all should stay green.
 
 View/rendering changes: there is no visual regression suite, so verify by
 driving the actual app:
@@ -1523,7 +1523,7 @@ Step 1 was a blank slate — one droplet, zero reflections, "we don't yet know
 what happens". Honest, and it told a reader nothing about what they were about
 to spend sixteen steps deriving. It now opens on both bows with split entry:
 two eyes, 42.4 and 50.4, the band between them, and a chip per entry point.
-The blank slate is step 2, unchanged. 17 steps.
+The blank slate is step 3 now. 20 steps.
 
 Known, pre-existing: with `wavelengthLabels` on, the sky's k=1 and k=2 bow
 captions can collide at low eye elevations. Not caused by the band caption,
@@ -2097,3 +2097,140 @@ within 3 deg of the bow ray's.
 
 Worth remembering generally: any time this project bins or sorts an angle from
 `atan2`, the seam is a bug waiting unless the set is unwrapped first.
+
+## Every step starts from the defaults
+
+The rule used to be "a step must pin everything it depends on", and this file
+kept recording the same bug under different names: a step that did not mention
+the beam count, the dispersion or the Sun inherited whatever the reader had
+left on, so the picture a step was written around depended on where the reader
+had been two steps earlier. Reported, in those words: *"user can change number
+of beams, properties of medium or other things and the visualisation is not
+clear then."*
+
+`state.js` now exports `resetPatch()`, built from `RESET_KEYS` applied to the
+`state` literal itself -- so the default value of anything is written down
+exactly once. Both the Reset button and `applyStep()` start from it, and a step
+declares only what it is ABOUT.
+
+Two things fell out of sharing one definition:
+
+- Reset was already missing `show.arrival`, `show.airObserver` and
+  `show.meetingEye`, so those three survived it. They do not now.
+- `scene` stays out of the baseline (Reset deliberately leaves the reader where
+  they are) and is defaulted inside `applyStep` instead, along with
+  `panel: 'guide'` -- clicking a ray jumps the column to the ray readout, and
+  the next step must not open behind it.
+
+A unit test pins it: every step, entered from a deliberately hostile state
+(flint glass at 1.14x, dispersion 0.17, a 60-ray beam, accumulate on, labels
+off), must come back to the defaults for every field it does not declare.
+
+## Toggle chips, and the steps that explained their own buttons
+
+Reported three times in one message: the horizon chip switched the horizon on
+and offered no way back, the aircraft chips moved the aircraft and not the
+reader, and the final step's chips "are not doing anything" -- because its
+`apply` already turned those flags on, so clicking them set true to true.
+
+`stepChip()` in panels.js now takes either a `patch` (set something, done) or
+`flags: ['horizon', 'ground']` (flip them, and show which way they are). The
+active class needs a `sync()`: what is on screen changes from the control
+column too, and the panel is not rebuilt for it. Verified by clicking each
+toggle twice and requiring the flag and the highlight to come back.
+
+### The full circle was closing off screen
+
+The height chips on the "why an arc" step were never broken. They set the
+height, the slider followed, and the readout went from 40 % to 100 % -- while
+the picture did not change at all, because at `eyeElevation: 12` with a 75 deg
+field the bottom of the ring is below the frame. The bow spans elevation
+-57 to +27 under a 15 deg Sun, so the step now looks at `eyeElevation: -15`
+with `fov: 120` and the arc visibly closes into a circle as the reader climbs.
+Same framing on the aircraft step.
+
+**The lesson is not about those two steps.** A number in a readout is not the
+demonstration; if a control's effect happens outside the viewport, the control
+reads as broken no matter how correct the state is.
+
+## What the drop is made of
+
+`O.MATERIALS` carries seven substances, each with its own Cauchy pair fitted to
+published indices at the hydrogen F (486.1 nm) and C (656.3 nm) lines. Fitting
+per material rather than scaling water's dispersion is the point: how much a
+substance spreads colour is its own property.
+
+Water keeps `mode: 'table'` -- the six-value teaching table everything else in
+this repo is built and tested against. Its Cauchy fit lands 1e-3 from the
+published 1.33304, which is why the published-index test skips it and a
+separate test asserts that water still means the tabulated model exactly.
+
+| material | n(650) | k=1 | k=2 |
+|---|---|---|---|
+| water | 1.3310 | 42.4 | 50.4 |
+| sea water | 1.3380 | 41.4 | 52.2 |
+| ice | 1.3081 | **45.8** | **44.1** |
+| acrylic | 1.4894 | 23.8 | 85.0 |
+| crown glass | 1.5145 | 21.6 | 89.4 |
+| flint glass | 1.7215 | 7.9 | 118.8 |
+| diamond | 2.4105 | **none** | 167.2 |
+
+Two of those rows are the reason the presets are worth having. **Ice inverts
+Alexander's band**: the two bows land 1.7 deg apart with the secondary INSIDE
+the primary. **Diamond has no primary bow at all** -- k=1 needs
+`cos(theta_i) = sqrt((n^2-1)/3)`, which has no solution above n = 2.
+
+The old table-vs-Cauchy select is gone. It asked the reader to choose a
+numerical method, which is a developer's question; this one asks a physical
+one. `state.indexScale` stays as the what-if multiplier on top.
+
+### Seven callers assumed a bow always exists
+
+`rainbowGeometry()` has been able to return null since it was written, and
+nothing ever hit it while water was the only material. Fixed, in order of
+discovery: the sky readout, the droplet scene's meeting-eye caption, the
+mathematics table, the mathematics result row, the free-mode guide,
+`alexandersBand()` (it returns null now -- a gap between a bow and nothing is
+not a gap), `alexanderCaption()` and the four scenes that draw the band, and
+`meetingPoint()`, where `bowEntry()` returning null meant `traceOne(..., null)`
+quietly traced b = 0 and produced a perfectly good ray on nobody's caustic.
+
+Two of those guards had to be written carefully: an early `return` inside
+`dropsView.draw()` would have taken the rest of the scene with it, and
+`computeObservers()` returns `[]` rather than an entry with a null geometry in
+it. Verified by rendering 7 materials x 4 scenes x 4 panels x both cameras --
+168 passes, silent console.
+
+**Habit this leaves:** the moment a control can push the engine outside the
+range everything was written for, grep for the functions that can return null
+and check every caller, not the one that threw.
+
+## The arrival arc read as "slightly busier", not "empty except here"
+
+Reported about step 8: *"visualisation of outgoing rays here misses the part
+where rainbow is actually created."* The bearings and the bow tick were
+already right -- measured, the busiest bins sit at +-138 deg, which IS the
+bow. Three things were wrong with how that got drawn:
+
+- **`sqrt(dens / peak)`.** At a true density ratio of 5.5 the square root drew
+  the empty directions at 43 % of the caustic's height. The one claim the
+  display makes is "most directions stay almost empty, one fills up", and the
+  compression was arguing against it. Linear now: the floor is a fifth of the
+  peak, which is what the physics says.
+- **200 samples.** The quiet bins came out 2,3,2,4,2 and the noise read as
+  structure. At 1200 the spread of the quiet bins drops from 15 % to 4 % while
+  the peak-to-median ratio stays at 5.5. Cached against the physics, so it is
+  paid once per change.
+- **`ARRIVAL_BAR` 26 -> 42 px**, and the radius is now fitted to the canvas
+  rather than scaled with the droplet. Order 2 leaves across the whole forward
+  hemisphere, so its profile wraps most of the way round the drop; at zoom 1
+  the preferred radius put it off three edges at once. Measured after: the
+  profile's bounding box is strictly inside the canvas at zoom 1, 2.6, 3.5, 6
+  and 12, with zero edge pixels.
+
+Two bugs in the bow tick found while checking this, both latent until now:
+it was computed with a raw `atan2` instead of `bearing()`, so it walked off its
+own peak the moment a step raised the Sun; and it used the UNSIGNED
+`geo.impactParameter`, which put k=2's tick on the mirror peak -- the far side
+of the picture from k=1's, turning Alexander's band into a gap of the wrong
+size pointing the wrong way.

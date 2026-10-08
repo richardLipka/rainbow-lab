@@ -67,7 +67,7 @@ const RAIN_PATH_MIN = 2000;
 let profileCache = { key: '', profile: null };
 
 function bowProfile() {
-  const key = `${state.dispersion}|${state.indexMode}|${state.indexScale}|${state.show.primary}|${state.show.secondary}|${state.show.higher}`;
+  const key = `${state.dispersion}|${state.material}|${state.indexScale}|${state.show.primary}|${state.show.secondary}|${state.show.higher}`;
   if (profileCache.key === key) return profileCache.profile;
   const orders = [];
   if (state.show.primary) orders.push(1);
@@ -389,7 +389,7 @@ export function createSkyView(canvas) {
   function bandKey() {
     return [
       state.sunElevation, state.sunAzimuth, state.wavelength, state.dispersion,
-      state.indexMode, state.indexScale,
+      state.material, state.indexScale,
       state.show.primary, state.show.secondary, state.show.higher,
     ].join('|');
   }
@@ -510,7 +510,7 @@ export function createSkyView(canvas) {
   function drawAlexander(ctx, anti) {
     if (!state.show.primary || !state.show.secondary) return;
     const band = O.alexandersBand(indexModel());
-    if (!(band.outerDeg > band.innerDeg)) return;
+    if (!band || !(band.outerDeg > band.innerDeg)) return;
     const steps = 8;
     for (let i = 0; i <= steps; i++) {
       const phi = band.innerDeg + ((band.outerDeg - band.innerDeg) * i) / steps;
@@ -529,7 +529,9 @@ export function createSkyView(canvas) {
     const top = topOfBow(anti, mid);
     if (!top || cam.depth(top) <= NEAR) return;
     const p = cam.project(top);
-    label(ctx, alexanderCaption(indexModel()).text, p.x, p.y + 4,
+    const cap = alexanderCaption(indexModel());
+    if (!cap) return;
+    label(ctx, cap.text, p.x, p.y + 4,
       { align: 'center', color: '#b3c2dc', bg: true });
   }
 
@@ -644,16 +646,29 @@ export function createSkyView(canvas) {
 
   function drawReadout(ctx, w, h, dip) {
     const idx = indexModel();
-    const geo = O.rainbowGeometry(idx(650), 1);
-    const vis = O.visibleFraction(state.sunElevation, geo.antisolarDeg, dip);
+    const geo1 = O.rainbowGeometry(idx(650), 1);
+    const geo2 = O.rainbowGeometry(idx(650), 2);
     let y = 16;
     const put = (s, color) => {
       label(ctx, s, 12, y, { color });
       y += 19;
     };
-    put(`${t('coneAngle')} (k=1): ${deg(geo.antisolarDeg, 2)} — ${t('derivedFromSim')}`, '#6fd3a4');
-    if (state.show.secondary) {
-      put(`${t('coneAngle')} (k=2): ${deg(O.rainbowGeometry(idx(650), 2).antisolarDeg, 2)}`, '#9b8cf0');
+    // A one-bounce bow needs cos(theta_i) = sqrt((n^2-1)/3), which has no
+    // solution above n = 2 -- so a drop of diamond genuinely has no primary
+    // bow and every line below has to be written without one.
+    const geo = geo1 || geo2;
+    if (!geo) {
+      put(t('noBowHere'), '#ff9a8a');
+      return;
+    }
+    const vis = O.visibleFraction(state.sunElevation, geo.antisolarDeg, dip);
+    if (geo1) {
+      put(`${t('coneAngle')} (k=1): ${deg(geo1.antisolarDeg, 2)} — ${t('derivedFromSim')}`, '#6fd3a4');
+    } else {
+      put(`${t('coneAngle')} (k=1): ${t('noBowHere')}`, '#ff9a8a');
+    }
+    if (state.show.secondary && geo2) {
+      put(`${t('coneAngle')} (k=2): ${deg(geo2.antisolarDeg, 2)}`, '#9b8cf0');
     }
     put(`${t('bowTopElevation')}: ${deg(vis.topElevationDeg, 1)}`, '#cfe0ff');
     // The share actually drawn, counted with the same test that draws it --
@@ -761,7 +776,7 @@ export function createSkyView(canvas) {
       size.w, size.h, state.view, state.camYaw, state.camPitch, state.camDist,
       state.eyeAzimuth, state.eyeElevation, state.fov,
       state.sunElevation, state.sunAzimuth, state.observerHeight,
-      state.wavelength, state.dispersion, state.indexMode, state.indexScale,
+      state.wavelength, state.dispersion, state.material, state.indexScale,
       state.show.primary, state.show.secondary, state.show.higher,
       state.show.rainBelow, state.show.horizon, state.show.ground,
     ].join('|');

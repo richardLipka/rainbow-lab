@@ -30,7 +30,7 @@ export function createGraphView(canvas) {
       activeOrders().join(','),
       activeLambdas().join(','),
       state.dispersion,
-      state.indexMode,
+      state.material,
       state.indexScale,
       distRange().join(','),
     ].join('|');

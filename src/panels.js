@@ -3,7 +3,7 @@
  * and the question set. All text comes from i18n.
  */
 import * as O from './optics.js';
-import { state, set, indexModel, activeLambdas, activeOrders } from './state.js';
+import { state, set, indexModel, activeLambdas, activeOrders, resetPatch } from './state.js';
 import { t, deg, num, CLASS_KEY, CLASS_EXPLAIN } from './i18n.js';
 import { el, row, segmented, mathml, M } from './ui.js';
 import {
@@ -37,100 +37,56 @@ import { WORLD_SCALE_M } from './fieldView.js';
  */
 export const TUTORIAL = [
   {
-    /* The destination, first. The opener used to be a blank slate -- one
-       droplet, no reflections, "we don't yet know what happens" -- which is
-       honest but tells a reader nothing about what they are about to spend
-       fifteen steps deriving. Both bows are on screen here, entering through
-       their own halves so the 8 deg between them is the real gap and not the
-       92.8 deg that one entry point forces. Everything after this takes the
-       picture apart; this step only says what the picture is. */
+    /* The destination, first. Both bows, each fed by its own half of the
+       face, each with its own eye -- because the gap the sky shows is 8 deg
+       and the picture has to start by being that picture. */
     title: 's1title', body: 's1body',
     apply: {
-      // White light, because the destination is two COLOURED bows and red
-      // alone makes that impossible to see. No band and no arrival arc: both
-      // get their own steps later, and here they are the clutter standing
-      // between the reader and "two bows, eight degrees apart".
-      // TWO eyes, one per bow, each named for the bow it stands for. The
-      // general truth comes first: the two bows leave in different
-      // directions, so they need different places to stand. Step 2 then
-      // finds the single spot where those two places coincide, which is the
-      // special case and reads as a trick if it arrives first.
-      scene: 'droplet', graph: 'exit', reflections: 2, dispersion: 1, wavelength: 'white',
-      impact: 0.861, fanCount: 12, showNonRainbow: false, angleMode: 'antisolar',
-      dropletZoom: 1, graphOpen: false, sunElevation: 0,
-      show: {
-        angles: false, normals: false, labels: true, renderedBow: false,
-        alexander: false, arrival: false, walls: false, meetingEye: false,
-      },
-      families: { 0: false, 1: true, 2: true, 3: false },
+      scene: 'droplet', reflections: 2, wavelength: 'white', dispersion: 1,
+      impact: 0.861, fanCount: 12, sunElevation: 0,
+      // The arc and the band each get their own step later; here they are
+      // the clutter between the reader and "two bows, two observers".
+      show: { angles: false, walls: false, alexander: false, arrival: false },
     },
     focus: ['reflections', 'bowRays'],
     actions: [
-      {
-        labelKey: 'bowName1',
-        patch: () => ({ impact: bowEntry(1, indexModel()(650)) }),
-      },
-      {
-        labelKey: 'bowName2',
-        patch: () => ({ impact: bowEntry(2, indexModel()(650)) }),
-      },
+      { labelKey: 'bowName1', patch: () => ({ impact: bowEntry(1, indexModel()(650)) }) },
+      { labelKey: 'bowName2', patch: () => ({ impact: bowEntry(2, indexModel()(650)) }) },
     ],
+    note: 'explOppositeHalves',
   },
   {
-    /* Why one eye and not two.
-       Each bow's ray carries on for ever, so ANY distance along it sees that
-       bow. Both at once is different: the two rays leave different points in
-       different directions and cross at exactly one place, 12.2 droplet radii
-       out. Scale that to a real drop and it is 12 mm, which is why the sky
-       cannot work this way and the two bows up there come from two different
-       sets of droplets. The chips put the eyes back per bow and take them
-       away again, so the difference is something you do rather than read. */
+    /* Why one eye and not two. Each bow ray carries on for ever, so any
+       distance along it sees that bow; both at once needs the one place the
+       two rays cross, 12.2 radii out. */
     title: 's1ctitle', body: 's1cbody',
     apply: {
-      scene: 'droplet', reflections: 2, dispersion: 1, wavelength: 'white',
-      impact: 0.861, fanCount: 0, dropletZoom: 25, sunElevation: 0,
-      graphOpen: false, panel: 'guide',
-      families: { 0: false, 1: true, 2: true, 3: false },
-      show: {
-        angles: false, normals: false, labels: true, renderedBow: false,
-        alexander: false, arrival: false, walls: false, meetingEye: true,
-      },
+      scene: 'droplet', reflections: 2, impact: 0.861, fanCount: 0,
+      dropletZoom: 25, sunElevation: 0,
+      show: { angles: false, walls: false, alexander: false, arrival: false, meetingEye: true },
     },
-    focus: ['dropletZoom', 'reflections'],
+    focus: ['impactParameter', 'dropletZoom'],
     actions: [
-      { labelKey: 'eyeMeeting', patch: { show: { meetingEye: true } } },
-      { labelKey: 'eyePerBow', patch: { show: { meetingEye: false } } },
+      { labelKey: 'bowName1', patch: () => ({ impact: bowEntry(1, indexModel()(650)) }) },
+      { labelKey: 'bowName2', patch: () => ({ impact: bowEntry(2, indexModel()(650)) }) },
+      { labelKey: 'eyeMeeting', flags: ['meetingEye'] },
     ],
     note: 'explMeetingPoint',
   },
   {
-    /* The blank slate that used to open the tutorial, now that the reader has
-       seen what it is heading towards. Nothing on screen but one droplet and
-       one ray that does not reflect at all. */
+    /* Back to the beginning: one drop, one ray, no reflection at all. */
     title: 's1btitle', body: 's1bbody',
     apply: {
-      scene: 'droplet', graph: 'exit', reflections: 0, dispersion: 0, wavelength: 'white',
-      impact: 0.6, fanCount: 0, showNonRainbow: false, angleMode: 'antisolar',
-      dropletZoom: 1, graphOpen: false,
-      // Step 1 stands one eye at the crossing; from here each bow gets its
-      // own, because the rest of the guide is about one order at a time.
-      show: {
-        angles: false, normals: false, labels: true, renderedBow: false,
-        meetingEye: false,
-      },
-      families: { 0: true, 1: false, 2: false, 3: false },
+      scene: 'droplet', reflections: 0, dispersion: 0, impact: 0.6,
+      sunElevation: 0, show: { angles: false, arrival: false },
     },
     focus: ['impactParameter', 'wavelength'],
   },
   {
     title: 's2title', body: 's2body',
     apply: {
-      // One ray, pinned: these two steps are about following a single path,
-      // and a step that does not pin the beam inherits whatever the reader
-      // left on -- a 32-ray fan makes the path impossible to follow.
-      scene: 'droplet', reflections: 0, graphOpen: false, fanCount: 0,
-      show: { angles: true, normals: true },
-      families: { 0: true, 1: false, 2: false, 3: false },
+      scene: 'droplet', reflections: 0, impact: 0.6, dispersion: 0,
+      sunElevation: 0, show: { angles: true, normals: true, arrival: false },
     },
     focus: ['impactParameter', 'showNormals', 'showAngles'],
     actions: [
@@ -140,33 +96,29 @@ export const TUTORIAL = [
     ],
   },
   {
+    /* Two bounces, not one: the body walks R0 -> R1 -> R2 -> R3, and a
+       single reflection only ever produces three segments. */
     title: 's3title', body: 's3body',
     apply: {
-      scene: 'droplet', reflections: 1, impact: 0.7, showNonRainbow: true, graphOpen: false,
-      fanCount: 0,
-      families: { 0: false, 1: true, 2: false, 3: false },
-      show: { normals: false, angles: true, walls: true, labels: true },
+      scene: 'droplet', reflections: 2, impact: 0.7, sunElevation: 0,
+      show: { normals: false, angles: true, walls: true, arrival: false },
     },
-    focus: ['reflections', 'showWalls'],
-    // The wall markers arrived after this step was written and say exactly
-    // what it is about: how little of the light carries on at each surface,
-    // and that the bounce is not total internal reflection.
+    focus: ['reflections', 'showWalls', 'impactParameter'],
     note: ['explReflectionIsWeak', 'explNoTotalReflection'],
+    showRay: true,
   },
   {
+    /* Deliberately off the bow: an angle that is already the answer has
+       nothing to demonstrate, and the chip is what makes 42 a measurement. */
     title: 's4title', body: 's4body',
     apply: {
-      // One ray: this step reads phi off a single exit, and the compact ray
-      // readout beside it describes that one ray.
-      scene: 'droplet', reflections: 1, showNonRainbow: false, panel: 'guide',
-      fanCount: 0, graphOpen: false, show: { angles: true },
+      scene: 'droplet', reflections: 1, impact: 0.6, sunElevation: 0,
+      show: { angles: true, arrival: false },
     },
     focus: ['impactParameter', 'showAngles'],
     note: 'explObserverAngle',
     actions: [{
       labelKey: 'extremumLabel',
-      // From the engine, not written down: 0.861 was a literal sitting in
-      // the one file that is supposed to contain none.
       patch: () => ({ impact: bowEntry(1, indexModel()(650)) }),
     }],
     showRay: true,
@@ -174,59 +126,45 @@ export const TUTORIAL = [
   {
     title: 's5title', body: 's5body',
     apply: {
-      scene: 'droplet', graph: 'exit', graphOpen: true, reflections: 1, fanCount: 9,
-      panel: 'guide',
+      scene: 'droplet', graph: 'exit', graphOpen: true, reflections: 1,
+      fanCount: 9, sunElevation: 0, show: { arrival: false, walls: false },
     },
-    focus: ['fanCount', 'impactParameter'],
+    focus: ['fanCount', 'impactParameter', 'reflections'],
     actions: [
       { label: '1', patch: { fanCount: 0 } },
       { label: '9', patch: { fanCount: 9 } },
       { label: '25', patch: { fanCount: 25 } },
+      { labelKey: 'chipRefl1', patch: { reflections: 1, families: { 0: false, 1: true, 2: false, 3: false } } },
+      { labelKey: 'chipRefl2', patch: { reflections: 2, families: { 0: false, 1: true, 2: true, 3: false } } },
+      { labelKey: 'chipRefl3', patch: { reflections: 3, families: { 0: false, 1: true, 2: true, 3: true } } },
     ],
   },
   {
-    /* Where must you stand? The eye is handed over to the reader here: the
-       fan is already on screen from the previous step, so sweeping the eye
-       across it makes the caustic count itself, and 42 deg arrives as a
-       measurement rather than as an assertion. Deliberately started off the
-       bow -- an eye that is already correct has nothing to demonstrate. */
+    /* The pile-up, counted on the canvas. One wavelength, because the arc
+       is a density display and six overlapping spectra make the count a
+       guess. Starts sparse on purpose: four rays each leave in their own
+       direction, and only as the count climbs do they stack. */
     title: 's6title', body: 's6body',
     apply: {
-      // One wavelength, full dispersion: the tally then counts exactly the
-      // rays that are visible on screen (under white light all six overlap
-      // at once and it would read 48/276 for 46 visible lines), and the
-      // angle in play is the real n(650) one the rest of the app quotes
-      // rather than the mean-index 41.9 that dispersion=0 produces.
-      scene: 'droplet', graph: 'exit', reflections: 1, fanCount: 4, dispersion: 1,
-      wavelength: 650, impact: 0.861, dropletZoom: 2.6,
-      panel: 'guide', graphOpen: false,
-      // Step 1 switches the arc off to keep its own picture clean; this is
-      // the step whose note is about the arc, so it switches it back.
-      show: { angles: true, normals: false, labels: true, arrival: true },
-      families: { 0: false, 1: true, 2: false, 3: false },
+      scene: 'droplet', reflections: 1, fanCount: 16, wavelength: 650,
+      impact: 0.861, dropletZoom: 2.6, sunElevation: 0,
+      show: { angles: true, arrival: true, walls: false },
     },
-    focus: ['fanCount', 'impactParameter'],
-    // Deliberately starting at four rays: a sparse beam shows every ray
-    // leaving in its own direction, and only as the count climbs do they
-    // stop spreading and stack up along one. Handing the reader a dense beam
-    // first shows the answer without the comparison.
+    focus: ['fanCount', 'showArrival', 'impactParameter'],
     actions: [
       { label: '4', patch: { fanCount: 4 } },
       { label: '16', patch: { fanCount: 16 } },
       { label: '60', patch: { fanCount: 60 } },
+      { labelKey: 'showArrival', flags: ['arrival'] },
     ],
-    // The arc above the droplet IS the stacking, counted. It draws only with
-    // a beam on screen, so this is the first step that can talk about it.
     note: 'explArrivalArc',
   },
   {
     title: 's7title', body: 's7body',
     apply: {
-      // Enough samples that the shape is already a shape. At 40 it was a
-      // handful of spikes and the reader's first impression of the plot
-      // was noise; the chips still go down to 10 to show it falling apart.
-      scene: 'droplet', graph: 'dist', graphOpen: true, reflections: 1, fanCount: 25,
-      distRays: 2000,
+      scene: 'droplet', graph: 'dist', graphOpen: true, reflections: 1,
+      fanCount: 25, distRays: 2000, sunElevation: 0,
+      show: { walls: false },
     },
     focus: ['rayCount'],
     actions: [
@@ -240,8 +178,7 @@ export const TUTORIAL = [
   {
     title: 's8title', body: 's8body',
     apply: {
-      scene: 'drops', graph: 'dist', dropCount: 1, dropsAnimate: true,
-      dropsObserverX: 0, dropsObserverY: 0, graphOpen: false,
+      scene: 'drops', dropCount: 1, dropsAnimate: true,
       show: { droplets: true, primary: true, secondary: false },
     },
     focus: ['dropCount', 'animateDrops'],
@@ -255,38 +192,33 @@ export const TUTORIAL = [
     note: 'explNotAnObject',
   },
   {
-    /* The bow is not a place. Nothing about the droplet field changes here --
-       only where the reader is standing -- and a different set of droplets
-       lights up, which is the claim the previous step could only make in
-       words. */
+    /* The bow is not a place. Nothing about the rain changes here -- only
+       where the reader stands -- and a different set of droplets lights up. */
     title: 's9title', body: 's9body',
     apply: {
-      scene: 'drops', graph: 'dist', dropCount: 1500, dropsAnimate: false,
-      dropsObserverX: 0, dropsObserverY: 0, sunElevation: 15, graphOpen: false,
-      show: { droplets: true, primary: true, secondary: false, ground: true, labels: true },
+      scene: 'drops', dropCount: 1500, sunElevation: 15,
+      show: { droplets: true, primary: true, secondary: false, ground: true },
     },
-    focus: ['observerDepth', 'observerRise'],
+    focus: ['observerDepth', 'observerRise', 'sunElevation'],
     actions: [
-      { labelKey: 'observerRecentre', patch: { dropsObserverX: 0, dropsObserverY: 0 } },
+      { labelKey: 'observerRecentre', patch: { dropsObserverX: 0, dropsObserverY: 0, sunElevation: 15 } },
       { labelKey: 'obsChipForward', patch: { dropsObserverX: 0.45 } },
       { labelKey: 'obsChipUp', patch: { dropsObserverY: 0.28 } },
       { labelKey: 'obsChipDown', patch: { dropsObserverY: -0.09 } },
+      { labelKey: 'chipSunHigh', patch: { sunElevation: 35 } },
     ],
     note: 'explBowFollowsYou',
   },
   {
-    /* The flat scene's argument, with the cross-section taken away. Nothing
-       here draws a circle: the arc is however many of the droplets around
-       the reader answered yes to the one angular test, which is the claim
-       the sky view can only make by drawing the circle it is explaining. */
+    /* The flat scene's argument with the cross-section taken away. Nothing
+       here draws a circle: the arc is however many droplets answered yes. */
     title: 's10title', body: 's10body',
     apply: {
       scene: 'field', view: 'eye', eyeAzimuth: 0, eyeElevation: 14, fov: 110,
-      sunElevation: 15, observerHeight: 1.7, fieldCount: 60000, graphOpen: false,
-      wavelength: 'white', dispersion: 1,
+      sunElevation: 15, observerHeight: 1.7, fieldCount: 60000,
       show: {
         droplets: true, primary: true, secondary: true, higher: false,
-        ground: true, horizon: true, rainBelow: false, antisolar: true, labels: true,
+        ground: true, horizon: true, rainBelow: false, antisolar: true,
       },
     },
     focus: ['fieldCount', 'viewMode'],
@@ -302,38 +234,39 @@ export const TUTORIAL = [
   {
     title: 's11title', body: 's11body',
     apply: {
-      scene: 'sky', view: 'orbit', sunElevation: 15, graphOpen: false,
-      show: { cone: true, horizon: false, ground: false, antisolar: true, primary: true, secondary: false, renderedBow: false },
+      scene: 'sky', view: 'orbit', sunElevation: 15,
+      show: {
+        cone: true, horizon: false, ground: false, antisolar: true,
+        primary: true, secondary: false, renderedBow: false,
+      },
     },
     focus: ['showCone', 'showHorizon', 'viewMode'],
     actions: [
-      { labelKey: 'showCone', patch: { show: { cone: true } } },
-      { labelKey: 'showHorizon', patch: { show: { horizon: true, ground: true } } },
+      { labelKey: 'showCone', flags: ['cone'] },
+      { labelKey: 'showHorizon', flags: ['horizon', 'ground'] },
+      { labelKey: 'viewOrbit', patch: { view: 'orbit' } },
       { labelKey: 'viewEye', patch: { view: 'eye' } },
     ],
   },
   {
-    /* Why it is an arc and not a ring.
-       Step 11 ends on "switch the horizon on and the lower part disappears",
-       which invites the obvious next question and then drops it. The scene
-       has had the two controls that answer it for a long time -- observer
-       height and whether there is rain below the eye -- and no step ever
-       touched either. They are also the two that people get the wrong way
-       round: altitude is not what buys the full circle, rain underneath is. */
+    /* Why an arc and not a ring -- and the camera has to be pointed where
+       the answer is. At the default look-up the ring closes OFF SCREEN: the
+       readout went from 40 % to 100 % while the picture did not change, so
+       the chips looked broken. Centred on the antisolar point with a wide
+       field, the arc visibly becomes a circle. */
     title: 's11btitle', body: 's11bbody',
     apply: {
       scene: 'sky', view: 'eye', sunElevation: 15, observerHeight: 1.7,
-      graphOpen: false, reflections: 1,
-      families: { 0: false, 1: true, 2: false, 3: false },
+      eyeElevation: -15, fov: 120, reflections: 1,
       show: {
-        primary: true, secondary: false, cone: false, horizon: true, ground: true,
-        rainBelow: false, renderedBow: true, antisolar: true, labels: true,
+        primary: true, secondary: false, cone: false, horizon: true,
+        ground: true, rainBelow: false, renderedBow: true, antisolar: true,
       },
     },
     focus: ['observerHeight', 'rainBelow'],
     actions: [
-      { label: '1.7 m', patch: { observerHeight: 1.7, show: { rainBelow: false } } },
-      { labelKey: 'rainBelow', patch: { show: { rainBelow: true } } },
+      { labelKey: 'rainBelow', flags: ['rainBelow'] },
+      { label: '1.7 m', patch: { observerHeight: 1.7 } },
       { label: '300 m', patch: { observerHeight: 300, show: { rainBelow: true } } },
       { label: '1 km', patch: { observerHeight: 1000, show: { rainBelow: true } } },
       { label: '3 km', patch: { observerHeight: 3000, show: { rainBelow: true } } },
@@ -341,37 +274,40 @@ export const TUTORIAL = [
     note: 'explFullCircle',
   },
   {
-    /* The second observer. Step 13 establishes that the bottom of the circle
-       needs rain below the eye; this one puts someone up there and draws the
-       part of the SAME bow they get. Both orders, because the secondary does
-       exactly the same thing eight degrees further out. */
+    /* Two observers of the SAME bow. The reader stays on the ground -- that
+       is the whole comparison -- and the chips fly the aircraft. */
     title: 's11ctitle', body: 's11cbody',
     apply: {
       scene: 'sky', view: 'eye', sunElevation: 15, observerHeight: 1.7,
-      airHeight: 3000, graphOpen: false, reflections: 2, wavelength: 'white',
-      dispersion: 1, families: { 0: false, 1: true, 2: true, 3: false },
+      airHeight: 3000, eyeElevation: -15, fov: 120, reflections: 2,
+      wavelength: 'white', dispersion: 1,
       show: {
         primary: true, secondary: true, airObserver: true, alexander: true,
         cone: false, horizon: true, ground: true, rainBelow: false,
-        renderedBow: false, antisolar: true, labels: true,
+        renderedBow: false, antisolar: true,
       },
     },
-    focus: ['showAirObserver', 'airHeight'],
+    focus: ['showAirObserver', 'airHeight', 'observerHeight'],
     actions: [
+      { labelKey: 'showAirObserver', flags: ['airObserver'] },
       { label: '1 km', patch: { airHeight: 1000 } },
       { label: '3 km', patch: { airHeight: 3000 } },
       { label: '10 km', patch: { airHeight: 10000 } },
-      { labelKey: 'showAirObserver', patch: { show: { airObserver: false } } },
+      { labelKey: 'chipClimbThere', patch: { observerHeight: 3000, show: { rainBelow: true } } },
+      { labelKey: 'chipBackDown', patch: { observerHeight: 1.7, show: { rainBelow: false } } },
     ],
     note: 'explAirObserver',
   },
   {
+    /* Colour, with the histogram already open: the step is about every
+       wavelength getting its own angle, and that is a thing you read off
+       the plot rather than off a single split ray. */
     title: 's12title', body: 's12body',
     apply: {
-      scene: 'droplet', graph: 'exit', wavelength: 'white', dispersion: 0, reflections: 1,
-      fanCount: 0, dropletZoom: 9, graphOpen: true,
-      show: { wavelengthLabels: true, angles: true },
-      families: { 0: false, 1: true, 2: false, 3: false },
+      scene: 'droplet', graph: 'dist', graphOpen: true, wavelength: 'white',
+      dispersion: 1, reflections: 1, fanCount: 0, dropletZoom: 9,
+      distRays: 2000, sunElevation: 0,
+      show: { wavelengthLabels: true, angles: true, walls: false },
     },
     focus: ['dispersion', 'dropletZoom', 'showWavelengthLabels'],
     actions: [
@@ -382,94 +318,64 @@ export const TUTORIAL = [
     note: 'explDispersionZoom',
   },
   {
-    /* The secondary, built rather than announced. Step 13 used to be the only
-       step that mentioned it, in the sky, with the answer already assembled --
-       so a reader who followed the tutorial never met the cascade, the bow
-       marks or the impact-parameter chips at all. These two steps put the
-       droplet work in the guided path, and the sky step becomes the payoff. */
+    /* The higher orders, built rather than announced: same drop, same
+       geometry, a different place to land. */
     title: 's13atitle', body: 's13abody',
     apply: {
-      // panel: 'guide' with showRay, not panel: 'ray' -- the tutorial text
-      // lives in the guide, so selecting the ray panel hides the very step
-      // the reader is on. showRay embeds the compact readout instead.
-      // The fan is on, because a single ray cannot show a pile-up and the
-      // arrival arc is the point of this step. 45 gives the secondary's
-      // narrower caustic enough rays to bunch visibly.
-      scene: 'droplet', panel: 'guide', wavelength: 650, dispersion: 1,
-      reflections: 2, fanCount: 45, dropletZoom: 1,
-      graphOpen: false, showNonRainbow: false,
-      families: { 0: false, 1: true, 2: true, 3: false },
-      show: {
-        angles: false, normals: false, labels: true, renderedBow: false,
-        arrival: true, alexander: false,
-      },
+      scene: 'droplet', wavelength: 650, dispersion: 1, reflections: 2,
+      fanCount: 36, dropletZoom: 2.2, sunElevation: 0,
+      show: { angles: false, arrival: true, alexander: false, walls: false },
     },
-    focus: ['impactParameter', 'bowRays'],
+    compute: () => ({ impact: bowEntry(2, indexModel()(650)) }),
+    focus: ['impactParameter', 'bowRays', 'reflections'],
     actions: [
-      {
-        labelKey: 'bowName1',
-        patch: () => ({ impact: bowEntry(1, indexModel()(650)) }),
-      },
-      {
-        labelKey: 'bowName2',
-        patch: () => ({ impact: bowEntry(2, indexModel()(650)) }),
-      },
+      { labelKey: 'bowName1', patch: () => ({ impact: bowEntry(1, indexModel()(650)) }) },
+      { labelKey: 'bowName2', patch: () => ({ impact: bowEntry(2, indexModel()(650)) }) },
+      { labelKey: 'chipRefl3', patch: { reflections: 3, families: { 0: false, 1: true, 2: true, 3: true } } },
     ],
-    note: ['coneSliceNote', 'explOppositeHalves'],
+    note: ['coneSliceNote', 'explOppositeHalves', 'explWhyFainter'],
     showRay: true,
   },
   {
-    /* Why the colours run the other way -- the one claim the app used to
-       assert four times and derive never. Both curves are already on the plot
-       the moment two orders are active; this step opens it and says what to
-       look at. */
+    /* Why the colours run the other way. Both curves are on the plot the
+       moment two orders are active; this step opens it and says what to
+       look at, and the histogram chip shows where each colour lands. */
     title: 's13btitle', body: 's13bbody',
     apply: {
       scene: 'droplet', graph: 'exit', graphOpen: true, angleMode: 'antisolar',
       wavelength: 'white', dispersion: 1, reflections: 2, fanCount: 0,
-      families: { 0: false, 1: true, 2: true, 3: false },
-      panel: 'guide', show: { labels: true, wavelengthLabels: true },
+      distRays: 2000, sunElevation: 0,
+      show: { wavelengthLabels: true, arrival: false, walls: false },
     },
-    focus: ['angleConvention', 'dispersion'],
+    // NOT angleConvention: it lives in the exit plot's own tab bar, so this
+    // step's "switch to the histogram" chip takes it off screen and
+    // applyFocus() rightly complains about a step pointing at a control that
+    // is no longer there.
+    focus: ['dispersion', 'impactParameter'],
+    actions: [
+      { labelKey: 'chipPlotExit', patch: { graph: 'exit' } },
+      { labelKey: 'chipPlotDist', patch: { graph: 'dist' } },
+      { labelKey: 'bowName1', patch: () => ({ impact: bowEntry(1, indexModel()(650)) }) },
+      { labelKey: 'bowName2', patch: () => ({ impact: bowEntry(2, indexModel()(650)) }) },
+    ],
     note: 'explColourFlip',
   },
   {
-    /* Two rays, two entry heights, and the gap between them at its real size.
-       Every other droplet step traces one entry point, because the cascade is
-       what causes the secondary -- but that same choice throws the two exits
-       onto opposite sides of the picture, 92.8 deg apart, and the 8 deg the
-       sky actually shows you becomes something only the captions know. Here
-       the secondary is fed through the top half, which is what the Sun does
-       anyway, and the dark band is a wedge you can see instead of a
-       subtraction you have to perform. */
+    /* Alexander's band, with the arrival arc on -- the gap between the two
+       profiles IS the band, counted by the rays rather than shaded in. */
     title: 's13ctitle', body: 's13cbody',
     apply: {
-      scene: 'droplet', panel: 'guide', wavelength: 650, dispersion: 1,
-      // Pinned to the SECONDARY's own entry point, which is in the lower half
-      // of the face. Left at the primary's +0.862 the secondary ray leaves
-      // upward, away from both eyes, and the step reads as if the secondary
-      // bow pointed at the sky instead of at the observer.
-      reflections: 2, fanCount: 32, dropletZoom: 1,
-      graphOpen: false, showNonRainbow: false,
-      families: { 0: false, 1: true, 2: true, 3: false },
-      // The band IS this step, so it says so rather than inheriting it.
-      show: {
-        angles: true, normals: false, labels: true, renderedBow: false,
-        alexander: true, arrival: false,
-      },
+      scene: 'droplet', wavelength: 650, dispersion: 1, reflections: 2,
+      fanCount: 24, dropletZoom: 3, sunElevation: 0,
+      show: { angles: false, alexander: true, arrival: true, walls: false },
     },
-    // From the engine. -0.951 is not a number this file is allowed to know.
     compute: () => ({ impact: bowEntry(2, indexModel()(650)) }),
-    focus: ['reflections', 'impactParameter'],
+    focus: ['showArrival', 'showAlexander', 'impactParameter'],
     actions: [
-      {
-        labelKey: 'bowName1',
-        patch: () => ({ impact: bowEntry(1, indexModel()(650)) }),
-      },
-      {
-        labelKey: 'bowName2',
-        patch: () => ({ impact: bowEntry(2, indexModel()(650)) }),
-      },
+      { labelKey: 'showArrival', flags: ['arrival'] },
+      { labelKey: 'showAlexander', flags: ['alexander'] },
+      { labelKey: 'bowName1', patch: () => ({ impact: bowEntry(1, indexModel()(650)) }) },
+      { labelKey: 'bowName2', patch: () => ({ impact: bowEntry(2, indexModel()(650)) }) },
     ],
     note: 'explAlexander',
     showRay: true,
@@ -477,50 +383,106 @@ export const TUTORIAL = [
   {
     title: 's13title', body: 's13body',
     apply: {
-      // Back to ground level: the reader may have climbed to 3 km on the
-      // full-circle step, and the payoff is what the sky looks like from
-      // where they actually stand.
-      // The Sun too: every other sky and rain step pins 15 deg, and this one
-      // did not. Arrive here with the Sun at 75 and the whole bow is below
-      // the horizon -- the payoff step showing an empty sky.
-      scene: 'sky', view: 'eye', dispersion: 1, wavelength: 'white', reflections: 2,
-      graphOpen: false, observerHeight: 1.7, sunElevation: 15,
-      families: { 0: false, 1: true, 2: true, 3: false },
+      scene: 'sky', view: 'eye', dispersion: 1, wavelength: 'white',
+      reflections: 2, observerHeight: 1.7, sunElevation: 15,
       show: {
-        primary: true, secondary: true, alexander: true, horizon: true, ground: true,
-        renderedBow: true, cone: false, wavelengthLabels: true, rainBelow: false,
-        // The aircraft had its own step; here it would just add dashed arcs
-        // across the band this step is about.
-        airObserver: false,
+        primary: true, secondary: true, alexander: true, horizon: true,
+        ground: true, renderedBow: true, cone: false, wavelengthLabels: true,
+        rainBelow: false, airObserver: false,
       },
     },
     focus: ['showSecondary', 'showAlexander', 'showRenderedBow'],
     actions: [
-      { labelKey: 'showRenderedBow', patch: { show: { renderedBow: true } } },
-      { labelKey: 'showAlexander', patch: { show: { alexander: true } } },
-      { labelKey: 'showCone', patch: { show: { cone: true } } },
+      { labelKey: 'showRenderedBow', flags: ['renderedBow'] },
+      { labelKey: 'showAlexander', flags: ['alexander'] },
+      { labelKey: 'showCone', flags: ['cone'] },
+      { labelKey: 'mat_water', patch: { material: 'water' } },
+      { labelKey: 'mat_ice', patch: { material: 'ice' } },
+      { labelKey: 'mat_crown', patch: { material: 'crown' } },
     ],
-    note: ['explAlexander', 'explWhyFainter'],
+    note: ['explAlexander', 'explWhyFainter', 'explMaterials'],
   },
 ];
 
 export function applyStep(i) {
   const s = TUTORIAL[i];
   if (!s) return;
+  /*
+   * Every step starts from the defaults, not from wherever the reader left
+   * the controls.
+   *
+   * Pinning field by field was the old rule and it kept failing in the same
+   * way: a step that did not mention the beam count, the material or the
+   * dispersion inherited them, so the picture a step was written around
+   * depended on what the reader had been playing with two steps earlier --
+   * a 60-ray beam over a step about one path, a glass drop under a sentence
+   * quoting water's 42 degrees. Starting from the baseline makes the
+   * omission harmless: a step now declares what it is ABOUT and gets the
+   * defaults for everything else.
+   *
+   * `scene` is not in the baseline (Reset deliberately leaves the reader
+   * where they are), so it is defaulted here instead, and `panel` goes back
+   * to the guide -- clicking a ray jumps the column to the ray readout, and
+   * the next step must not open behind it.
+   */
+  const base = resetPatch();
   // `apply` is a literal, so a step that needs a value out of the engine --
   // an entry point, a bow angle -- supplies `compute()` instead of writing
   // the number down. Applied after `apply`, so it wins.
   const computed = typeof s.compute === 'function' ? s.compute() : null;
   // activeOrders() reads `families`, not `reflections`, so a step that sets
-  // the count without the families keeps whatever the reader arrived with --
-  // jump into "try different incoming rays" from the secondary steps and it
-  // quietly plots two orders. Derive it, cumulatively, the way the control
-  // does. A step that states its own families still wins.
+  // the count without the families would trace the wrong set. Derive it,
+  // cumulatively, the way the control does. A step that states its own
+  // families still wins.
   const k = s.apply.reflections;
-  const families = k === undefined || s.apply.families !== undefined
-    ? null
-    : { families: { 0: k === 0, 1: k >= 1, 2: k >= 2, 3: k >= 3 } };
-  set({ ...s.apply, ...families, ...computed, step: i });
+  const families = s.apply.families
+    ? { ...base.families, ...s.apply.families }
+    : (k === undefined
+      ? base.families
+      : { 0: k === 0, 1: k >= 1, 2: k >= 2, 3: k >= 3 });
+  set({
+    ...base,
+    scene: 'droplet',
+    panel: 'guide',
+    ...s.apply,
+    ...computed,
+    show: { ...base.show, ...(s.apply.show || {}) },
+    families,
+    step: i,
+  });
+}
+
+/**
+ * One chip in a step's action row.
+ *
+ * Two kinds. A `patch` chip sets something and is done -- a beam count, an
+ * entry point, an altitude -- and may be a function when the value has to
+ * come out of the engine rather than be written down as a literal.
+ *
+ * A `flags` chip switches a visualisation on AND off again, and shows which
+ * it currently is. Every one of these used to be a one-way patch: the step
+ * that says "switch the horizon on and the circle becomes an arc" set
+ * horizon to true and offered no way back, and the steps whose `apply`
+ * already turned the flag on offered a chip that did visibly nothing at
+ * all. Reported, twice. The active class needs a sync(): what is on screen
+ * changes from the control column too, and the panel is not rebuilt for it.
+ */
+function stepChip(a) {
+  const flags = a.flags || (a.flag ? [a.flag] : null);
+  const node = el('button', {
+    class: 'chip', type: 'button',
+    onclick: flags
+      ? () => {
+        const next = !state.show[flags[0]];
+        set({ show: Object.fromEntries(flags.map((f) => [f, next])) });
+      }
+      : () => set(typeof a.patch === 'function' ? a.patch() : a.patch),
+  }, a.labelKey ? t(a.labelKey) : a.label);
+  if (flags) {
+    node.sync = () => node.classList.toggle('active', !!state.show[flags[0]]);
+    node.sync();
+  }
+  return node;
 }
 
 function renderTutorial() {
@@ -528,21 +490,13 @@ function renderTutorial() {
   const nodes = [
     el('div', { class: 'step-counter' }, `${t('step')} ${state.step + 1} ${t('of')} ${TUTORIAL.length}`),
     el('h2', {}, t(s.title)),
-    el('p', {}, t(s.body)),
+    // A step's body is one string with blank lines in it, rendered as real
+    // paragraphs. Run together in a single <p> the longer steps read as a
+    // wall, and the breaks are where the argument turns.
+    ...t(s.body).split('\n\n').map((para) => el('p', {}, para)),
   ];
   if (s.actions) {
-    nodes.push(
-      el('div', { class: 'action-row' },
-        s.actions.map((a) =>
-          el('button', {
-            class: 'chip', type: 'button',
-            // A patch may be a function when the value has to come out of the
-            // engine -- a chip that jumps to the rainbow angle must not carry
-            // that angle as a literal.
-            onclick: () => set(typeof a.patch === 'function' ? a.patch() : a.patch),
-          }, a.labelKey ? t(a.labelKey) : a.label)
-        ))
-    );
+    nodes.push(el('div', { class: 'action-row' }, s.actions.map(stepChip)));
   }
   if (s.showRay) nodes.push(...rayInfoNodes({ compact: true }));
   // A step may carry more than one note: naming the bow a reflection count
@@ -578,14 +532,20 @@ function renderFreeGuide() {
   const idx = indexModel();
   const p = O.rainbowGeometry(idx(650), 1);
   const s = O.rainbowGeometry(idx(650), 2);
+  // Every value here is read out of the engine, so a material that has no
+  // such bow prints that rather than a number -- which is the honest answer
+  // and also the only one that does not throw.
+  const band = O.alexandersBand(idx);
   return [
     el('h2', {}, t('reconstructTitle')),
     el('p', { class: 'chain' }, t('reconstructBody')),
     el('div', { class: 'panel-block' },
       el('h3', {}, t('notHardCoded')),
-      row('primaryRainbow', deg(p.antisolarDeg, 2)),
-      row('secondaryRainbow', deg(s.antisolarDeg, 2)),
-      row('showAlexander', `${deg(O.alexandersBand(idx).innerDeg, 1)} – ${deg(O.alexandersBand(idx).outerDeg, 1)}`)
+      row('primaryRainbow', p ? deg(p.antisolarDeg, 2) : t('noBowHere')),
+      row('secondaryRainbow', s ? deg(s.antisolarDeg, 2) : t('noBowHere')),
+      row('showAlexander', band
+        ? `${deg(band.innerDeg, 1)} – ${deg(band.outerDeg, 1)}`
+        : t('noBowHere'))
     ),
     el('p', { class: 'note' }, t('explObserverHeight')),
     el('p', { class: 'note' }, t('dropletSizeNote')),
@@ -1039,14 +999,17 @@ function renderMath() {
         const nn = idx(c.lambda);
         const g1 = O.rainbowGeometry(nn, 1);
         const g2 = O.rainbowGeometry(nn, 2);
+        // A dash rather than a crash: above n = 2 the one-bounce bow has no
+        // turning point to tabulate.
+        const cell = (g, pick, digits) => el('td', {}, g ? num(pick(g), digits) : '—');
         return el('tr', {},
           el('td', { style: `color:${O.rgbCss(c.lambda)}` }, `${c.lambda}`),
           el('td', {}, num(nn, 4)),
-          el('td', {}, num(g1.thetaIDeg, 2)),
-          el('td', {}, num(g1.thetaRDeg, 2)),
-          el('td', {}, num(g1.deviationDeg, 2)),
-          el('td', {}, num(g1.antisolarDeg, 3)),
-          el('td', {}, num(g2.antisolarDeg, 3)));
+          cell(g1, (g) => g.thetaIDeg, 2),
+          cell(g1, (g) => g.thetaRDeg, 2),
+          cell(g1, (g) => g.deviationDeg, 2),
+          cell(g1, (g) => g.antisolarDeg, 3),
+          cell(g2, (g) => g.antisolarDeg, 3));
       }))
   );
 
@@ -1077,7 +1040,10 @@ function renderMath() {
       row('infoIndex', `${num(n, 4)}  (λ = 650 ${t('nm')})`),
       row('infoReflections', String(k)),
       row('infoIncidence', deg(analytic * O.DEG, 4)),
-      row('infoExitAngle', deg(O.rainbowGeometry(n, k).antisolarDeg, 4))),
+      row('infoExitAngle', (() => {
+        const g = O.rainbowGeometry(n, k);
+        return g ? deg(g.antisolarDeg, 4) : t('noBowHere');
+      })())),
     el('p', { class: 'note' }, t('mathResultNote')),
 
     el('h3', {}, t('mathNumericCheck')),

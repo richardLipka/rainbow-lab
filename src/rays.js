@@ -195,6 +195,8 @@ export function orderColor(k) {
  */
 export function alexanderCaption(idx = indexModel()) {
   const band = O.alexandersBand(idx);
+  // Null when the material has no pair of bows to leave a gap between.
+  if (!band) return null;
   return { band, text: `${t('alexanderBandLabel')} · ${deg(band.widthDeg, 1)}` };
 }
 

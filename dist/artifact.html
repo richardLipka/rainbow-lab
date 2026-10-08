@@ -803,6 +803,39 @@ function makeIndexModel(opts = {}) {
 /** Default model: tabulated values, full dispersion. */
 const defaultIndex = makeIndexModel();
 
+/**
+ * What the drop is made of.
+ *
+ * Each entry carries its own Cauchy pair, fitted to that substance's
+ * published indices at the hydrogen F (486.1 nm) and C (656.3 nm) lines, so
+ * the amount a material spreads colour is its own property rather than
+ * water's dispersion scaled up. The fits reproduce the published n at the
+ * sodium D line to better than 3e-4 -- checked in the unit tests, because a
+ * preset nobody can verify is just a number someone typed.
+ *
+ * Water keeps `mode: 'table'`, which is the tabulated six colours the whole
+ * app was built and tested against; every other material is continuous.
+ *
+ * Diamond is in the list for the one thing it does NOT do: k=1 needs
+ * cos(theta_i) = sqrt((n^2-1)/3), which has no solution above n = 2, so a
+ * diamond sphere has no primary bow at all. `rainbowGeometry` returns null
+ * there and the scenes draw what is left.
+ */
+const MATERIALS = [
+  { id: 'water', mode: 'table', cauchy: CAUCHY },
+  { id: 'seawater', mode: 'cauchy', cauchy: { A: 1.33049, B: 0.003177 } },
+  { id: 'ice', mode: 'cauchy', cauchy: { A: 1.30137, B: 0.002832 } },
+  { id: 'acrylic', mode: 'cauchy', cauchy: { A: 1.47880, B: 0.004481 } },
+  { id: 'crown', mode: 'cauchy', cauchy: { A: 1.50452, B: 0.004219 } },
+  { id: 'flint', mode: 'cauchy', cauchy: { A: 1.68970, B: 0.013416 } },
+  { id: 'diamond', mode: 'cauchy', cauchy: { A: 2.37891, B: 0.013348 } },
+];
+
+/** A material by id, falling back to water rather than to undefined. */
+function materialById(id) {
+  return MATERIALS.find((m) => m.id === id) || MATERIALS[0];
+}
+
 /* =========================================================================
  * 3. Interface physics: Snell, reflection, Fresnel
  * =======================================================================*/
@@ -1619,6 +1652,10 @@ function alexandersBand(indexModel = defaultIndex) {
   const p1v = rainbowGeometry(nViolet, 1);
   const p2r = rainbowGeometry(nRed, 2);
   const p2v = rainbowGeometry(nViolet, 2);
+  // No band without both of its edges. An index above 2 removes the
+  // one-bounce bow entirely, and a gap between a bow and nothing is not a
+  // gap -- callers get null and say so instead of drawing a wedge.
+  if (!p1r || !p1v || !p2r || !p2v) return null;
   const innerDeg = Math.max(p1r.antisolarDeg, p1v.antisolarDeg);
   const outerDeg = Math.min(p2r.antisolarDeg, p2v.antisolarDeg);
   return {
@@ -1635,7 +1672,7 @@ function alexandersBand(indexModel = defaultIndex) {
 
 /* namespace object standing in for `import * as O from "./optics.js"` */
 
-const O = { DEG, RAD, EPS, vec, vadd, vsub, vmul, vdot, vcross, vlen, vneg, clamp, vnorm, vangle, NAMED_COLORS, LAMBDA_REF, fitCauchy, CAUCHY, cauchyIndex, makeIndexModel, defaultIndex, refract, reflect, snellAngle, criticalAngle, fresnelReflectance, intersectRaySphere, RayClass, CAUSTIC_TOLERANCE_DEG, deviation, foldToScattering, antisolarAngle, rainbowIncidenceAnalytic, rainbowIncidenceNumeric, rainbowGeometry, exitSwing, bowBrightness, traceRay, classifyRay, exitAngleCurve, angleFor, angularDistribution, sunDirection, antisolarDirection, orthonormalBasis, bowDirection, rainbowCircle, directionAtAngle, EARTH_RADIUS_M, horizonDipDeg, visibleFraction, wavelengthToRGB, rgbCss, linspace, spectralProfile, alexandersBand };
+const O = { DEG, RAD, EPS, vec, vadd, vsub, vmul, vdot, vcross, vlen, vneg, clamp, vnorm, vangle, NAMED_COLORS, LAMBDA_REF, fitCauchy, CAUCHY, cauchyIndex, makeIndexModel, defaultIndex, MATERIALS, materialById, refract, reflect, snellAngle, criticalAngle, fresnelReflectance, intersectRaySphere, RayClass, CAUSTIC_TOLERANCE_DEG, deviation, foldToScattering, antisolarAngle, rainbowIncidenceAnalytic, rainbowIncidenceNumeric, rainbowGeometry, exitSwing, bowBrightness, traceRay, classifyRay, exitAngleCurve, angleFor, angularDistribution, sunDirection, antisolarDirection, orthonormalBasis, bowDirection, rainbowCircle, directionAtAngle, EARTH_RADIUS_M, horizonDipDeg, visibleFraction, wavelengthToRGB, rgbCss, linspace, spectralProfile, alexandersBand };
 
 /* ============ src/assets.js ============ */
 
@@ -1786,10 +1823,25 @@ const translations = {
     reflectionsHint:
       'Zvolené číslo zapne všechny řády až po něj, aby šly duhy porovnat. Políčka níž je pak můžete jednotlivě vypnout.',
     refractiveIndex: 'Index lomu',
-    indexModel: 'Model indexu lomu',
-    indexTable: 'tabulka (6 barev)',
-    indexCauchy: 'Cauchyho vztah',
-    indexScale: 'Násobek indexu lomu',
+    material: 'Materiál kapky',
+    noBowHere: 'tenhle materiál takovou duhu nemá',
+    mat_water: 'voda',
+    mat_seawater: 'mořská voda',
+    mat_ice: 'led',
+    mat_acrylic: 'plexisklo',
+    mat_crown: 'sklo (korunové)',
+    mat_flint: 'sklo (flintové)',
+    mat_diamond: 'diamant',
+    chipRefl1: '1 odraz',
+    chipRefl2: '2 odrazy',
+    chipRefl3: '3 odrazy',
+    chipSunHigh: 'Slunce výš',
+    chipClimbThere: 'Nahoru do letadla',
+    chipBackDown: 'Zpátky na zem',
+    chipPlotExit: 'Graf: úhel výstupu',
+    chipPlotDist: 'Graf: histogram',
+    explMaterials: 'Materiály nejsou odhady. Každý má vlastní Cauchyho koeficienty dopočtené z publikovaných indexů lomu pro vodíkové čáry F a C. Index lomu určuje úhel obou duh, takže s jiným materiálem se oblouky posunou: u ledu se téměř překryjí, u skla se stáhnou hluboko dovnitř. Nad indexem lomu 2 primární duha přestane existovat úplně, proto u diamantu zbude jen ta po dvou odrazech.',
+    indexScale: 'Násobek indexu lomu (pokus)',
     optics: 'Optika',
 
     /* ---- controls: rays ---- */
@@ -1979,22 +2031,14 @@ const translations = {
       'Tentýž rozpad, jenže venku. Každá kapka dělá to co ta jediná v řezu: všechny řády naráz, každý jinam. Který z nich dorazí k vám, rozhoduje jedině to, kde kapka stojí — takže kapka, ze které máte primární duhu, vám tu vedlejší udělat nemůže. Ta je z úplně jiných kapek.',
 
     /* ---- the secondary, built rather than announced ---- */
-    s13atitle: 'Tentýž paprsek, o odraz dál',
+    s13atitle: 'Další duhy zadarmo',
     s13abody:
-      'Do kapky nevstupuje nic nového. Ten čárkovaný pahýl na první stěně je primární duha, jak '
-      + 'odchází; co zůstalo uvnitř a doletělo na další stěnu, dělá vedlejší. Obě větve jsou na '
-      + 'obrázku naráz. Teď najděte paprsek, kterému vedlejší duha patří — čipy skáčou mezi oběma '
-      + 'vstupními polohami, a ty leží v opačných polovinách kapky. Dívejte se, které oko se '
-      + 'rozsvítí. Vždycky jen jedno.',
+      'Na další duhy není potřeba nic nového. Rozhoduje zase jen místo dopadu. Paprsek, který vstoupí do spodní části kapky, se uvnitř odrazí dvakrát a odejde pod jiným úhlem — a z toho je druhý oblouk. Povolte třetí odraz a dostanete další.\n\n'
+      + 'Čtěte přitom čísla v přehledu pod textem. S každým dalším odrazem zbývá z původního světla výrazně méně, a právě proto je sekundární duha na obloze slabá a terciární nikdo běžně nevidí. Tlačítky přepínáte mezi skupinami paprsků, které jednotlivé oblouky tvoří.',
     s13btitle: 'Proč se barvy obracejí',
     s13bbody:
-      'Každá barva má svůj vlastní úhel, protože má svůj index lomu. Červená u jednoho odrazu '
-      + 'končí na 42,2°, fialová na 40,5° — červená je dál od antisolárního bodu, takže leží '
-      + 'na vnějším okraji duhy. '
-      + 'U dvou odrazů je červená na 50,7° a fialová na 53,7°, takže je to naopak: fialová je dál, '
-      + 'červená blíž. Na grafu je vidět proč. Primární křivka má vrchol a ten vrchol je pro '
-      + 'červenou výš; vedlejší má sedlo a to sedlo je pro červenou níž. Stejná disperze, '
-      + 'obrácené pořadí.',
+      'Každá barva má svůj index lomu, a tedy i svůj vlastní úhel. Po jednom odrazu leží červená dál od antisolárního bodu než fialová, takže je na vnějším okraji oblouku.\n\n'
+      + 'Po dvou odrazech je to obráceně, a graf říká proč: křivka prvního odrazu má v tom místě maximum, křivka druhého minimum. Jedna se do mezery mezi nimi nedostane shora, druhá zdola. Proto má sekundární duha barvy v opačném pořadí. Přepněte graf na histogram a uvidíte, kam míří jednotlivé barvy u každého řádu.',
     explColourFlip:
       'Červená se v primární duze obrací u {p1} a ve vedlejší u {p2}, fialová u {v1} a u {v2}. Jedna křivka má vrchol, druhá sedlo — a tentýž rozptyl indexu lomu proto naskládá barvy jednou takhle a podruhé obráceně. Mezera mezi nimi, {gap} oblohy, je prázdná ze stejného důvodu: obě křivky se od ní odvracejí, takže do ní žádný paprsek s jedním ani dvěma odrazy nedopadne.',
     turnMax: 'vrchol',
@@ -2050,18 +2094,13 @@ const translations = {
 
     s1title: 'Jedna kapka, dvě duhy',
     s1body:
-      'Tohle je cíl. Jedna kulová kapka v řezu, sluneční světlo zleva — a DVA pozorovatelé. '
-      + 'Ne jeden. Jeden stojí tam, kam míří hlavní duha, 42,4° od antisolárního bodu; druhý '
-      + 'tam, kam míří vedlejší, 50,4°. Každá duha totiž odchází z kapky jiným směrem, takže '
-      + 'se na každou z nich stojí jinde. A každá potřebuje jiný paprsek — vstupuje do kapky '
-      + 'jinou výškou a uvnitř se odrazí jinak často. Zkuste přepnout mezi oběma vstupními body.',
+      'Když přijde řeč na duhu, objeví se obvykle obrázek jako tenhle. Co na něm vlastně je, se člověk dozví málokdy — jak odrazy uvnitř jediné kapky souvisejí s obloukem přes půl oblohy a proč těch oblouků bývá víc. Projdeme to krok za krokem.\n\n'
+      + 'Zvýrazněné jsou dvě skupiny paprsků. Jedna vstupuje do horní části kapky a vytváří primární, jasnější duhu. Druhá vstupuje dole a vede k duze sekundární — jenže pro jiného pozorovatele. Proto jsou tu dvě oči a u každého je napsáno, kterou duhu vidí. Jedna kapka obě duhy jednomu člověku nikdy nepošle.\n\n'
+      + 'Nic z toho není nakreslený obrázek. Všechny dráhy počítá simulace, takže do nich můžete sahat. Přepněte tlačítky zvýrazněnou duhu a pokračujte.',
     s1ctitle: 'Obě naráz jen z jednoho místa',
     s1cbody:
-      'Dva pozorovatelé z předchozího kroku ale nemusí stát pořád zvlášť. Každý paprsek letí '
-      + 'pořád dál, takže tu svou duhu uvidíte kdekoli na něm. A protože ty dva paprsky vycházejí '
-      + 'z různých míst kapky různými směry, někde se musí protnout — přesně v jednom bodě, '
-      + '12,2 poloměru kapky daleko. Tam a nikde jinde splynou oba pozorovatelé v jednoho. '
-      + 'Přepněte mezi oběma pohledy.',
+      'Teď je na scéně jediný paprsek a zvýrazní se ve chvíli, kdy povede ke vzniku duhy. Zkuste s ním posouvat. Funguje to jen z určitých míst dopadu — a podle toho, kam dopadne, vznikne jasnější primární duha po jednom odrazu, nebo slabší sekundární po dvou.\n\n'
+      + 'Oba výstupní paprsky se někde protnou, takže by se mohlo zdát, že z jedné kapky jdou vidět obě duhy naráz. Podívejte se ale, jak daleko ten průsečík leží: zhruba dvanáct poloměrů kapky. U skutečné kapky o průměru milimetru to je přes centimetr od ní. Tam nikdo oko nemá. Proto k vám na obloze primární a sekundární duhu posílají dvě úplně jiné skupiny kapek.',
     eyeMeeting: 'Jedno oko tam, kde se protnou',
     eyePerBow: 'Oko u každé duhy zvlášť',
     explMeetingPoint:
@@ -2069,59 +2108,49 @@ const translations = {
       + 'deště — a právě proto obloha nefunguje takhle. Tam je každá kapka metry daleko, pošle '
       + 'vám jednu jedinou duhu, a hlavní a vedlejší duha k vám přicházejí ze dvou úplně '
       + 'různých skupin kapek. Tahle scéna je řez jednou kapkou zblízka, ne obloha.',
-    s1btitle: 'Může jedna kapka udělat duhu?',
+    s1btitle: 'Zpátky na začátek: co se děje v kapce',
     s1bbody:
-      'Zpátky na začátek, s prázdným obrázkem. Jedna kulová kapka v řezu, jeden paprsek zleva a '
-      + 'zatím ani jeden odraz. Odsud se k těm dvěma duhám dopracujeme krok za krokem — nic '
-      + 'z toho, co uvidíte, není nakreslené dopředu.',
-    s2title: 'Sledujte paprsek',
+      'Zleva přichází sluneční světlo. Na rozhraní vzduchu a vody se paprsek láme — přesně tím způsobem, kvůli kterému vypadá zlomeně klacek strčený do rybníka. Světlo kapkou projde, ale odejde jiným směrem.\n\n'
+      + 'Uvnitř se zatím nic neodráží. Jedna cesta dovnitř, jedna ven.',
+    s2title: 'Místo dopadu rozhoduje',
     s2body:
-      'Táhněte posuvníkem parametru dopadu, nebo myší přímo v kapce. Kde paprsek dopadne, '
-      + 'rozhoduje o všem: povrch koule se od středu k okraji odklání, takže posun vstupního '
-      + 'bodu mění úhel, pod kterým paprsek na stěnu narazí. Zbytek udělá Snellův zákon: '
-      + 'sin θᵢ = n · sin θᵣ.',
+      'Táhněte posuvníkem parametru dopadu, nebo chytněte paprsek rovnou v kapce. Místo, kam dopadne, rozhoduje o celé jeho další cestě.\n\n'
+      + 'Povrch koule se od středu k okraji odklání, takže posun vstupního bodu mění úhel, pod kterým paprsek narazí na stěnu. Zbytek dořeší Snellův zákon: sin θᵢ = n · sin θᵣ. Na ploché tabuli skla by nic takového nefungovalo — tam dopadají všechny rovnoběžné paprsky pod stejným úhlem a není co soustředit.',
     s3title: 'Přidejte vnitřní odraz',
     s3body:
-      'Na zadní stěně se část světla odrazí zpět dovnitř. Jak velká? Značky na stěnách to říkají '
-      + 'pro tenhle paprsek: kolik projde, kolik se odrazí, a ten čárkovaný pahýl je světlo, '
-      + 'které tam uniklo ven. Pod každým číslem je druhé — kolik z původního paprsku ještě '
-      + 'zbývá. Táhněte posuvníkem a obě čísla se mění s úhlem dopadu. '
-      + 'Sledujte dráhu R0 → R1 → R2 → R3 a čísla zároveň.',
+      'Na rozhraní se světlo neláme celé. Část se ho odrazí, a znáte to z rybníka: jednou je skrz hladinu vidět dno, jindy obloha, les nebo vy sami.\n\n'
+      + 'U každé stěny, na kterou paprsek narazí, je číslo. Říká, kolik světla se tam odrazí zpátky dovnitř a kolik projde ven. Pod ním je druhé číslo: kolik z původního paprsku v tu chvíli ještě zbývá. Táhněte posuvníkem a obě čísla se mění s úhlem dopadu. Projděte dráhu R0 → R1 → R2 → R3 a čtěte čísla spolu s ní.',
     s4title: 'Kam paprsek míří?',
     s4body:
-      'Paprsek někam odchází. Úhel, který má smysl číst, se ale neměří u kapky, ale u vás: '
-      + 'postavte se zády ke Slunci a φ je úhel mezi kapkou a bodem přesně proti Slunci — tedy '
-      + 'stínem vaší hlavy. Panel vpravo ho ukazuje.',
-    s5title: 'Zkuste jiné paprsky',
+      'Každý paprsek kapkou projde a část z něj nakonec odejde nějakým směrem. Ten směr se musí k něčemu vztáhnout, jinak je to jen číslo bez obsahu. Vztahuje se ke směru, odkud přišlo sluneční světlo: úhel φ se měří od antisolárního bodu, tedy od stínu vaší vlastní hlavy.\n\n'
+      + 'Většina paprsků duhu neudělá. Tlačítkem pošlete paprsek tam, kde byste ho uviděli jako její součást, a porovnejte úhel.',
+    s5title: 'Projděte celý rozsah',
     s5body:
-      'Projděte celý rozsah parametru dopadu a dívejte se na graf dole. Nejde o to, že někde je '
-      + 'úhel největší — jde o to, že tam je křivka vodorovná. Plochá křivka znamená, že celý pás '
-      + 'vstupních bodů odejde skoro stejným směrem. Jinde se úhel při každém posunu mění a světlo '
-      + 'se rozprostře. Jestli je ten plochý bod vrchol nebo sedlo, na tom nezáleží: u jednoho '
-      + 'odrazu '
-      + 'vyjde vrchol, u dvou sedlo, a duha je v obou případech tam, kde se křivka obrací.',
+      'Projeďte posuvníkem všechna možná místa dopadu a sledujte zároveň výstupní směr a graf dole. Graf říká, kam paprsek po jednom odrazu zamíří, podle toho, kam do kapky vstoupil.\n\n'
+      + 'Kolem 42 stupňů je křivka plochá, a v tom je celý trik. Široký pás vstupních bodů posílá světlo prakticky jedním směrem, zatímco odjinud se paprsky rozbíhají. Kapka je neodráží silněji — jen jich do jednoho směru pošle mnohem víc. Pro pozorovatele, který v tom směru stojí, je to rozdíl mezi jasným a nevýrazným.\n\n'
+      + 'Přepněte počet odrazů a v grafu přibudou křivky pro druhý a třetí odraz. Přidejte paprsky a soustředění ve směru duhy vystoupí ještě víc.',
     s7title: 'Proč existuje jasný směr?',
     s7body:
-      'Totéž ploché místo, teď spočítané. Graf dole sčítá světlo odcházející každým směrem — ne '
-      + 'kolik paprsků, ale kolik energie. Mimo duhu se světlo rozprostře natenko. V plochém '
-      + 'místě spadne celý pás vstupních bodů do úzkého rozmezí úhlů a křivka vyskočí. Zvyšte '
-      + 'počet vzorků a vrchol se vyloupne ze šumu.',
+      'Dole je teď histogram: kolik světla odejde kterým směrem. S pár paprsky je to šum a nevyčtete z něj nic.\n\n'
+      + 'Pošlete jich na kapku tisíce. Objeví se ostrý vrchol kolem jednoho úhlu — a hned za ním nula, žádné světlo. Zelená čára ukazuje, kde má ten vrchol podle výpočtu být. Světle modrá ukazuje, kde ho vzorky skutečně našly. Čím víc paprsků, tím blíž k sobě obě hodnoty jsou.',
     s8title: 'Teď přidejte tisíce kapek',
     s8body:
-      'Každá kapka dělá totéž. K pozorovateli se dostane světlo jen od těch kapek, které leží ve správném úhlu. Přidávejte kapky a sledujte, jak oblouk houstne.',
+      'V dešti jsou kapek miliony a každá dělá přesně totéž. Každá tečka je jedna kapka a počítá se v ní ten samý lom, který jste právě viděli.\n\n'
+      + 'S pár kapkami se nestane nic. S desetitisíci se část z nich rozsvítí — to jsou ty, které posílají světlo zrovna vaším směrem. Duha není předmět někde na obloze. Je to světlo ze všech kapek, které vás vidí pod správným úhlem.',
     s10title: 'Tytéž kapky, ale v prostoru',
     s10body:
-      'Stejná otázka, jen bez řezu: u každé kapky kolem vás se ptáme, pod jakým úhlem ji vidíte a jestli právě tam nějaká vlnová délka vychází. Žádná kružnice se nekreslí. Barevné jsou jen kapky, které prošly testem — a oblouk z nich stejně vyjde.',
+      'Ve skutečnosti se to celé děje v prostoru. Barevné kapky jsou ty, které prošly jediným testem: pod jakým úhlem od antisolárního bodu je pozorovatel vidí. Nikdo je nevybíral podle toho, že leží na nějakém oblouku. Oblouk z nich vyjde sám.\n\n'
+      + 'Přepněte se na pohled zvenku. Duha najednou není oblouk, ale kužel, a celý ten kužel míří do jednoho oka. Zvenku přitom žádná duha vidět není — kdo stojí stranou, o ní neví nic, protože k němu to světlo nemíří. Přidejte kapky a oblouk zjasní.',
     explFieldAssembles:
       'Přidejte kapky a oblouk zhoustne, uberte je a rozpadne se na jednotlivé body. Duha není nakreslený tvar, je to statistika: kolik kapek náhodou stojí ve správném směru.',
     s11title: 'Proč je to oblouk?',
     s11body:
-      'Ve třech rozměrech tvoří všechny takové směry kužel kolem antisolárního bodu. Průnik kužele s oblohou je kružnice. Zapněte obzor a dolní část zmizí.',
+      'Duha je kužel kolem antisolárního bodu, tedy bodu přesně proti Slunci. Celý ho nevidíte jen proto, že jeho spodní část by ležela pod zemí, a tam žádné kapky nejsou.\n\n'
+      + 'Zapněte obzor a z kruhu se stane známý oblouk. Vypněte ho a kruh se vrátí.',
     s11btitle: 'Proč oblouk, a ne kruh',
     s11bbody:
-      'Ze země uvidíte zhruba 40 % kruhu. Zbytek je pod obzorem a stojí v něm země. Výška sama '
-      + 'skoro nepomůže — deset kilometrů nad zemí sníží obzor o pouhé 3,2°. Rozhoduje něco jiného: '
-      + 'jestli je déšť i pod vámi. Zapněte ho a stoupejte. Kolem 1,7 km se kruh uzavře.',
+      'Ze země uvidíte zhruba 40 % kruhu. Zbytek je pod obzorem, kde stojí v cestě země.\n\n'
+      + 'Výška sama skoro nepomůže: deset kilometrů nad zemí sníží obzor o pouhé 3,2°. Rozhoduje něco jiného — jestli je déšť i pod vámi. Zapněte ho a stoupejte. Kolem 1,7 km se kruh uzavře. Z letadla tak jde za vhodných podmínek vidět duha celá.',
     explFullCircle:
       'Duha je vždycky celý kruh. Ze země z něj vidíte horní část, protože antisolární bod leží '
       + 'pod obzorem — při Slunci 15° nad obzorem sahá oblouk od +27,2° do −57,2° a pod nulou je '
@@ -2133,10 +2162,8 @@ const translations = {
       + 'Ten hrb je duha a jediný paprsek ho ukázat nedokáže.',
     s11ctitle: 'Co vidí letadlo',
     s11cbody:
-      'Stejná obloha, dva pozorovatelé. Vy stojíte na louce. Čárkovaně je zbytek téhož oblouku — '
-      + 'ta část, na kterou dosáhne někdo letící ve třech kilometrech, a vy ne. Na světle se nic '
-      + 'nezměnilo: duha je pro oba stejných 42° od antisolárního bodu. Změnilo se, co je pod '
-      + 'vámi. On tam má déšť, vy zem. Vedlejší duha dělá totéž o osm stupňů dál.',
+      'Čárkovaně je část duhy, kterou ze země nevidíte, ale letadlo nad stejným deštěm ano. Tlačítky ho zvedněte nebo snižte.\n\n'
+      + 'Na světle se nezměnilo vůbec nic. Pro vás i pro posádku leží duha stejných 42° od antisolárního bodu a dělají ji stejné kapky. Liší se jen to, co máte pod sebou: letadlo tam má déšť, vy zem. Posledními dvěma tlačítky se můžete do letadla přesunout a zase sejít dolů.',
     explAirObserver:
       'Kapky, které tvoří čárkovanou část, leží pod úrovní očí, takže jejich světlo míří vzhůru. '
       + 'Na zemi je nikdo nechytí — tam, kde by musely být, je zem. Z letadla ano, a kruh se '
@@ -2144,30 +2171,24 @@ const translations = {
       + 'můžou padat i pod vámi.',
     s12title: 'Odkud jsou barvy?',
     s12body:
-      'Index lomu vody závisí na vlnové délce. Posuňte disperzi z 0 % na 100 % a jediný úhel se rozpadne na pás barev. Graf dole se rozpadne s ním — na jednu křivku pro každou vlnovou délku.',
+      'Zatím nepadlo o barvách ani slovo. Barva je vlnová délka světla a každá vlnová délka se ve vodě láme trochu jinak — index lomu na ní závisí. Rozdíl je nepatrný, a přesto stačí.\n\n'
+      + 'Posuvníkem disperze ho zvětšujete a zmenšujete. V histogramu dole má každá barva vrchol u jiného úhlu, a právě tohle pořadí vidíte na obloze jako sluneční spektrum. Zkuste disperzi stáhnout na nulu: všechny barvy splynou do jediného bílého oblouku.',
     s13ctitle: 'Pás, do kterého nic nepřijde',
     s13cbody:
-      'Paprsek je nastavený na vedlejší duhu, a proto vstupuje spodní polovinou kapky — jen odtud '
-      + 'odejde po dvou odrazech dolů k pozorovateli. Horní polovinou by odešel nahoru, pryč. '
-      + 'Primární duha to má opačně. Proto jsou obě oči na stejné straně, 8° od sebe, a mezi nimi '
-      + 'zůstane klín, do kterého nevychází nic — ani po jednom odrazu, ani po dvou, při žádném '
-      + 'místě dopadu. To je Alexandrův temný pás.',
+      'Stejná geometrie, která soustředí paprsky do duhy, nechává některé směry úplně prázdné. Podívejte se na červený profil kolem kapky: má dva vrcholy a mezi nimi nejde ven vůbec nic.\n\n'
+      + 'Tma tam ale není. Z těch směrů k vám pořád míří světlo rozptýlené zbytkem atmosféry, chybí jen příspěvek kapek. Výsledkem je znatelně tmavší pruh mezi primární a sekundární duhou. Jmenuje se Alexandrův temný pás.',
     s13title: 'Může být duh víc?',
     s13body:
-      'A takhle to dopadne na obloze. Pás leží přesně mezi červeným okrajem hlavní duhy na 42,4° '
-      + 'a červeným okrajem vedlejší na 50,4° — ano, je to ta mezera mezi dvěma červenými kruhy. '
-      + 'Temný je proto, že ven z kapky tam nemíří nic: za hlavní duhu se po jednom odrazu '
-      + 'nedostane nic a před vedlejší se po dvou nedostane nic. Vypněte a zapněte stínování pásu '
-      + 'a porovnejte ho s oblohou vně vedlejší duhy — tam světlo je, jen slabé.',
-
-/* ---- controls: the observer ---- */
+      'A takhle to dopadne na obloze. Mezi hlavní a vedlejší duhou leží přesně ten pruh, o kterém byla řeč, a jeho šířku si přečtete v popisku. Tmavý je proto, že ven z kapky tam nemíří nic: po jednom odrazu se světlo za hlavní duhu nedostane, po dvou se nedostane před vedlejší.\n\n'
+      + 'Vypněte a zapněte stínování pásu a porovnejte ho s oblohou vně vedlejší duhy. Tam světlo je, jen slabé.\n\n'
+      + 'Dál si můžete pustit volný režim a zkoušet, co chcete — na jedné kapce, v řezu deštěm i ve 3D. Posledními tlačítky přepnete materiál kapky. Voda dělá duhu, kterou znáte; led posune oba oblouky skoro na sebe a sklo je stáhne hluboko dovnitř. Zbytek nastavení je ve sloupci vlevo.',
     observerGroup: 'Pozorovatel',
     observerDepth: 'Pozorovatel — dopředu / dozadu',
     observerRise: 'Pozorovatel — nahoru / dolů',
     observerMoveHint:
       'Posunutím pozorovatele se změní úhly ke všem kapkám, takže duhu začne tvořit jiná skupina kapek. Pozorovatele lze také přetáhnout myší v obrázku.',
     observerRecentre: 'Zpět na výchozí místo',
-    indexGroup: 'Index lomu (pokročilé)',
+    indexGroup: 'Materiál a index lomu (pokročilé)',
     observerOnBow: '✓ přesně na duze',
     dropsMoveHint: 'Přetáhněte pozorovatele — duha se přesune s vámi na jiné kapky.',
     obsChipForward: 'dál do deště',
@@ -2177,14 +2198,14 @@ const translations = {
     /* ---- tutorial: the two observer steps ---- */
     s6title: 'Přidávejte paprsky',
     s6body:
-      'Čtyři rovnoběžné paprsky, čtyři různé směry ven. Nic zvláštního. Přidejte jich šestnáct a pak šedesát '
-      + 'a sledujte, kde se začnou hromadit. Většina směrů zůstane skoro prázdná, jeden se zaplní. '
-      + 'Tam je oko. Duha není směr, kterým letí paprsek, ale směr, kterým jich letí naráz mnoho.',
+      'Přidejte paprsky a sledujte červený profil kolem kapky. Počítá, kolik paprsků odchází kterým směrem. Většina směrů zůstane skoro prázdná. Jeden se zaplní — a je u něj napsáno, že je to primární duha.\n\n'
+      + 'Kdo stojí v tomhle směru, dostane z kapky mnohem víc světla než z kteréhokoli jiného. Duha tedy není věc ani místo. Je to směr, pod kterým k vám světlo přichází, měřený vůči paprskům ze Slunce.',
     explObserverAngle:
       'Úhel φ se měří u pozorovatele: mezi pohledem na kapku a antisolárním směrem, tedy směrem, kterým sluneční světlo letělo dál. Je to přesně totéž φ, které ukazuje výpis u výstupu paprsku.',
     s9title: 'Duha není na jednom místě',
     s9body:
-      'Ani jedna kapka se nepohne. Mění se jen to, kde stojíte vy. Posuňte pozorovatele a duhu začne tvořit úplně jiná skupina kapek — rozhoduje totiž výhradně úhel, pod kterým je vidíte.',
+      'Pohněte pozorovatelem, nebo zvedněte Slunce. Kapky zůstanou přesně tam, kde byly. Ale protože se změnil úhel, vaši duhu teď dělají úplně jiné kapky než před chvílí.\n\n'
+      + 'K duze se proto nedá dojít. Není kam — každý krok vymění sadu kapek, která vám ji posílá. A ano, znamená to, že každý člověk vidí svou vlastní duhu, složenou z jiných kapek než ta vedle něj.',
     explBowFollowsYou:
       'Proto k duze nelze dojít a proto ji každý vidí na jiných kapkách. Vaše duha je jen vaše.',
     explDispersionZoom:
@@ -2407,10 +2428,25 @@ const translations = {
     reflectionsHint:
       'Picking a number shows every order up to it, so the bows can be compared. The checkboxes below switch individual ones off again.',
     refractiveIndex: 'Refractive index',
-    indexModel: 'Refractive-index model',
-    indexTable: 'table (6 colours)',
-    indexCauchy: 'Cauchy relation',
-    indexScale: 'Refractive-index multiplier',
+    material: 'What the drop is made of',
+    noBowHere: 'this material has no such bow',
+    mat_water: 'water',
+    mat_seawater: 'sea water',
+    mat_ice: 'ice',
+    mat_acrylic: 'acrylic',
+    mat_crown: 'crown glass',
+    mat_flint: 'flint glass',
+    mat_diamond: 'diamond',
+    chipRefl1: '1 reflection',
+    chipRefl2: '2 reflections',
+    chipRefl3: '3 reflections',
+    chipSunHigh: 'Sun higher',
+    chipClimbThere: 'Up to the aircraft',
+    chipBackDown: 'Back to the ground',
+    chipPlotExit: 'Plot: exit angle',
+    chipPlotDist: 'Plot: histogram',
+    explMaterials: 'The materials are not guesses. Each carries its own Cauchy coefficients, fitted to published refractive indices at the hydrogen F and C lines. The index sets the angle of both bows, so another material moves them: in ice they nearly overlap, in glass they pull far inside. Above an index of 2 the primary bow stops existing at all, which is why diamond keeps only the two-bounce one.',
+    indexScale: 'Refractive-index multiplier (what if)',
     optics: 'Optics',
 
     /* ---- controls: rays ---- */
@@ -2602,21 +2638,14 @@ const translations = {
       "The same split, out here. Every droplet does what the single one did: every order at once, each leaving in its own direction. Which one reaches you depends only on where the droplet sits — so the droplet giving you the primary cannot also give you the secondary. That one comes from entirely different droplets.",
 
     /* ---- the secondary, built rather than announced ---- */
-    s13atitle: 'The same ray, one bounce further',
+    s13atitle: 'More bows, for free',
     s13abody:
-      'Nothing new enters the droplet. That dashed stub at the first wall is the primary leaving; '
-      + 'what stayed inside and reached the next wall makes the secondary. Both branches are on '
-      + 'screen at once. Now find the ray the secondary belongs to — the chips jump between the '
-      + 'two entry positions, and those sit in opposite halves of the drop. Watch which eye lights '
-      + 'up. Only ever one.',
+      'Nothing new is needed for the other bows. Again it comes down to where the ray lands. A ray entering the lower part of the drop reflects twice inside and leaves at a different angle — and that is the second bow. Allow a third reflection and you get another one.\n\n'
+      + 'Read the numbers in the readout below as you go. Each extra bounce leaves far less of the original light, which is why the secondary bow is faint in the sky and almost nobody ever sees the third. The buttons switch between the groups of rays that build each bow.',
     s13btitle: 'Why the colours flip',
     s13bbody:
-      'Every colour has its own angle, because it has its own refractive index. With one bounce '
-      + 'red turns at 42.2° and violet at 40.5° — red is further from the antisolar point, so red '
-      + 'is on the outside. With two bounces red is at 50.7° and violet at 53.7°, and now it is '
-      + 'the other way round: violet is further out, red is nearer in. The plot shows why. The '
-      + 'primary curve has a peak and red peaks higher; the secondary curve has a trough and red '
-      + 'bottoms out lower. Same dispersion, reversed order.',
+      'Every colour has its own refractive index, so every colour has its own angle. After one reflection red sits further from the antisolar point than violet, which puts red on the outer edge of the bow.\n\n'
+      + 'After two reflections it is the other way round, and the plot says why: the one-bounce curve turns at a maximum there, the two-bounce curve at a minimum. One cannot get into the gap between them from above, the other cannot from below. So the secondary bow runs its colours backwards. Switch the plot to the histogram and you can see where each colour goes for each order.',
     explColourFlip:
       'Red turns over at {p1} in the primary and {p2} in the secondary; violet at {v1} and {v2}. One curve peaks and the other troughs, so the same spread of refractive index stacks the colours one way and then the other. The gap between them — {gap} of sky — is empty for the same reason: both curves turn away from it, so no once- or twice-reflected ray can land there.',
     turnMax: 'peak',
@@ -2673,19 +2702,13 @@ const translations = {
 
     s1title: 'One drop, two rainbows',
     s1body:
-      'This is where we are going. One spherical drop in cross-section, sunlight from the left — '
-      + 'and TWO observers. Not one. The first stands where the primary bow goes, 42.4° from the '
-      + 'antisolar point; the second where the secondary goes, 50.4°. The two bows leave the drop '
-      + 'in different directions, so each has its own place to stand. And each needs its own ray: '
-      + 'entering the drop at a different height, bouncing a different number of times inside. Try '
-      + 'the two entry points.',
+      'Mention rainbows and a picture like this one usually turns up. What it actually shows gets explained far less often — how a couple of reflections inside a single drop end up as an arc across half the sky, and why there is often more than one. We will take it apart step by step.\n\n'
+      + 'Two groups of rays are highlighted. One enters the upper part of the drop and builds the primary bow, the bright one. The other enters at the bottom and leads to the secondary bow — but for a different observer. That is why there are two eyes here, each labelled with the bow it sees. A single drop never delivers both bows to the same person.\n\n'
+      + 'None of this is a drawing. Every path is traced by the simulation, so you can push it around. Use the buttons to switch which bow is highlighted, then carry on.',
     s1ctitle: 'Both at once, from one place only',
     s1cbody:
-      'Those two observers do not have to stay apart, though. Each ray carries on for ever, so '
-      + 'you see its bow from anywhere along it. And because the two rays leave different points '
-      + 'on the drop in different directions, somewhere they must cross — at exactly one place, '
-      + '12.2 droplet radii out. There and nowhere else the two observers become one. Switch '
-      + 'between the two views.',
+      'One ray now, and it lights up the moment it ends up making a rainbow. Drag it around. Only certain landing points work — and which bow they make depends on where they land: the brighter primary after one reflection, the weaker secondary after two.\n\n'
+      + 'The two outgoing rays do cross somewhere, so it can look as though one drop could show you both bows at once. Look how far out that crossing sits: about twelve drop radii. On a real millimetre drop that is over a centimetre away. Nobody\'s eye is ever there. That is why the primary and the secondary you see in the sky arrive from two completely different sets of drops.',
     eyeMeeting: 'One eye where they cross',
     eyePerBow: 'An eye for each bow',
     explMeetingPoint:
@@ -2694,61 +2717,49 @@ const translations = {
       + 'there every drop is metres off and sends you one bow only, so the primary and the '
       + 'secondary reach you from two completely different sets of droplets. This scene is one '
       + 'drop close up, not the sky.',
-    s1btitle: 'Can one raindrop create a rainbow?',
+    s1btitle: 'Back to the start: what happens inside',
     s1bbody:
-      'Back to the start, with an empty picture. One spherical drop in cross-section, one ray from '
-      + 'the left, and not a single reflection yet. From here we build up to those two bows a step '
-      + 'at a time, and nothing you see is drawn in advance.',
-    s2title: 'Trace the ray',
+      'Sunlight arrives from the left. At the boundary between air and water the ray bends — the same bend that makes a stick look broken where it enters a pond. The light crosses the drop, but it leaves in a new direction.\n\n'
+      + 'Nothing reflects inside yet. One way in, one way out.',
+    s2title: 'Where it lands decides everything',
     s2body:
-      'Drag the impact-parameter slider, or drag inside the droplet itself. Where the ray lands '
-      + 'decides everything: a sphere tilts away from you as you go out towards the rim, so '
-      + 'moving the entry point changes the angle the ray strikes at. Snell’s law does the rest: '
-      + 'sin θᵢ = n · sin θᵣ.',
+      'Drag the impact-parameter slider, or just grab the ray inside the drop. Where a ray lands decides the whole of the rest of its path.\n\n'
+      + 'A sphere curves away from the centre towards the rim, so moving the entry point changes the angle at which the ray meets the surface. Snell\'s law does the rest: sin θᵢ = n · sin θᵣ. A flat sheet of glass could never do this — there every parallel ray meets the surface at the same angle, and there is nothing to concentrate.',
     s3title: 'Add internal reflection',
     s3body:
-      'At the back wall part of the light reflects back inside. How much? The wall markers say, '
-      + 'for this ray: how much goes through, how much reflects on, and the dashed stub is the '
-      + 'light that escaped there. Under each is a second number — how much of the original beam '
-      + 'is still left. Drag the slider and both change with the angle of incidence. Follow the '
-      + 'path R0 → R1 → R2 → R3 and watch the numbers with it.',
+      'At a boundary the light does not all bend. Part of it reflects, and you know this from a pond: sometimes you see the bottom through the surface, sometimes the sky, the trees or yourself.\n\n'
+      + 'Every wall the ray meets carries a number. It says how much light bounces back inside there and how much passes out. Underneath sits a second number: how much of the original ray is still left at that point. Drag the slider and both numbers move with the angle. Follow the path R0 → R1 → R2 → R3 and read the numbers along with it.',
     s4title: 'Where does the outgoing ray point?',
     s4body:
-      'The ray leaves in some direction. But the angle worth reading is not measured at the '
-      + 'droplet — it is measured at you. Stand with the Sun behind you: φ is the angle between '
-      + 'the droplet and the point directly opposite the Sun, which is the shadow of your own '
-      + 'head. The panel on the right prints it.',
-    s5title: 'Try different incoming rays',
+      'Every ray crosses the drop and part of it leaves in some direction. That direction has to be measured against something, or it is a number with no meaning. It is measured against the direction the sunlight came from: the angle φ, counted from the antisolar point, which is the shadow of your own head.\n\n'
+      + 'Most rays make no rainbow at all. Use the button to send the ray to the place where you would see it as part of one, and compare the angle.',
+    s5title: 'Sweep the whole range',
     s5body:
-      'Sweep the impact parameter and watch the graph below. The point is not that the angle is '
-      + 'largest somewhere — it is that the curve goes flat there. Flat means a whole band of '
-      + 'entry points leaves in nearly the same direction. Everywhere else the angle shifts with '
-      + 'every step you take and the light spreads out. Whether that flat spot is a peak or a '
-      + 'trough does not matter: one bounce gives a peak, two give a trough, and the bow is at '
-      + 'the turn either way.',
+      'Run the slider through every possible landing point and watch the outgoing direction and the plot below at the same time. The plot says where a ray goes after one reflection, as a function of where it entered.\n\n'
+      + 'Around 42 degrees the curve goes flat, and that is the whole trick. A wide band of entry points sends its light in practically one direction, while rays from elsewhere spread out. The drop does not reflect them more strongly — it simply sends far more of them the same way. For an observer standing in that direction, that is the difference between bright and unremarkable.\n\n'
+      + 'Switch the number of reflections and curves for the second and third bounce appear. Add rays and the bunching at the rainbow direction shows up more clearly still.',
     s7title: 'Why is there a bright direction?',
     s7body:
-      'The same flat spot, now counted. The plot below adds up the light leaving in each '
-      + 'direction — not how many rays, but how much energy. Away from the bow the light spreads '
-      + 'thin. At the flat spot a whole band of entry points lands in one narrow range of angles '
-      + 'and the curve spikes. Raise the sample count and the spike sharpens out of the noise.',
+      'The plot below is a histogram now: how much light leaves in each direction. With a handful of rays it is noise and tells you nothing.\n\n'
+      + 'Fire thousands at the drop. A sharp peak appears at one angle — and immediately beyond it, nothing at all. The green line marks where the calculation says the peak belongs. The pale blue one marks where the samples actually put it. The more rays, the closer the two sit.',
     s8title: 'Now add thousands of droplets',
     s8body:
-      'Every droplet does the same thing. Light reaches the observer only from droplets that lie at the right angle. Raise the droplet count and watch the bow fill in.',
+      'Real rain holds millions of drops and every one does the same thing. Each dot here is one drop, running the same refraction you just watched.\n\n'
+      + 'With a handful, nothing happens. With tens of thousands, some of them light up — the ones sending their light your way. A rainbow is not an object up in the sky. It is the light from every drop that happens to sit at the right angle from you.',
     s10title: 'The same droplets, now in space',
     s10body:
-      'The same question with the cross-section removed: every droplet around you is asked what angle you see it at, and whether some wavelength comes out exactly there. No circle is drawn — only the droplets that passed are coloured, and an arc comes out of them anyway.',
+      'All of this really happens in three dimensions. The coloured drops are the ones that passed a single test: the angle from the antisolar point at which the observer sees them. Nobody picked them for lying on an arc. The arc falls out on its own.\n\n'
+      + 'Switch to the outside view. The rainbow stops being an arc and becomes a cone, and the whole cone points into one eye. From outside there is no rainbow to see at all — stand to the side and you know nothing about it, because none of that light is aimed at you. Add drops and the arc brightens.',
     explFieldAssembles:
       'Add droplets and the arc thickens; take them away and it breaks back into separate points. A rainbow is not a drawn shape, it is a tally: how many droplets happen to stand in the right direction.',
     s11title: 'Why does it look like an arc?',
     s11body:
-      'In three dimensions all those directions form a cone around the antisolar point. The cone meets the sky in a circle. Switch the horizon on and the lower part disappears.',
+      'The rainbow is a cone around the antisolar point, the point directly opposite the Sun. You never see all of it, because the lower part would sit below the ground, and there are no drops down there.\n\n'
+      + 'Switch the horizon on and the circle becomes the familiar arc. Switch it off and the circle comes back.',
     s11btitle: 'Why an arc and not a circle',
     s11bbody:
-      'From the ground you get about 40 % of a circle. The rest is below the horizon with the '
-      + 'ground standing in it. Height on its own barely helps — ten kilometres up buys three '
-      + 'degrees of horizon dip. What decides it is whether there is rain below you. Switch that '
-      + 'on and climb. At around 1.7 km the ring closes.',
+      'From the ground you see roughly 40 % of the circle. The rest is below the horizon with the ground in the way.\n\n'
+      + 'Height alone barely helps: ten kilometres up lowers the horizon by a mere 3.2°. Something else decides it — whether there is rain below you as well. Switch it on and climb. At around 1.7 km the circle closes. From an aircraft, in the right conditions, the whole rainbow is there to see.',
     explFullCircle:
       'A rainbow is always a full circle. From the ground you see the top of it, because the '
       + 'antisolar point is below the horizon — with the Sun 15° up the bow runs from +27.2° down '
@@ -2761,11 +2772,8 @@ const translations = {
       + 'one gets a bulge. That bulge is the bow, and a single ray cannot show it.',
     s11ctitle: 'What the aircraft sees',
     s11cbody:
-      'Same sky, two observers. You are standing in a field. The dashed line is the rest of the '
-      + 'same bow — the part someone flying at three kilometres gets and you do not. Nothing about '
-      + 'the light changed: the bow is the same 42° from the antisolar point for both of you. What '
-      + 'changed is what is underneath. They have rain down there, you have ground. The secondary '
-      + 'does the same thing eight degrees further out.',
+      'The dashed part is the piece of the bow you cannot see from the ground but an aircraft above the same shower can. Use the buttons to fly it higher or lower.\n\n'
+      + 'Nothing about the light changed. For you and for the crew the bow sits at the same 42° from the antisolar point, built by the same kind of drops. All that differs is what is underneath: the aircraft has rain down there, you have ground. The last two buttons move you up to the aircraft and back down again.',
     explAirObserver:
       'The droplets making the dashed part sit below eye level, so their light travels upward. On '
       + 'the ground nobody catches it — where those droplets would have to be, there is ground. From '
@@ -2773,31 +2781,24 @@ const translations = {
       + 'circle can be seen from a plane because droplets can be falling both above and below you.',
     s12title: 'Where do the colours come from?',
     s12body:
-      "Water's refractive index depends on wavelength. Move dispersion from 0 % to 100 % and a single angle splits into a band of colours. The graph below splits with it, one curve per wavelength.",
+      'Not a word about colour so far. Colour is wavelength, and every wavelength bends slightly differently in water — the refractive index depends on it. The difference is tiny, and it is enough.\n\n'
+      + 'The dispersion slider makes it bigger or smaller. In the histogram below, each colour peaks at a different angle, and that ordering is exactly the solar spectrum you see in the sky. Pull dispersion down to zero and all the colours collapse into one white arc.',
     s13ctitle: 'The band nothing arrives in',
     s13cbody:
-      'The ray is set to the secondary, which is why it enters through the BOTTOM half of the '
-      + 'drop — only from there does two bounces send it down to the observer. Through the top '
-      + 'half it would leave upward, away. The primary is the other way round. That is why both '
-      + 'eyes sit on the same side, 8° apart, with a wedge between them that takes no light at '
-      + "all — not after one bounce, not after two, at no entry point. That is Alexander's band.",
+      'The same geometry that piles rays into a rainbow leaves other directions completely empty. Look at the red profile around the drop: two peaks, and between them nothing leaves at all.\n\n'
+      + 'It is not dark there, though. Light scattered by the rest of the atmosphere still reaches you from those directions; what is missing is the drops\' contribution. The result is a noticeably darker strip between the primary and the secondary bow. It is called Alexander\'s dark band.',
     s13title: 'Can there be another rainbow?',
     s13body:
-      'And here is how it lands in the sky. The band sits exactly between the primary’s red '
-      + 'rim at 42.4° and the secondary’s red rim at 50.4° — so yes, it is the gap between the '
-      + 'two red circles. It is dark because nothing leaves a droplet into it: one bounce never '
-      + 'gets past the primary, two bounces never get inside the secondary. Toggle the band '
-      + 'shading off and on, and compare it with the sky outside the secondary — there is light '
-      + 'there, just faint.',
-
-/* ---- controls: the observer ---- */
+      'And here is how it lands in the sky. Between the main bow and the secondary sits exactly the strip we just built, and the caption gives you its width. It is dark because nothing leaves the drop into it: after one reflection light cannot get beyond the main bow, after two it cannot get inside the secondary.\n\n'
+      + 'Toggle the band shading on and off and compare it with the sky outside the secondary. There is light there, just not much of it.\n\n'
+      + 'From here, switch to free mode and try whatever you like — one drop, a slice through the rain, or the full three-dimensional view. The last buttons change what the drop is made of. Water gives the bow you know; ice pushes the two arcs almost on top of each other, and glass pulls them far inside. Everything else is in the column on the left.',
     observerGroup: 'Observer',
     observerDepth: 'Observer — forward / back',
     observerRise: 'Observer — up / down',
     observerMoveHint:
       'Moving the observer changes the angle to every droplet, so a different set of droplets forms the bow. The observer can also be dragged in the picture.',
     observerRecentre: 'Back to the starting point',
-    indexGroup: 'Refractive index (advanced)',
+    indexGroup: 'Material and refractive index (advanced)',
     observerOnBow: '✓ exactly on the bow',
     dropsMoveHint: 'Drag the observer — the bow moves with you, onto different droplets.',
     obsChipForward: 'further into the rain',
@@ -2807,14 +2808,14 @@ const translations = {
     /* ---- tutorial: the two observer steps ---- */
     s6title: 'Add more rays',
     s6body:
-      'Four parallel rays, four different directions out. Nothing special. Put sixteen in, then sixty, and '
-      + 'watch where they start to stack. Most directions stay nearly empty; one fills up. That is where '
-      + 'the eye is. A rainbow is not the direction a ray goes — it is the direction a crowd of them goes at once.',
+      'Add rays and watch the red profile around the drop. It counts how many rays leave in each direction. Most directions stay almost empty. One fills up — and it is labelled as the primary bow.\n\n'
+      + 'Stand in that direction and you get far more light out of the drop than from anywhere else. So a rainbow is neither an object nor a place. It is a direction light reaches you from, measured against the rays coming from the Sun.',
     explObserverAngle:
       'φ is measured at the observer: between the line of sight to the droplet and the antisolar direction, the direction the sunlight was already travelling. It is the same φ the exit readout prints.',
     s9title: 'A rainbow is not in a place',
     s9body:
-      'Not one droplet moves. The only thing that changes is where you stand. Move the observer and a completely different set of droplets forms the bow, because the only thing that decides is the angle you see them at.',
+      'Move the observer, or raise the Sun. The drops stay exactly where they were. But the angle changed, so a completely different set of them is making your rainbow now.\n\n'
+      + 'You cannot walk to a rainbow. There is nowhere to walk to — every step swaps the drops that send it to you. And yes, that means everyone sees their own rainbow, built from different drops than the person standing next to them.',
     explBowFollowsYou:
       'This is why you can never walk up to a rainbow, and why no two people see theirs on the same droplets. Yours is yours alone.',
     explDispersionZoom:
@@ -2986,7 +2987,6 @@ const CLASS_EXPLAIN = {
  * state.js -- one observable store for the whole application.
  * Views subscribe; nothing reads the DOM to find out what is going on.
  */
-
 const listeners = new Set();
 
 const state = {
@@ -3011,7 +3011,11 @@ const state = {
   /* droplet & optics */
   impact: 0.861, // b/R
   reflections: 1,
-  indexMode: 'table',
+  /* What the drop is made of. Water is the whole point of the app; the other
+     presets exist so "would a drop of something else still make a bow, and
+     where?" is a question the reader can answer by trying it rather than by
+     being told. See MATERIALS in optics.js. */
+  material: 'water',
   indexScale: 1,
 
   /* how far (in droplet radii) the observer is drawn from the droplet in the
@@ -3139,6 +3143,42 @@ const state = {
   selectedDrop: null,
 };
 
+/**
+ * Which fields describe what is ON SCREEN, as opposed to who is reading
+ * (language), how (tutorial or free), where in the tour, and which scene.
+ *
+ * Captured from the literal above rather than written out a second time, so
+ * the default value of anything lives in exactly one place. Both the Reset
+ * button and every tutorial step start from this.
+ */
+const RESET_KEYS = [
+  'graph', 'graphOpen', 'wavelength', 'dispersion', 'impact', 'reflections',
+  'material', 'indexScale', 'dropletZoom', 'showNonRainbow', 'families',
+  'fanCount', 'angleMode', 'distRays', 'distAccumulate', 'dropCount',
+  'dropsAnimate', 'fieldCount', 'dropsObserverX', 'dropsObserverY',
+  'sunElevation', 'sunAzimuth', 'airHeight', 'observerHeight', 'view',
+  'camYaw', 'camPitch', 'camDist', 'eyeAzimuth', 'eyeElevation', 'fov',
+  'show', 'selectedRay', 'skyPick', 'fieldPick', 'selectedDrop',
+];
+
+const DEFAULTS = Object.freeze(
+  Object.fromEntries(RESET_KEYS.map((k) => [
+    k,
+    state[k] && typeof state[k] === 'object' ? Object.freeze({ ...state[k] }) : state[k],
+  ]))
+);
+
+/**
+ * A fresh patch back to the defaults.
+ *
+ * Returned as a new object every time because set() merges `show` and
+ * `families` with Object.assign -- handing out the stored one would let a
+ * later set() write straight into the defaults.
+ */
+function resetPatch() {
+  return { ...DEFAULTS, show: { ...DEFAULTS.show }, families: { ...DEFAULTS.families } };
+}
+
 /** Wavelengths currently in play: one, or all six for white light. */
 function activeLambdas() {
   if (state.wavelength === 'white') return [650, 610, 580, 540, 480, 420];
@@ -3147,8 +3187,10 @@ function activeLambdas() {
 
 /** The refractive-index model implied by the current controls. */
 function indexModel() {
+  const m = materialById(state.material);
   return makeIndexModel({
-    mode: state.indexMode,
+    mode: m.mode,
+    cauchy: m.cauchy,
     dispersion: state.dispersion,
     scale: state.indexScale,
   });
@@ -3878,6 +3920,8 @@ function orderColor(k) {
  */
 function alexanderCaption(idx = indexModel()) {
   const band = O.alexandersBand(idx);
+  // Null when the material has no pair of bows to leave a gap between.
+  if (!band) return null;
   return { band, text: `${t('alexanderBandLabel')} · ${deg(band.widthDeg, 1)}` };
 }
 
@@ -4719,7 +4763,12 @@ function createDropletView(canvas) {
   function meetingPoint(nRef) {
     const orders = activeOrders().filter((k) => k >= 1);
     if (orders.length !== 2) return null;
-    const rays = orders.map((k) => traceOne(650, nRef, k, bowEntry(k, nRef)).path);
+    // Two bows, or no crossing. bowEntry returns null for an order this
+    // material has no bow for, and tracing at null quietly traces b = 0 --
+    // a perfectly good ray that is not on anybody's caustic.
+    const entries = orders.map((k) => bowEntry(k, nRef));
+    if (entries.some((b) => b === null)) return null;
+    const rays = orders.map((k, i) => traceOne(650, nRef, k, entries[i]).path);
     if (rays.some((p) => !p.dirOut || !p.exitPoint)) return null;
     const [a, b] = rays;
     const det = a.dirOut.x * -b.dirOut.y - -b.dirOut.x * a.dirOut.y;
@@ -4753,6 +4802,7 @@ function createDropletView(canvas) {
         }
       }
       const geoRef = O.rainbowGeometry(nRef, meet.orders[0]);
+      if (!geoRef) return [];
       return [{
         valid: true, kRef: meet.orders[0], bows, at: meet.at, meetsRadii: meet.radii,
         meetOrders: meet.orders,
@@ -5070,7 +5120,14 @@ function createDropletView(canvas) {
    * holds 3 ticks against a typical 1, which reads as noise; at 200 it holds
    * 15 against 4, which reads as a caustic.
    */
-  const ARRIVAL_SAMPLES = 200;
+  /* 200 was enough to put the peak in the right bin and not enough to make
+     the floor look like a floor: the quiet bins came out 2,3,2,4,2 and the
+     noise read as structure. Measured over the whole arc, the spread of the
+     quiet bins falls from 15 % at 200 samples to 4 % at 1200, while the
+     peak-to-median ratio stays where the physics puts it (5.5 for k=1).
+     Cached against the physics, so this is paid once per change, not per
+     frame. */
+  const ARRIVAL_SAMPLES = 1200;
 
   /* Cached against the physics plus the one piece of camera that reaches
      into it: the exit bearings are stored already tilted by the Sun's
@@ -5079,7 +5136,7 @@ function createDropletView(canvas) {
 
   function arrivalKey() {
     return [
-      state.wavelength, state.dispersion, state.indexMode, state.indexScale,
+      state.wavelength, state.dispersion, state.material, state.indexScale,
       activeOrders().join(','), state.sunElevation,
     ].join('|');
   }
@@ -5143,7 +5200,11 @@ function createDropletView(canvas) {
    * tight one.
    */
   const ARRIVAL_BIN = 1.2 * Math.PI / 180;
-  const ARRIVAL_BAR = 26;
+  /* 26 px of spike on a 266 px arc is a correct reading of the density and
+     an easy one to miss, which is what the step is about. At 42 the caustic
+     still clears the canvas at every zoom the scene allows and the quiet
+     stretch stays a thin line. */
+  const ARRIVAL_BAR = 42;
 
   /** Bring d into (-pi, pi]. */
   function wrapPi(d) {
@@ -5157,8 +5218,17 @@ function createDropletView(canvas) {
     // Pointless with one ray on screen: a pile-up needs a population, and the
     // reader has not asked to see one.
     if (!state.show.arrival || state.fanCount <= 0) return;
-    const r = layout.s * ARRIVAL_R;
-    if (r < 40) return;
+    /*
+     * Fitted to the canvas, not just scaled with the droplet. Order 2 leaves
+     * across the whole forward hemisphere, so its profile wraps most of the
+     * way round the drop -- at zoom 1 the preferred radius put it off three
+     * edges at once and the band step drew two arcs with their peaks cut
+     * off. Shrinking the arc keeps the angles honest: the only thing that
+     * moves is how far from the drop the density is drawn.
+     */
+    const room = Math.min(layout.cx, layout.w - layout.cx, layout.cy, layout.h - layout.cy);
+    const r = Math.min(layout.s * ARRIVAL_R, room - ARRIVAL_BAR - 18);
+    if (r < 40 || r < layout.s * 1.12) return;
     const { groups } = buildArrival();
     if (!groups.length) return;
 
@@ -5219,7 +5289,15 @@ function createDropletView(canvas) {
           ks[0] * ARRIVAL_BIN - 0.02, ks[ks.length - 1] * ARRIVAL_BIN + 0.02);
         ctx.stroke();
 
-        const rad = (i) => r + 3 + ARRIVAL_BAR * Math.sqrt(dens(ks, i) / peak);
+        /* Linear in the count, not sqrt. The square root was there to keep
+           the quiet end of the arc visible and it did exactly the wrong
+           thing to the one claim this display makes: at a true density
+           ratio of 5.5 it drew the empty directions at 43 % of the bow's
+           height, so "most directions stay nearly empty, one fills up"
+           looked like "some directions are a bit busier than others". At
+           5.5 the floor is now a fifth of the peak, which is what the
+           physics says. The +3 keeps the quiet end off the baseline. */
+        const rad = (i) => r + 3 + ARRIVAL_BAR * (dens(ks, i) / peak);
         const at = (i, rr) => ({
           x: layout.cx + Math.cos(ks[i] * ARRIVAL_BIN) * rr,
           y: layout.cy + Math.sin(ks[i] * ARRIVAL_BIN) * rr,
@@ -5257,9 +5335,20 @@ function createDropletView(canvas) {
       if (k < 1) continue;
       const geo = O.rainbowGeometry(idx2(activeLambdas()[0]), k);
       if (!geo) continue;
-      const canon = traceOne(activeLambdas()[0], idx2(activeLambdas()[0]), k, geo.impactParameter);
+      // bowEntry, not geo.impactParameter: the beam fills the whole face, so
+      // every order piles up at BOTH of its bearings and the tick has to
+      // land on the one aiming at the observer. Unsigned, k=2's tick sat on
+      // the mirror peak, i.e. on the far side of the picture from the k=1
+      // tick -- which turns the gap between them, Alexander's band, into a
+      // gap of the wrong size pointing the wrong way.
+      const bEntry = bowEntry(k, idx2(activeLambdas()[0]));
+      if (bEntry === null) continue;
+      const canon = traceOne(activeLambdas()[0], idx2(activeLambdas()[0]), k, bEntry);
       if (!canon.path.dirOut) continue;
-      const a3 = Math.atan2(-canon.path.dirOut.y, canon.path.dirOut.x);
+      // Through bearing(), like the profile itself. Computed raw it ignored
+      // the Sun tilt that project() applies to everything else, so the tick
+      // walked off its own peak as soon as a step raised the Sun.
+      const a3 = bearing(canon.path.dirOut);
       const c3 = Math.cos(a3);
       const s3 = Math.sin(a3);
       ctx.save();
@@ -5432,7 +5521,9 @@ function createDropletView(canvas) {
         ? t('observerNoConcentration')
         : observer.meetOrders
           ? observer.meetOrders
-            .map((k) => deg(O.rainbowGeometry(indexModel()(650), k).antisolarDeg, 1))
+            .map((k) => O.rainbowGeometry(indexModel()(650), k))
+            .filter(Boolean)
+            .map((g) => deg(g.antisolarDeg, 1))
             .join(' + ')
           : `φ ≈ ${deg(observer.phiDeg, 1)}${observer.kRef ? ` · k=${observer.kRef}` : ''}`;
       // Stack the caption upwards when a downward stack would not fit. The
@@ -5892,7 +5983,9 @@ function createDropletView(canvas) {
     // captions, which sit much further out along this same bearing, and into
     // the hint row at the foot of the canvas.
     const lr = (r0 + r1) / 2;
-    label(ctx, alexanderCaption(indexModel()).text,
+    const cap = alexanderCaption(indexModel());
+    if (!cap) return;
+    label(ctx, cap.text,
       O.clamp(layout.cx + Math.cos(mid) * lr, 84, layout.w - 84),
       O.clamp(layout.cy + Math.sin(mid) * lr, 16, layout.h - 44),
       { align: 'center', color: '#b3c2dc', bg: true });
@@ -6155,11 +6248,6 @@ function distToSegment(px, py, a, b) {
  * Both directions of the interaction are wired: dragging the ray moves the
  * marker, clicking the graph moves the ray.
  */
-
-
-
-
-
 const PAD = { l: 58, r: 16, t: 26, b: 34 };
 
 function createGraphView(canvas) {
@@ -6174,7 +6262,7 @@ function createGraphView(canvas) {
       activeOrders().join(','),
       activeLambdas().join(','),
       state.dispersion,
-      state.indexMode,
+      state.material,
       state.indexScale,
       distRange().join(','),
     ].join('|');
@@ -6815,8 +6903,13 @@ function createDropsView(canvas) {
     // bows have to be on screen for it to mean anything: on its own the
     // primary has an outside, not a gap. Drawn before the direction lines so
     // they read as its edges.
-    if (state.show.alexander && state.show.primary && state.show.secondary) {
-      const { band: ab, text } = alexanderCaption(idx);
+    const alexCap = state.show.alexander && state.show.primary && state.show.secondary
+      ? alexanderCaption(idx)
+      : null;
+    // Null for a material with no pair of bows, and this is the middle of
+    // draw() -- skipping the band must not take the rest of the scene with it.
+    if (alexCap) {
+      const { band: ab, text } = alexCap;
       if (ab.outerDeg > ab.innerDeg) {
         const R = s * 1.35;
         for (const sign of [1, -1]) {
@@ -7405,7 +7498,7 @@ const RAIN_PATH_MIN = 2000;
 let profileCache = { key: '', profile: null };
 
 function bowProfile() {
-  const key = `${state.dispersion}|${state.indexMode}|${state.indexScale}|${state.show.primary}|${state.show.secondary}|${state.show.higher}`;
+  const key = `${state.dispersion}|${state.material}|${state.indexScale}|${state.show.primary}|${state.show.secondary}|${state.show.higher}`;
   if (profileCache.key === key) return profileCache.profile;
   const orders = [];
   if (state.show.primary) orders.push(1);
@@ -7727,7 +7820,7 @@ function createSkyView(canvas) {
   function bandKey() {
     return [
       state.sunElevation, state.sunAzimuth, state.wavelength, state.dispersion,
-      state.indexMode, state.indexScale,
+      state.material, state.indexScale,
       state.show.primary, state.show.secondary, state.show.higher,
     ].join('|');
   }
@@ -7848,7 +7941,7 @@ function createSkyView(canvas) {
   function drawAlexander(ctx, anti) {
     if (!state.show.primary || !state.show.secondary) return;
     const band = O.alexandersBand(indexModel());
-    if (!(band.outerDeg > band.innerDeg)) return;
+    if (!band || !(band.outerDeg > band.innerDeg)) return;
     const steps = 8;
     for (let i = 0; i <= steps; i++) {
       const phi = band.innerDeg + ((band.outerDeg - band.innerDeg) * i) / steps;
@@ -7867,7 +7960,9 @@ function createSkyView(canvas) {
     const top = topOfBow(anti, mid);
     if (!top || cam.depth(top) <= NEAR) return;
     const p = cam.project(top);
-    label(ctx, alexanderCaption(indexModel()).text, p.x, p.y + 4,
+    const cap = alexanderCaption(indexModel());
+    if (!cap) return;
+    label(ctx, cap.text, p.x, p.y + 4,
       { align: 'center', color: '#b3c2dc', bg: true });
   }
 
@@ -7982,16 +8077,29 @@ function createSkyView(canvas) {
 
   function drawReadout(ctx, w, h, dip) {
     const idx = indexModel();
-    const geo = O.rainbowGeometry(idx(650), 1);
-    const vis = O.visibleFraction(state.sunElevation, geo.antisolarDeg, dip);
+    const geo1 = O.rainbowGeometry(idx(650), 1);
+    const geo2 = O.rainbowGeometry(idx(650), 2);
     let y = 16;
     const put = (s, color) => {
       label(ctx, s, 12, y, { color });
       y += 19;
     };
-    put(`${t('coneAngle')} (k=1): ${deg(geo.antisolarDeg, 2)} — ${t('derivedFromSim')}`, '#6fd3a4');
-    if (state.show.secondary) {
-      put(`${t('coneAngle')} (k=2): ${deg(O.rainbowGeometry(idx(650), 2).antisolarDeg, 2)}`, '#9b8cf0');
+    // A one-bounce bow needs cos(theta_i) = sqrt((n^2-1)/3), which has no
+    // solution above n = 2 -- so a drop of diamond genuinely has no primary
+    // bow and every line below has to be written without one.
+    const geo = geo1 || geo2;
+    if (!geo) {
+      put(t('noBowHere'), '#ff9a8a');
+      return;
+    }
+    const vis = O.visibleFraction(state.sunElevation, geo.antisolarDeg, dip);
+    if (geo1) {
+      put(`${t('coneAngle')} (k=1): ${deg(geo1.antisolarDeg, 2)} — ${t('derivedFromSim')}`, '#6fd3a4');
+    } else {
+      put(`${t('coneAngle')} (k=1): ${t('noBowHere')}`, '#ff9a8a');
+    }
+    if (state.show.secondary && geo2) {
+      put(`${t('coneAngle')} (k=2): ${deg(geo2.antisolarDeg, 2)}`, '#9b8cf0');
     }
     put(`${t('bowTopElevation')}: ${deg(vis.topElevationDeg, 1)}`, '#cfe0ff');
     // The share actually drawn, counted with the same test that draws it --
@@ -8099,7 +8207,7 @@ function createSkyView(canvas) {
       size.w, size.h, state.view, state.camYaw, state.camPitch, state.camDist,
       state.eyeAzimuth, state.eyeElevation, state.fov,
       state.sunElevation, state.sunAzimuth, state.observerHeight,
-      state.wavelength, state.dispersion, state.indexMode, state.indexScale,
+      state.wavelength, state.dispersion, state.material, state.indexScale,
       state.show.primary, state.show.secondary, state.show.higher,
       state.show.rainBelow, state.show.horizon, state.show.ground,
     ].join('|');
@@ -8342,7 +8450,7 @@ function createFieldView(canvas) {
   function classKey() {
     return [
       state.fieldCount, state.sunElevation, state.sunAzimuth, state.wavelength,
-      state.dispersion, state.indexMode, state.indexScale, state.observerHeight,
+      state.dispersion, state.material, state.indexScale, state.observerHeight,
       state.show.primary, state.show.secondary, state.show.higher, state.show.rainBelow,
     ].join('|');
   }
@@ -8512,7 +8620,9 @@ function createFieldView(canvas) {
    */
   function drawAlexander(ctx, anti) {
     if (!state.show.alexander || !state.show.primary || !state.show.secondary) return;
-    const { band, text } = alexanderCaption(indexModel());
+    const cap = alexanderCaption(indexModel());
+    if (!cap) return;
+    const { band, text } = cap;
     if (!(band.outerDeg > band.innerDeg)) return;
     for (const [phi, k] of [[band.innerDeg, 1], [band.outerDeg, 2]]) {
       const circle = O.rainbowCircle(anti, phi, 180);
@@ -8882,100 +8992,56 @@ function createFieldView(canvas) {
  */
 const TUTORIAL = [
   {
-    /* The destination, first. The opener used to be a blank slate -- one
-       droplet, no reflections, "we don't yet know what happens" -- which is
-       honest but tells a reader nothing about what they are about to spend
-       fifteen steps deriving. Both bows are on screen here, entering through
-       their own halves so the 8 deg between them is the real gap and not the
-       92.8 deg that one entry point forces. Everything after this takes the
-       picture apart; this step only says what the picture is. */
+    /* The destination, first. Both bows, each fed by its own half of the
+       face, each with its own eye -- because the gap the sky shows is 8 deg
+       and the picture has to start by being that picture. */
     title: 's1title', body: 's1body',
     apply: {
-      // White light, because the destination is two COLOURED bows and red
-      // alone makes that impossible to see. No band and no arrival arc: both
-      // get their own steps later, and here they are the clutter standing
-      // between the reader and "two bows, eight degrees apart".
-      // TWO eyes, one per bow, each named for the bow it stands for. The
-      // general truth comes first: the two bows leave in different
-      // directions, so they need different places to stand. Step 2 then
-      // finds the single spot where those two places coincide, which is the
-      // special case and reads as a trick if it arrives first.
-      scene: 'droplet', graph: 'exit', reflections: 2, dispersion: 1, wavelength: 'white',
-      impact: 0.861, fanCount: 12, showNonRainbow: false, angleMode: 'antisolar',
-      dropletZoom: 1, graphOpen: false, sunElevation: 0,
-      show: {
-        angles: false, normals: false, labels: true, renderedBow: false,
-        alexander: false, arrival: false, walls: false, meetingEye: false,
-      },
-      families: { 0: false, 1: true, 2: true, 3: false },
+      scene: 'droplet', reflections: 2, wavelength: 'white', dispersion: 1,
+      impact: 0.861, fanCount: 12, sunElevation: 0,
+      // The arc and the band each get their own step later; here they are
+      // the clutter between the reader and "two bows, two observers".
+      show: { angles: false, walls: false, alexander: false, arrival: false },
     },
     focus: ['reflections', 'bowRays'],
     actions: [
-      {
-        labelKey: 'bowName1',
-        patch: () => ({ impact: bowEntry(1, indexModel()(650)) }),
-      },
-      {
-        labelKey: 'bowName2',
-        patch: () => ({ impact: bowEntry(2, indexModel()(650)) }),
-      },
+      { labelKey: 'bowName1', patch: () => ({ impact: bowEntry(1, indexModel()(650)) }) },
+      { labelKey: 'bowName2', patch: () => ({ impact: bowEntry(2, indexModel()(650)) }) },
     ],
+    note: 'explOppositeHalves',
   },
   {
-    /* Why one eye and not two.
-       Each bow's ray carries on for ever, so ANY distance along it sees that
-       bow. Both at once is different: the two rays leave different points in
-       different directions and cross at exactly one place, 12.2 droplet radii
-       out. Scale that to a real drop and it is 12 mm, which is why the sky
-       cannot work this way and the two bows up there come from two different
-       sets of droplets. The chips put the eyes back per bow and take them
-       away again, so the difference is something you do rather than read. */
+    /* Why one eye and not two. Each bow ray carries on for ever, so any
+       distance along it sees that bow; both at once needs the one place the
+       two rays cross, 12.2 radii out. */
     title: 's1ctitle', body: 's1cbody',
     apply: {
-      scene: 'droplet', reflections: 2, dispersion: 1, wavelength: 'white',
-      impact: 0.861, fanCount: 0, dropletZoom: 25, sunElevation: 0,
-      graphOpen: false, panel: 'guide',
-      families: { 0: false, 1: true, 2: true, 3: false },
-      show: {
-        angles: false, normals: false, labels: true, renderedBow: false,
-        alexander: false, arrival: false, walls: false, meetingEye: true,
-      },
+      scene: 'droplet', reflections: 2, impact: 0.861, fanCount: 0,
+      dropletZoom: 25, sunElevation: 0,
+      show: { angles: false, walls: false, alexander: false, arrival: false, meetingEye: true },
     },
-    focus: ['dropletZoom', 'reflections'],
+    focus: ['impactParameter', 'dropletZoom'],
     actions: [
-      { labelKey: 'eyeMeeting', patch: { show: { meetingEye: true } } },
-      { labelKey: 'eyePerBow', patch: { show: { meetingEye: false } } },
+      { labelKey: 'bowName1', patch: () => ({ impact: bowEntry(1, indexModel()(650)) }) },
+      { labelKey: 'bowName2', patch: () => ({ impact: bowEntry(2, indexModel()(650)) }) },
+      { labelKey: 'eyeMeeting', flags: ['meetingEye'] },
     ],
     note: 'explMeetingPoint',
   },
   {
-    /* The blank slate that used to open the tutorial, now that the reader has
-       seen what it is heading towards. Nothing on screen but one droplet and
-       one ray that does not reflect at all. */
+    /* Back to the beginning: one drop, one ray, no reflection at all. */
     title: 's1btitle', body: 's1bbody',
     apply: {
-      scene: 'droplet', graph: 'exit', reflections: 0, dispersion: 0, wavelength: 'white',
-      impact: 0.6, fanCount: 0, showNonRainbow: false, angleMode: 'antisolar',
-      dropletZoom: 1, graphOpen: false,
-      // Step 1 stands one eye at the crossing; from here each bow gets its
-      // own, because the rest of the guide is about one order at a time.
-      show: {
-        angles: false, normals: false, labels: true, renderedBow: false,
-        meetingEye: false,
-      },
-      families: { 0: true, 1: false, 2: false, 3: false },
+      scene: 'droplet', reflections: 0, dispersion: 0, impact: 0.6,
+      sunElevation: 0, show: { angles: false, arrival: false },
     },
     focus: ['impactParameter', 'wavelength'],
   },
   {
     title: 's2title', body: 's2body',
     apply: {
-      // One ray, pinned: these two steps are about following a single path,
-      // and a step that does not pin the beam inherits whatever the reader
-      // left on -- a 32-ray fan makes the path impossible to follow.
-      scene: 'droplet', reflections: 0, graphOpen: false, fanCount: 0,
-      show: { angles: true, normals: true },
-      families: { 0: true, 1: false, 2: false, 3: false },
+      scene: 'droplet', reflections: 0, impact: 0.6, dispersion: 0,
+      sunElevation: 0, show: { angles: true, normals: true, arrival: false },
     },
     focus: ['impactParameter', 'showNormals', 'showAngles'],
     actions: [
@@ -8985,33 +9051,29 @@ const TUTORIAL = [
     ],
   },
   {
+    /* Two bounces, not one: the body walks R0 -> R1 -> R2 -> R3, and a
+       single reflection only ever produces three segments. */
     title: 's3title', body: 's3body',
     apply: {
-      scene: 'droplet', reflections: 1, impact: 0.7, showNonRainbow: true, graphOpen: false,
-      fanCount: 0,
-      families: { 0: false, 1: true, 2: false, 3: false },
-      show: { normals: false, angles: true, walls: true, labels: true },
+      scene: 'droplet', reflections: 2, impact: 0.7, sunElevation: 0,
+      show: { normals: false, angles: true, walls: true, arrival: false },
     },
-    focus: ['reflections', 'showWalls'],
-    // The wall markers arrived after this step was written and say exactly
-    // what it is about: how little of the light carries on at each surface,
-    // and that the bounce is not total internal reflection.
+    focus: ['reflections', 'showWalls', 'impactParameter'],
     note: ['explReflectionIsWeak', 'explNoTotalReflection'],
+    showRay: true,
   },
   {
+    /* Deliberately off the bow: an angle that is already the answer has
+       nothing to demonstrate, and the chip is what makes 42 a measurement. */
     title: 's4title', body: 's4body',
     apply: {
-      // One ray: this step reads phi off a single exit, and the compact ray
-      // readout beside it describes that one ray.
-      scene: 'droplet', reflections: 1, showNonRainbow: false, panel: 'guide',
-      fanCount: 0, graphOpen: false, show: { angles: true },
+      scene: 'droplet', reflections: 1, impact: 0.6, sunElevation: 0,
+      show: { angles: true, arrival: false },
     },
     focus: ['impactParameter', 'showAngles'],
     note: 'explObserverAngle',
     actions: [{
       labelKey: 'extremumLabel',
-      // From the engine, not written down: 0.861 was a literal sitting in
-      // the one file that is supposed to contain none.
       patch: () => ({ impact: bowEntry(1, indexModel()(650)) }),
     }],
     showRay: true,
@@ -9019,59 +9081,45 @@ const TUTORIAL = [
   {
     title: 's5title', body: 's5body',
     apply: {
-      scene: 'droplet', graph: 'exit', graphOpen: true, reflections: 1, fanCount: 9,
-      panel: 'guide',
+      scene: 'droplet', graph: 'exit', graphOpen: true, reflections: 1,
+      fanCount: 9, sunElevation: 0, show: { arrival: false, walls: false },
     },
-    focus: ['fanCount', 'impactParameter'],
+    focus: ['fanCount', 'impactParameter', 'reflections'],
     actions: [
       { label: '1', patch: { fanCount: 0 } },
       { label: '9', patch: { fanCount: 9 } },
       { label: '25', patch: { fanCount: 25 } },
+      { labelKey: 'chipRefl1', patch: { reflections: 1, families: { 0: false, 1: true, 2: false, 3: false } } },
+      { labelKey: 'chipRefl2', patch: { reflections: 2, families: { 0: false, 1: true, 2: true, 3: false } } },
+      { labelKey: 'chipRefl3', patch: { reflections: 3, families: { 0: false, 1: true, 2: true, 3: true } } },
     ],
   },
   {
-    /* Where must you stand? The eye is handed over to the reader here: the
-       fan is already on screen from the previous step, so sweeping the eye
-       across it makes the caustic count itself, and 42 deg arrives as a
-       measurement rather than as an assertion. Deliberately started off the
-       bow -- an eye that is already correct has nothing to demonstrate. */
+    /* The pile-up, counted on the canvas. One wavelength, because the arc
+       is a density display and six overlapping spectra make the count a
+       guess. Starts sparse on purpose: four rays each leave in their own
+       direction, and only as the count climbs do they stack. */
     title: 's6title', body: 's6body',
     apply: {
-      // One wavelength, full dispersion: the tally then counts exactly the
-      // rays that are visible on screen (under white light all six overlap
-      // at once and it would read 48/276 for 46 visible lines), and the
-      // angle in play is the real n(650) one the rest of the app quotes
-      // rather than the mean-index 41.9 that dispersion=0 produces.
-      scene: 'droplet', graph: 'exit', reflections: 1, fanCount: 4, dispersion: 1,
-      wavelength: 650, impact: 0.861, dropletZoom: 2.6,
-      panel: 'guide', graphOpen: false,
-      // Step 1 switches the arc off to keep its own picture clean; this is
-      // the step whose note is about the arc, so it switches it back.
-      show: { angles: true, normals: false, labels: true, arrival: true },
-      families: { 0: false, 1: true, 2: false, 3: false },
+      scene: 'droplet', reflections: 1, fanCount: 16, wavelength: 650,
+      impact: 0.861, dropletZoom: 2.6, sunElevation: 0,
+      show: { angles: true, arrival: true, walls: false },
     },
-    focus: ['fanCount', 'impactParameter'],
-    // Deliberately starting at four rays: a sparse beam shows every ray
-    // leaving in its own direction, and only as the count climbs do they
-    // stop spreading and stack up along one. Handing the reader a dense beam
-    // first shows the answer without the comparison.
+    focus: ['fanCount', 'showArrival', 'impactParameter'],
     actions: [
       { label: '4', patch: { fanCount: 4 } },
       { label: '16', patch: { fanCount: 16 } },
       { label: '60', patch: { fanCount: 60 } },
+      { labelKey: 'showArrival', flags: ['arrival'] },
     ],
-    // The arc above the droplet IS the stacking, counted. It draws only with
-    // a beam on screen, so this is the first step that can talk about it.
     note: 'explArrivalArc',
   },
   {
     title: 's7title', body: 's7body',
     apply: {
-      // Enough samples that the shape is already a shape. At 40 it was a
-      // handful of spikes and the reader's first impression of the plot
-      // was noise; the chips still go down to 10 to show it falling apart.
-      scene: 'droplet', graph: 'dist', graphOpen: true, reflections: 1, fanCount: 25,
-      distRays: 2000,
+      scene: 'droplet', graph: 'dist', graphOpen: true, reflections: 1,
+      fanCount: 25, distRays: 2000, sunElevation: 0,
+      show: { walls: false },
     },
     focus: ['rayCount'],
     actions: [
@@ -9085,8 +9133,7 @@ const TUTORIAL = [
   {
     title: 's8title', body: 's8body',
     apply: {
-      scene: 'drops', graph: 'dist', dropCount: 1, dropsAnimate: true,
-      dropsObserverX: 0, dropsObserverY: 0, graphOpen: false,
+      scene: 'drops', dropCount: 1, dropsAnimate: true,
       show: { droplets: true, primary: true, secondary: false },
     },
     focus: ['dropCount', 'animateDrops'],
@@ -9100,38 +9147,33 @@ const TUTORIAL = [
     note: 'explNotAnObject',
   },
   {
-    /* The bow is not a place. Nothing about the droplet field changes here --
-       only where the reader is standing -- and a different set of droplets
-       lights up, which is the claim the previous step could only make in
-       words. */
+    /* The bow is not a place. Nothing about the rain changes here -- only
+       where the reader stands -- and a different set of droplets lights up. */
     title: 's9title', body: 's9body',
     apply: {
-      scene: 'drops', graph: 'dist', dropCount: 1500, dropsAnimate: false,
-      dropsObserverX: 0, dropsObserverY: 0, sunElevation: 15, graphOpen: false,
-      show: { droplets: true, primary: true, secondary: false, ground: true, labels: true },
+      scene: 'drops', dropCount: 1500, sunElevation: 15,
+      show: { droplets: true, primary: true, secondary: false, ground: true },
     },
-    focus: ['observerDepth', 'observerRise'],
+    focus: ['observerDepth', 'observerRise', 'sunElevation'],
     actions: [
-      { labelKey: 'observerRecentre', patch: { dropsObserverX: 0, dropsObserverY: 0 } },
+      { labelKey: 'observerRecentre', patch: { dropsObserverX: 0, dropsObserverY: 0, sunElevation: 15 } },
       { labelKey: 'obsChipForward', patch: { dropsObserverX: 0.45 } },
       { labelKey: 'obsChipUp', patch: { dropsObserverY: 0.28 } },
       { labelKey: 'obsChipDown', patch: { dropsObserverY: -0.09 } },
+      { labelKey: 'chipSunHigh', patch: { sunElevation: 35 } },
     ],
     note: 'explBowFollowsYou',
   },
   {
-    /* The flat scene's argument, with the cross-section taken away. Nothing
-       here draws a circle: the arc is however many of the droplets around
-       the reader answered yes to the one angular test, which is the claim
-       the sky view can only make by drawing the circle it is explaining. */
+    /* The flat scene's argument with the cross-section taken away. Nothing
+       here draws a circle: the arc is however many droplets answered yes. */
     title: 's10title', body: 's10body',
     apply: {
       scene: 'field', view: 'eye', eyeAzimuth: 0, eyeElevation: 14, fov: 110,
-      sunElevation: 15, observerHeight: 1.7, fieldCount: 60000, graphOpen: false,
-      wavelength: 'white', dispersion: 1,
+      sunElevation: 15, observerHeight: 1.7, fieldCount: 60000,
       show: {
         droplets: true, primary: true, secondary: true, higher: false,
-        ground: true, horizon: true, rainBelow: false, antisolar: true, labels: true,
+        ground: true, horizon: true, rainBelow: false, antisolar: true,
       },
     },
     focus: ['fieldCount', 'viewMode'],
@@ -9147,38 +9189,39 @@ const TUTORIAL = [
   {
     title: 's11title', body: 's11body',
     apply: {
-      scene: 'sky', view: 'orbit', sunElevation: 15, graphOpen: false,
-      show: { cone: true, horizon: false, ground: false, antisolar: true, primary: true, secondary: false, renderedBow: false },
+      scene: 'sky', view: 'orbit', sunElevation: 15,
+      show: {
+        cone: true, horizon: false, ground: false, antisolar: true,
+        primary: true, secondary: false, renderedBow: false,
+      },
     },
     focus: ['showCone', 'showHorizon', 'viewMode'],
     actions: [
-      { labelKey: 'showCone', patch: { show: { cone: true } } },
-      { labelKey: 'showHorizon', patch: { show: { horizon: true, ground: true } } },
+      { labelKey: 'showCone', flags: ['cone'] },
+      { labelKey: 'showHorizon', flags: ['horizon', 'ground'] },
+      { labelKey: 'viewOrbit', patch: { view: 'orbit' } },
       { labelKey: 'viewEye', patch: { view: 'eye' } },
     ],
   },
   {
-    /* Why it is an arc and not a ring.
-       Step 11 ends on "switch the horizon on and the lower part disappears",
-       which invites the obvious next question and then drops it. The scene
-       has had the two controls that answer it for a long time -- observer
-       height and whether there is rain below the eye -- and no step ever
-       touched either. They are also the two that people get the wrong way
-       round: altitude is not what buys the full circle, rain underneath is. */
+    /* Why an arc and not a ring -- and the camera has to be pointed where
+       the answer is. At the default look-up the ring closes OFF SCREEN: the
+       readout went from 40 % to 100 % while the picture did not change, so
+       the chips looked broken. Centred on the antisolar point with a wide
+       field, the arc visibly becomes a circle. */
     title: 's11btitle', body: 's11bbody',
     apply: {
       scene: 'sky', view: 'eye', sunElevation: 15, observerHeight: 1.7,
-      graphOpen: false, reflections: 1,
-      families: { 0: false, 1: true, 2: false, 3: false },
+      eyeElevation: -15, fov: 120, reflections: 1,
       show: {
-        primary: true, secondary: false, cone: false, horizon: true, ground: true,
-        rainBelow: false, renderedBow: true, antisolar: true, labels: true,
+        primary: true, secondary: false, cone: false, horizon: true,
+        ground: true, rainBelow: false, renderedBow: true, antisolar: true,
       },
     },
     focus: ['observerHeight', 'rainBelow'],
     actions: [
-      { label: '1.7 m', patch: { observerHeight: 1.7, show: { rainBelow: false } } },
-      { labelKey: 'rainBelow', patch: { show: { rainBelow: true } } },
+      { labelKey: 'rainBelow', flags: ['rainBelow'] },
+      { label: '1.7 m', patch: { observerHeight: 1.7 } },
       { label: '300 m', patch: { observerHeight: 300, show: { rainBelow: true } } },
       { label: '1 km', patch: { observerHeight: 1000, show: { rainBelow: true } } },
       { label: '3 km', patch: { observerHeight: 3000, show: { rainBelow: true } } },
@@ -9186,37 +9229,40 @@ const TUTORIAL = [
     note: 'explFullCircle',
   },
   {
-    /* The second observer. Step 13 establishes that the bottom of the circle
-       needs rain below the eye; this one puts someone up there and draws the
-       part of the SAME bow they get. Both orders, because the secondary does
-       exactly the same thing eight degrees further out. */
+    /* Two observers of the SAME bow. The reader stays on the ground -- that
+       is the whole comparison -- and the chips fly the aircraft. */
     title: 's11ctitle', body: 's11cbody',
     apply: {
       scene: 'sky', view: 'eye', sunElevation: 15, observerHeight: 1.7,
-      airHeight: 3000, graphOpen: false, reflections: 2, wavelength: 'white',
-      dispersion: 1, families: { 0: false, 1: true, 2: true, 3: false },
+      airHeight: 3000, eyeElevation: -15, fov: 120, reflections: 2,
+      wavelength: 'white', dispersion: 1,
       show: {
         primary: true, secondary: true, airObserver: true, alexander: true,
         cone: false, horizon: true, ground: true, rainBelow: false,
-        renderedBow: false, antisolar: true, labels: true,
+        renderedBow: false, antisolar: true,
       },
     },
-    focus: ['showAirObserver', 'airHeight'],
+    focus: ['showAirObserver', 'airHeight', 'observerHeight'],
     actions: [
+      { labelKey: 'showAirObserver', flags: ['airObserver'] },
       { label: '1 km', patch: { airHeight: 1000 } },
       { label: '3 km', patch: { airHeight: 3000 } },
       { label: '10 km', patch: { airHeight: 10000 } },
-      { labelKey: 'showAirObserver', patch: { show: { airObserver: false } } },
+      { labelKey: 'chipClimbThere', patch: { observerHeight: 3000, show: { rainBelow: true } } },
+      { labelKey: 'chipBackDown', patch: { observerHeight: 1.7, show: { rainBelow: false } } },
     ],
     note: 'explAirObserver',
   },
   {
+    /* Colour, with the histogram already open: the step is about every
+       wavelength getting its own angle, and that is a thing you read off
+       the plot rather than off a single split ray. */
     title: 's12title', body: 's12body',
     apply: {
-      scene: 'droplet', graph: 'exit', wavelength: 'white', dispersion: 0, reflections: 1,
-      fanCount: 0, dropletZoom: 9, graphOpen: true,
-      show: { wavelengthLabels: true, angles: true },
-      families: { 0: false, 1: true, 2: false, 3: false },
+      scene: 'droplet', graph: 'dist', graphOpen: true, wavelength: 'white',
+      dispersion: 1, reflections: 1, fanCount: 0, dropletZoom: 9,
+      distRays: 2000, sunElevation: 0,
+      show: { wavelengthLabels: true, angles: true, walls: false },
     },
     focus: ['dispersion', 'dropletZoom', 'showWavelengthLabels'],
     actions: [
@@ -9227,94 +9273,64 @@ const TUTORIAL = [
     note: 'explDispersionZoom',
   },
   {
-    /* The secondary, built rather than announced. Step 13 used to be the only
-       step that mentioned it, in the sky, with the answer already assembled --
-       so a reader who followed the tutorial never met the cascade, the bow
-       marks or the impact-parameter chips at all. These two steps put the
-       droplet work in the guided path, and the sky step becomes the payoff. */
+    /* The higher orders, built rather than announced: same drop, same
+       geometry, a different place to land. */
     title: 's13atitle', body: 's13abody',
     apply: {
-      // panel: 'guide' with showRay, not panel: 'ray' -- the tutorial text
-      // lives in the guide, so selecting the ray panel hides the very step
-      // the reader is on. showRay embeds the compact readout instead.
-      // The fan is on, because a single ray cannot show a pile-up and the
-      // arrival arc is the point of this step. 45 gives the secondary's
-      // narrower caustic enough rays to bunch visibly.
-      scene: 'droplet', panel: 'guide', wavelength: 650, dispersion: 1,
-      reflections: 2, fanCount: 45, dropletZoom: 1,
-      graphOpen: false, showNonRainbow: false,
-      families: { 0: false, 1: true, 2: true, 3: false },
-      show: {
-        angles: false, normals: false, labels: true, renderedBow: false,
-        arrival: true, alexander: false,
-      },
+      scene: 'droplet', wavelength: 650, dispersion: 1, reflections: 2,
+      fanCount: 36, dropletZoom: 2.2, sunElevation: 0,
+      show: { angles: false, arrival: true, alexander: false, walls: false },
     },
-    focus: ['impactParameter', 'bowRays'],
+    compute: () => ({ impact: bowEntry(2, indexModel()(650)) }),
+    focus: ['impactParameter', 'bowRays', 'reflections'],
     actions: [
-      {
-        labelKey: 'bowName1',
-        patch: () => ({ impact: bowEntry(1, indexModel()(650)) }),
-      },
-      {
-        labelKey: 'bowName2',
-        patch: () => ({ impact: bowEntry(2, indexModel()(650)) }),
-      },
+      { labelKey: 'bowName1', patch: () => ({ impact: bowEntry(1, indexModel()(650)) }) },
+      { labelKey: 'bowName2', patch: () => ({ impact: bowEntry(2, indexModel()(650)) }) },
+      { labelKey: 'chipRefl3', patch: { reflections: 3, families: { 0: false, 1: true, 2: true, 3: true } } },
     ],
-    note: ['coneSliceNote', 'explOppositeHalves'],
+    note: ['coneSliceNote', 'explOppositeHalves', 'explWhyFainter'],
     showRay: true,
   },
   {
-    /* Why the colours run the other way -- the one claim the app used to
-       assert four times and derive never. Both curves are already on the plot
-       the moment two orders are active; this step opens it and says what to
-       look at. */
+    /* Why the colours run the other way. Both curves are on the plot the
+       moment two orders are active; this step opens it and says what to
+       look at, and the histogram chip shows where each colour lands. */
     title: 's13btitle', body: 's13bbody',
     apply: {
       scene: 'droplet', graph: 'exit', graphOpen: true, angleMode: 'antisolar',
       wavelength: 'white', dispersion: 1, reflections: 2, fanCount: 0,
-      families: { 0: false, 1: true, 2: true, 3: false },
-      panel: 'guide', show: { labels: true, wavelengthLabels: true },
+      distRays: 2000, sunElevation: 0,
+      show: { wavelengthLabels: true, arrival: false, walls: false },
     },
-    focus: ['angleConvention', 'dispersion'],
+    // NOT angleConvention: it lives in the exit plot's own tab bar, so this
+    // step's "switch to the histogram" chip takes it off screen and
+    // applyFocus() rightly complains about a step pointing at a control that
+    // is no longer there.
+    focus: ['dispersion', 'impactParameter'],
+    actions: [
+      { labelKey: 'chipPlotExit', patch: { graph: 'exit' } },
+      { labelKey: 'chipPlotDist', patch: { graph: 'dist' } },
+      { labelKey: 'bowName1', patch: () => ({ impact: bowEntry(1, indexModel()(650)) }) },
+      { labelKey: 'bowName2', patch: () => ({ impact: bowEntry(2, indexModel()(650)) }) },
+    ],
     note: 'explColourFlip',
   },
   {
-    /* Two rays, two entry heights, and the gap between them at its real size.
-       Every other droplet step traces one entry point, because the cascade is
-       what causes the secondary -- but that same choice throws the two exits
-       onto opposite sides of the picture, 92.8 deg apart, and the 8 deg the
-       sky actually shows you becomes something only the captions know. Here
-       the secondary is fed through the top half, which is what the Sun does
-       anyway, and the dark band is a wedge you can see instead of a
-       subtraction you have to perform. */
+    /* Alexander's band, with the arrival arc on -- the gap between the two
+       profiles IS the band, counted by the rays rather than shaded in. */
     title: 's13ctitle', body: 's13cbody',
     apply: {
-      scene: 'droplet', panel: 'guide', wavelength: 650, dispersion: 1,
-      // Pinned to the SECONDARY's own entry point, which is in the lower half
-      // of the face. Left at the primary's +0.862 the secondary ray leaves
-      // upward, away from both eyes, and the step reads as if the secondary
-      // bow pointed at the sky instead of at the observer.
-      reflections: 2, fanCount: 32, dropletZoom: 1,
-      graphOpen: false, showNonRainbow: false,
-      families: { 0: false, 1: true, 2: true, 3: false },
-      // The band IS this step, so it says so rather than inheriting it.
-      show: {
-        angles: true, normals: false, labels: true, renderedBow: false,
-        alexander: true, arrival: false,
-      },
+      scene: 'droplet', wavelength: 650, dispersion: 1, reflections: 2,
+      fanCount: 24, dropletZoom: 3, sunElevation: 0,
+      show: { angles: false, alexander: true, arrival: true, walls: false },
     },
-    // From the engine. -0.951 is not a number this file is allowed to know.
     compute: () => ({ impact: bowEntry(2, indexModel()(650)) }),
-    focus: ['reflections', 'impactParameter'],
+    focus: ['showArrival', 'showAlexander', 'impactParameter'],
     actions: [
-      {
-        labelKey: 'bowName1',
-        patch: () => ({ impact: bowEntry(1, indexModel()(650)) }),
-      },
-      {
-        labelKey: 'bowName2',
-        patch: () => ({ impact: bowEntry(2, indexModel()(650)) }),
-      },
+      { labelKey: 'showArrival', flags: ['arrival'] },
+      { labelKey: 'showAlexander', flags: ['alexander'] },
+      { labelKey: 'bowName1', patch: () => ({ impact: bowEntry(1, indexModel()(650)) }) },
+      { labelKey: 'bowName2', patch: () => ({ impact: bowEntry(2, indexModel()(650)) }) },
     ],
     note: 'explAlexander',
     showRay: true,
@@ -9322,50 +9338,106 @@ const TUTORIAL = [
   {
     title: 's13title', body: 's13body',
     apply: {
-      // Back to ground level: the reader may have climbed to 3 km on the
-      // full-circle step, and the payoff is what the sky looks like from
-      // where they actually stand.
-      // The Sun too: every other sky and rain step pins 15 deg, and this one
-      // did not. Arrive here with the Sun at 75 and the whole bow is below
-      // the horizon -- the payoff step showing an empty sky.
-      scene: 'sky', view: 'eye', dispersion: 1, wavelength: 'white', reflections: 2,
-      graphOpen: false, observerHeight: 1.7, sunElevation: 15,
-      families: { 0: false, 1: true, 2: true, 3: false },
+      scene: 'sky', view: 'eye', dispersion: 1, wavelength: 'white',
+      reflections: 2, observerHeight: 1.7, sunElevation: 15,
       show: {
-        primary: true, secondary: true, alexander: true, horizon: true, ground: true,
-        renderedBow: true, cone: false, wavelengthLabels: true, rainBelow: false,
-        // The aircraft had its own step; here it would just add dashed arcs
-        // across the band this step is about.
-        airObserver: false,
+        primary: true, secondary: true, alexander: true, horizon: true,
+        ground: true, renderedBow: true, cone: false, wavelengthLabels: true,
+        rainBelow: false, airObserver: false,
       },
     },
     focus: ['showSecondary', 'showAlexander', 'showRenderedBow'],
     actions: [
-      { labelKey: 'showRenderedBow', patch: { show: { renderedBow: true } } },
-      { labelKey: 'showAlexander', patch: { show: { alexander: true } } },
-      { labelKey: 'showCone', patch: { show: { cone: true } } },
+      { labelKey: 'showRenderedBow', flags: ['renderedBow'] },
+      { labelKey: 'showAlexander', flags: ['alexander'] },
+      { labelKey: 'showCone', flags: ['cone'] },
+      { labelKey: 'mat_water', patch: { material: 'water' } },
+      { labelKey: 'mat_ice', patch: { material: 'ice' } },
+      { labelKey: 'mat_crown', patch: { material: 'crown' } },
     ],
-    note: ['explAlexander', 'explWhyFainter'],
+    note: ['explAlexander', 'explWhyFainter', 'explMaterials'],
   },
 ];
 
 function applyStep(i) {
   const s = TUTORIAL[i];
   if (!s) return;
+  /*
+   * Every step starts from the defaults, not from wherever the reader left
+   * the controls.
+   *
+   * Pinning field by field was the old rule and it kept failing in the same
+   * way: a step that did not mention the beam count, the material or the
+   * dispersion inherited them, so the picture a step was written around
+   * depended on what the reader had been playing with two steps earlier --
+   * a 60-ray beam over a step about one path, a glass drop under a sentence
+   * quoting water's 42 degrees. Starting from the baseline makes the
+   * omission harmless: a step now declares what it is ABOUT and gets the
+   * defaults for everything else.
+   *
+   * `scene` is not in the baseline (Reset deliberately leaves the reader
+   * where they are), so it is defaulted here instead, and `panel` goes back
+   * to the guide -- clicking a ray jumps the column to the ray readout, and
+   * the next step must not open behind it.
+   */
+  const base = resetPatch();
   // `apply` is a literal, so a step that needs a value out of the engine --
   // an entry point, a bow angle -- supplies `compute()` instead of writing
   // the number down. Applied after `apply`, so it wins.
   const computed = typeof s.compute === 'function' ? s.compute() : null;
   // activeOrders() reads `families`, not `reflections`, so a step that sets
-  // the count without the families keeps whatever the reader arrived with --
-  // jump into "try different incoming rays" from the secondary steps and it
-  // quietly plots two orders. Derive it, cumulatively, the way the control
-  // does. A step that states its own families still wins.
+  // the count without the families would trace the wrong set. Derive it,
+  // cumulatively, the way the control does. A step that states its own
+  // families still wins.
   const k = s.apply.reflections;
-  const families = k === undefined || s.apply.families !== undefined
-    ? null
-    : { families: { 0: k === 0, 1: k >= 1, 2: k >= 2, 3: k >= 3 } };
-  set({ ...s.apply, ...families, ...computed, step: i });
+  const families = s.apply.families
+    ? { ...base.families, ...s.apply.families }
+    : (k === undefined
+      ? base.families
+      : { 0: k === 0, 1: k >= 1, 2: k >= 2, 3: k >= 3 });
+  set({
+    ...base,
+    scene: 'droplet',
+    panel: 'guide',
+    ...s.apply,
+    ...computed,
+    show: { ...base.show, ...(s.apply.show || {}) },
+    families,
+    step: i,
+  });
+}
+
+/**
+ * One chip in a step's action row.
+ *
+ * Two kinds. A `patch` chip sets something and is done -- a beam count, an
+ * entry point, an altitude -- and may be a function when the value has to
+ * come out of the engine rather than be written down as a literal.
+ *
+ * A `flags` chip switches a visualisation on AND off again, and shows which
+ * it currently is. Every one of these used to be a one-way patch: the step
+ * that says "switch the horizon on and the circle becomes an arc" set
+ * horizon to true and offered no way back, and the steps whose `apply`
+ * already turned the flag on offered a chip that did visibly nothing at
+ * all. Reported, twice. The active class needs a sync(): what is on screen
+ * changes from the control column too, and the panel is not rebuilt for it.
+ */
+function stepChip(a) {
+  const flags = a.flags || (a.flag ? [a.flag] : null);
+  const node = el('button', {
+    class: 'chip', type: 'button',
+    onclick: flags
+      ? () => {
+        const next = !state.show[flags[0]];
+        set({ show: Object.fromEntries(flags.map((f) => [f, next])) });
+      }
+      : () => set(typeof a.patch === 'function' ? a.patch() : a.patch),
+  }, a.labelKey ? t(a.labelKey) : a.label);
+  if (flags) {
+    node.sync = () => node.classList.toggle('active', !!state.show[flags[0]]);
+    node.sync();
+  }
+  return node;
 }
 
 function renderTutorial() {
@@ -9373,21 +9445,13 @@ function renderTutorial() {
   const nodes = [
     el('div', { class: 'step-counter' }, `${t('step')} ${state.step + 1} ${t('of')} ${TUTORIAL.length}`),
     el('h2', {}, t(s.title)),
-    el('p', {}, t(s.body)),
+    // A step's body is one string with blank lines in it, rendered as real
+    // paragraphs. Run together in a single <p> the longer steps read as a
+    // wall, and the breaks are where the argument turns.
+    ...t(s.body).split('\n\n').map((para) => el('p', {}, para)),
   ];
   if (s.actions) {
-    nodes.push(
-      el('div', { class: 'action-row' },
-        s.actions.map((a) =>
-          el('button', {
-            class: 'chip', type: 'button',
-            // A patch may be a function when the value has to come out of the
-            // engine -- a chip that jumps to the rainbow angle must not carry
-            // that angle as a literal.
-            onclick: () => set(typeof a.patch === 'function' ? a.patch() : a.patch),
-          }, a.labelKey ? t(a.labelKey) : a.label)
-        ))
-    );
+    nodes.push(el('div', { class: 'action-row' }, s.actions.map(stepChip)));
   }
   if (s.showRay) nodes.push(...rayInfoNodes({ compact: true }));
   // A step may carry more than one note: naming the bow a reflection count
@@ -9423,14 +9487,20 @@ function renderFreeGuide() {
   const idx = indexModel();
   const p = O.rainbowGeometry(idx(650), 1);
   const s = O.rainbowGeometry(idx(650), 2);
+  // Every value here is read out of the engine, so a material that has no
+  // such bow prints that rather than a number -- which is the honest answer
+  // and also the only one that does not throw.
+  const band = O.alexandersBand(idx);
   return [
     el('h2', {}, t('reconstructTitle')),
     el('p', { class: 'chain' }, t('reconstructBody')),
     el('div', { class: 'panel-block' },
       el('h3', {}, t('notHardCoded')),
-      row('primaryRainbow', deg(p.antisolarDeg, 2)),
-      row('secondaryRainbow', deg(s.antisolarDeg, 2)),
-      row('showAlexander', `${deg(O.alexandersBand(idx).innerDeg, 1)} – ${deg(O.alexandersBand(idx).outerDeg, 1)}`)
+      row('primaryRainbow', p ? deg(p.antisolarDeg, 2) : t('noBowHere')),
+      row('secondaryRainbow', s ? deg(s.antisolarDeg, 2) : t('noBowHere')),
+      row('showAlexander', band
+        ? `${deg(band.innerDeg, 1)} – ${deg(band.outerDeg, 1)}`
+        : t('noBowHere'))
     ),
     el('p', { class: 'note' }, t('explObserverHeight')),
     el('p', { class: 'note' }, t('dropletSizeNote')),
@@ -9884,14 +9954,17 @@ function renderMath() {
         const nn = idx(c.lambda);
         const g1 = O.rainbowGeometry(nn, 1);
         const g2 = O.rainbowGeometry(nn, 2);
+        // A dash rather than a crash: above n = 2 the one-bounce bow has no
+        // turning point to tabulate.
+        const cell = (g, pick, digits) => el('td', {}, g ? num(pick(g), digits) : '—');
         return el('tr', {},
           el('td', { style: `color:${O.rgbCss(c.lambda)}` }, `${c.lambda}`),
           el('td', {}, num(nn, 4)),
-          el('td', {}, num(g1.thetaIDeg, 2)),
-          el('td', {}, num(g1.thetaRDeg, 2)),
-          el('td', {}, num(g1.deviationDeg, 2)),
-          el('td', {}, num(g1.antisolarDeg, 3)),
-          el('td', {}, num(g2.antisolarDeg, 3)));
+          cell(g1, (g) => g.thetaIDeg, 2),
+          cell(g1, (g) => g.thetaRDeg, 2),
+          cell(g1, (g) => g.deviationDeg, 2),
+          cell(g1, (g) => g.antisolarDeg, 3),
+          cell(g2, (g) => g.antisolarDeg, 3));
       }))
   );
 
@@ -9922,7 +9995,10 @@ function renderMath() {
       row('infoIndex', `${num(n, 4)}  (λ = 650 ${t('nm')})`),
       row('infoReflections', String(k)),
       row('infoIncidence', deg(analytic * O.DEG, 4)),
-      row('infoExitAngle', deg(O.rainbowGeometry(n, k).antisolarDeg, 4))),
+      row('infoExitAngle', (() => {
+        const g = O.rainbowGeometry(n, k);
+        return g ? deg(g.antisolarDeg, 4) : t('noBowHere');
+      })())),
     el('p', { class: 'note' }, t('mathResultNote')),
 
     el('h3', {}, t('mathNumericCheck')),
@@ -10017,18 +10093,6 @@ function renderPanel(container) {
  * app.js -- assembly. Builds the shell, the control column and the render
  * loop, and keeps the four views in step with the store.
  */
-
-
-
-
-
-
-
-
-
-
-
-
 /* ------------------------------------------------------------ shell DOM -- */
 
 const root = document.getElementById('app');
@@ -10770,9 +10834,14 @@ function buildControls() {
            the answer, so it must not be hidden, but it is not where anyone
            starts. --- */
     sceneGroup('indexGroup', [
-      c(ALL, () => select('indexModel',
-        [{ value: 'table', labelKey: 'indexTable' }, { value: 'cauchy', labelKey: 'indexCauchy' }],
-        () => state.indexMode, (v) => set({ indexMode: v }))),
+      // What the drop is made of, not "which curve fits water best". The old
+      // table-vs-Cauchy select asked the reader to pick a numerical method,
+      // which is a developer's question; this one asks a physical one, and
+      // water still means exactly the tabulated model everything is tested
+      // against.
+      c(ALL, () => select('material',
+        O.MATERIALS.map((m) => ({ value: m.id, labelKey: `mat_${m.id}` })),
+        () => state.material, (v) => set({ material: v }))),
       c(ALL, () => slider({
         labelKey: 'indexScale', min: 0.85, max: 1.15, step: 0.001,
         get: () => state.indexScale,
@@ -10839,24 +10908,12 @@ function sliderToHeight(v) {
 }
 
 function resetState() {
-  set({
-    wavelength: 'white', dispersion: 1, impact: 0.861, reflections: 1,
-    dropletZoom: 1, indexMode: 'table', indexScale: 1,
-    dropsObserverX: 0, dropsObserverY: 0,
-    showNonRainbow: false, fanCount: 0, families: { 0: false, 1: true, 2: false, 3: false },
-    angleMode: 'antisolar', distRays: 60, distAccumulate: false, graphOpen: false,
-    dropCount: 1, dropsAnimate: false, fieldCount: 60000,
-    sunElevation: 15, sunAzimuth: 180, observerHeight: 1.7,
-    view: 'orbit', camYaw: -35, camPitch: 14, camDist: 3.1,
-    eyeAzimuth: 0, eyeElevation: 12, fov: 75,
-    selectedRay: null, selectedDrop: null, skyPick: null, fieldPick: null,
-    show: {
-      normals: false, angles: true, labels: true, wavelengthLabels: false, walls: true,
-      droplets: true, cone: true, antisolar: true, horizon: true, ground: true,
-      renderedBow: false, alexander: true, primary: true, secondary: false,
-      higher: false, sky: true, rainBelow: false,
-    },
-  });
+  // One definition of "the defaults", shared with every tutorial step, so a
+  // field added to the store cannot end up resettable in one of the two and
+  // sticky in the other. It did: show.arrival, show.airObserver and
+  // show.meetingEye were all missing from the list this function used to
+  // carry, so Reset left them wherever the last step had put them.
+  set(resetPatch());
   graph.reset();
   views.drops.reset();
   views.sky.reset();
@@ -10940,7 +10997,7 @@ function panelKey() {
       })()
     : '';
   const mathPart =
-    state.panel === 'math' ? `${state.reflections}|${state.dispersion}|${state.indexMode}|${state.indexScale}` : '';
+    state.panel === 'math' ? `${state.reflections}|${state.dispersion}|${state.material}|${state.indexScale}` : '';
   // The many-droplets readout is about a clicked droplet, so it moves with
   // the droplet, the observer, the Sun and the index model -- everything
   // dropReport() reads.
@@ -10948,7 +11005,7 @@ function panelKey() {
     state.scene === 'drops' && state.panel === 'ray'
       ? (() => {
           const d = state.selectedDrop;
-          return `${d ? `${d.x.toFixed(4)},${d.y.toFixed(4)}` : '-'}|${state.sunElevation}|${state.dropsObserverX}|${state.dropsObserverY}|${state.dispersion}|${state.indexMode}|${state.indexScale}`;
+          return `${d ? `${d.x.toFixed(4)},${d.y.toFixed(4)}` : '-'}|${state.sunElevation}|${state.dropsObserverX}|${state.dropsObserverY}|${state.dispersion}|${state.material}|${state.indexScale}`;
         })()
       : '';
   // The sky readout is about a clicked point on a bow, so it moves with the
@@ -10957,7 +11014,7 @@ function panelKey() {
     state.scene === 'sky' && state.panel === 'ray'
       ? (() => {
           const k = state.skyPick;
-          return `${k ? `${k.k},${k.lambda},${k.roll.toFixed(2)}` : '-'}|${state.sunElevation}|${state.sunAzimuth}|${state.dispersion}|${state.indexMode}|${state.indexScale}`;
+          return `${k ? `${k.k},${k.lambda},${k.roll.toFixed(2)}` : '-'}|${state.sunElevation}|${state.sunAzimuth}|${state.dispersion}|${state.material}|${state.indexScale}`;
         })()
       : '';
   // The field readout is about a clicked droplet in space, so it moves with
@@ -10967,12 +11024,12 @@ function panelKey() {
     state.scene === 'field' && state.panel === 'ray'
       ? (() => {
           const d = state.fieldPick;
-          return `${d ? `${d.x.toFixed(4)},${d.y.toFixed(4)},${d.z.toFixed(4)}` : '-'}|${state.sunElevation}|${state.sunAzimuth}|${state.wavelength}|${state.dispersion}|${state.indexMode}|${state.indexScale}|${state.show.primary}${state.show.secondary}${state.show.higher}`;
+          return `${d ? `${d.x.toFixed(4)},${d.y.toFixed(4)},${d.z.toFixed(4)}` : '-'}|${state.sunElevation}|${state.sunAzimuth}|${state.wavelength}|${state.dispersion}|${state.material}|${state.indexScale}|${state.show.primary}${state.show.secondary}${state.show.higher}`;
         })()
       : '';
   const guidePart =
     state.mode === 'free' && state.panel === 'guide'
-      ? `${state.dispersion}|${state.indexMode}|${state.indexScale}|${state.show.renderedBow}`
+      ? `${state.dispersion}|${state.material}|${state.indexScale}|${state.show.renderedBow}`
       : '';
   return `${state.panel}|${state.scene}|${state.step}|${rayPart}|${mathPart}|${dropPart}|${skyPart}|${fieldPart}|${guidePart}`;
 }

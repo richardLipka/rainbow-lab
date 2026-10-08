@@ -244,7 +244,12 @@ export function createDropletView(canvas) {
   function meetingPoint(nRef) {
     const orders = activeOrders().filter((k) => k >= 1);
     if (orders.length !== 2) return null;
-    const rays = orders.map((k) => traceOne(650, nRef, k, bowEntry(k, nRef)).path);
+    // Two bows, or no crossing. bowEntry returns null for an order this
+    // material has no bow for, and tracing at null quietly traces b = 0 --
+    // a perfectly good ray that is not on anybody's caustic.
+    const entries = orders.map((k) => bowEntry(k, nRef));
+    if (entries.some((b) => b === null)) return null;
+    const rays = orders.map((k, i) => traceOne(650, nRef, k, entries[i]).path);
     if (rays.some((p) => !p.dirOut || !p.exitPoint)) return null;
     const [a, b] = rays;
     const det = a.dirOut.x * -b.dirOut.y - -b.dirOut.x * a.dirOut.y;
@@ -278,6 +283,7 @@ export function createDropletView(canvas) {
         }
       }
       const geoRef = O.rainbowGeometry(nRef, meet.orders[0]);
+      if (!geoRef) return [];
       return [{
         valid: true, kRef: meet.orders[0], bows, at: meet.at, meetsRadii: meet.radii,
         meetOrders: meet.orders,
@@ -595,7 +601,14 @@ export function createDropletView(canvas) {
    * holds 3 ticks against a typical 1, which reads as noise; at 200 it holds
    * 15 against 4, which reads as a caustic.
    */
-  const ARRIVAL_SAMPLES = 200;
+  /* 200 was enough to put the peak in the right bin and not enough to make
+     the floor look like a floor: the quiet bins came out 2,3,2,4,2 and the
+     noise read as structure. Measured over the whole arc, the spread of the
+     quiet bins falls from 15 % at 200 samples to 4 % at 1200, while the
+     peak-to-median ratio stays where the physics puts it (5.5 for k=1).
+     Cached against the physics, so this is paid once per change, not per
+     frame. */
+  const ARRIVAL_SAMPLES = 1200;
 
   /* Cached against the physics plus the one piece of camera that reaches
      into it: the exit bearings are stored already tilted by the Sun's
@@ -604,7 +617,7 @@ export function createDropletView(canvas) {
 
   function arrivalKey() {
     return [
-      state.wavelength, state.dispersion, state.indexMode, state.indexScale,
+      state.wavelength, state.dispersion, state.material, state.indexScale,
       activeOrders().join(','), state.sunElevation,
     ].join('|');
   }
@@ -668,7 +681,11 @@ export function createDropletView(canvas) {
    * tight one.
    */
   const ARRIVAL_BIN = 1.2 * Math.PI / 180;
-  const ARRIVAL_BAR = 26;
+  /* 26 px of spike on a 266 px arc is a correct reading of the density and
+     an easy one to miss, which is what the step is about. At 42 the caustic
+     still clears the canvas at every zoom the scene allows and the quiet
+     stretch stays a thin line. */
+  const ARRIVAL_BAR = 42;
 
   /** Bring d into (-pi, pi]. */
   function wrapPi(d) {
@@ -682,8 +699,17 @@ export function createDropletView(canvas) {
     // Pointless with one ray on screen: a pile-up needs a population, and the
     // reader has not asked to see one.
     if (!state.show.arrival || state.fanCount <= 0) return;
-    const r = layout.s * ARRIVAL_R;
-    if (r < 40) return;
+    /*
+     * Fitted to the canvas, not just scaled with the droplet. Order 2 leaves
+     * across the whole forward hemisphere, so its profile wraps most of the
+     * way round the drop -- at zoom 1 the preferred radius put it off three
+     * edges at once and the band step drew two arcs with their peaks cut
+     * off. Shrinking the arc keeps the angles honest: the only thing that
+     * moves is how far from the drop the density is drawn.
+     */
+    const room = Math.min(layout.cx, layout.w - layout.cx, layout.cy, layout.h - layout.cy);
+    const r = Math.min(layout.s * ARRIVAL_R, room - ARRIVAL_BAR - 18);
+    if (r < 40 || r < layout.s * 1.12) return;
     const { groups } = buildArrival();
     if (!groups.length) return;
 
@@ -744,7 +770,15 @@ export function createDropletView(canvas) {
           ks[0] * ARRIVAL_BIN - 0.02, ks[ks.length - 1] * ARRIVAL_BIN + 0.02);
         ctx.stroke();
 
-        const rad = (i) => r + 3 + ARRIVAL_BAR * Math.sqrt(dens(ks, i) / peak);
+        /* Linear in the count, not sqrt. The square root was there to keep
+           the quiet end of the arc visible and it did exactly the wrong
+           thing to the one claim this display makes: at a true density
+           ratio of 5.5 it drew the empty directions at 43 % of the bow's
+           height, so "most directions stay nearly empty, one fills up"
+           looked like "some directions are a bit busier than others". At
+           5.5 the floor is now a fifth of the peak, which is what the
+           physics says. The +3 keeps the quiet end off the baseline. */
+        const rad = (i) => r + 3 + ARRIVAL_BAR * (dens(ks, i) / peak);
         const at = (i, rr) => ({
           x: layout.cx + Math.cos(ks[i] * ARRIVAL_BIN) * rr,
           y: layout.cy + Math.sin(ks[i] * ARRIVAL_BIN) * rr,
@@ -782,9 +816,20 @@ export function createDropletView(canvas) {
       if (k < 1) continue;
       const geo = O.rainbowGeometry(idx2(activeLambdas()[0]), k);
       if (!geo) continue;
-      const canon = traceOne(activeLambdas()[0], idx2(activeLambdas()[0]), k, geo.impactParameter);
+      // bowEntry, not geo.impactParameter: the beam fills the whole face, so
+      // every order piles up at BOTH of its bearings and the tick has to
+      // land on the one aiming at the observer. Unsigned, k=2's tick sat on
+      // the mirror peak, i.e. on the far side of the picture from the k=1
+      // tick -- which turns the gap between them, Alexander's band, into a
+      // gap of the wrong size pointing the wrong way.
+      const bEntry = bowEntry(k, idx2(activeLambdas()[0]));
+      if (bEntry === null) continue;
+      const canon = traceOne(activeLambdas()[0], idx2(activeLambdas()[0]), k, bEntry);
       if (!canon.path.dirOut) continue;
-      const a3 = Math.atan2(-canon.path.dirOut.y, canon.path.dirOut.x);
+      // Through bearing(), like the profile itself. Computed raw it ignored
+      // the Sun tilt that project() applies to everything else, so the tick
+      // walked off its own peak as soon as a step raised the Sun.
+      const a3 = bearing(canon.path.dirOut);
       const c3 = Math.cos(a3);
       const s3 = Math.sin(a3);
       ctx.save();
@@ -957,7 +1002,9 @@ export function createDropletView(canvas) {
         ? t('observerNoConcentration')
         : observer.meetOrders
           ? observer.meetOrders
-            .map((k) => deg(O.rainbowGeometry(indexModel()(650), k).antisolarDeg, 1))
+            .map((k) => O.rainbowGeometry(indexModel()(650), k))
+            .filter(Boolean)
+            .map((g) => deg(g.antisolarDeg, 1))
             .join(' + ')
           : `φ ≈ ${deg(observer.phiDeg, 1)}${observer.kRef ? ` · k=${observer.kRef}` : ''}`;
       // Stack the caption upwards when a downward stack would not fit. The
@@ -1417,7 +1464,9 @@ export function createDropletView(canvas) {
     // captions, which sit much further out along this same bearing, and into
     // the hint row at the foot of the canvas.
     const lr = (r0 + r1) / 2;
-    label(ctx, alexanderCaption(indexModel()).text,
+    const cap = alexanderCaption(indexModel());
+    if (!cap) return;
+    label(ctx, cap.text,
       O.clamp(layout.cx + Math.cos(mid) * lr, 84, layout.w - 84),
       O.clamp(layout.cy + Math.sin(mid) * lr, 16, layout.h - 44),
       { align: 'center', color: '#b3c2dc', bg: true });

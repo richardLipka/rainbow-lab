@@ -2,7 +2,7 @@
  * state.js -- one observable store for the whole application.
  * Views subscribe; nothing reads the DOM to find out what is going on.
  */
-import { makeIndexModel } from './optics.js';
+import { makeIndexModel, materialById } from './optics.js';
 
 const listeners = new Set();
 
@@ -28,7 +28,11 @@ export const state = {
   /* droplet & optics */
   impact: 0.861, // b/R
   reflections: 1,
-  indexMode: 'table',
+  /* What the drop is made of. Water is the whole point of the app; the other
+     presets exist so "would a drop of something else still make a bow, and
+     where?" is a question the reader can answer by trying it rather than by
+     being told. See MATERIALS in optics.js. */
+  material: 'water',
   indexScale: 1,
 
   /* how far (in droplet radii) the observer is drawn from the droplet in the
@@ -156,6 +160,42 @@ export const state = {
   selectedDrop: null,
 };
 
+/**
+ * Which fields describe what is ON SCREEN, as opposed to who is reading
+ * (language), how (tutorial or free), where in the tour, and which scene.
+ *
+ * Captured from the literal above rather than written out a second time, so
+ * the default value of anything lives in exactly one place. Both the Reset
+ * button and every tutorial step start from this.
+ */
+const RESET_KEYS = [
+  'graph', 'graphOpen', 'wavelength', 'dispersion', 'impact', 'reflections',
+  'material', 'indexScale', 'dropletZoom', 'showNonRainbow', 'families',
+  'fanCount', 'angleMode', 'distRays', 'distAccumulate', 'dropCount',
+  'dropsAnimate', 'fieldCount', 'dropsObserverX', 'dropsObserverY',
+  'sunElevation', 'sunAzimuth', 'airHeight', 'observerHeight', 'view',
+  'camYaw', 'camPitch', 'camDist', 'eyeAzimuth', 'eyeElevation', 'fov',
+  'show', 'selectedRay', 'skyPick', 'fieldPick', 'selectedDrop',
+];
+
+const DEFAULTS = Object.freeze(
+  Object.fromEntries(RESET_KEYS.map((k) => [
+    k,
+    state[k] && typeof state[k] === 'object' ? Object.freeze({ ...state[k] }) : state[k],
+  ]))
+);
+
+/**
+ * A fresh patch back to the defaults.
+ *
+ * Returned as a new object every time because set() merges `show` and
+ * `families` with Object.assign -- handing out the stored one would let a
+ * later set() write straight into the defaults.
+ */
+export function resetPatch() {
+  return { ...DEFAULTS, show: { ...DEFAULTS.show }, families: { ...DEFAULTS.families } };
+}
+
 /** Wavelengths currently in play: one, or all six for white light. */
 export function activeLambdas() {
   if (state.wavelength === 'white') return [650, 610, 580, 540, 480, 420];
@@ -164,8 +204,10 @@ export function activeLambdas() {
 
 /** The refractive-index model implied by the current controls. */
 export function indexModel() {
+  const m = materialById(state.material);
   return makeIndexModel({
-    mode: state.indexMode,
+    mode: m.mode,
+    cauchy: m.cauchy,
     dispersion: state.dispersion,
     scale: state.indexScale,
   });
